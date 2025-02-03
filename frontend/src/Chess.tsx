@@ -39,6 +39,15 @@ variantToChar.set(PieceVariant.Rook, 'r')
 variantToChar.set(PieceVariant.Queen, 'q')
 variantToChar.set(PieceVariant.King, 'k')
 
+const fileToNumber = new Map<string, number>()
+fileToNumber.set('a', 0)
+fileToNumber.set('b', 1)
+fileToNumber.set('c', 2)
+fileToNumber.set('d', 3)
+fileToNumber.set('e', 4)
+fileToNumber.set('f', 5)
+fileToNumber.set('g', 6)
+fileToNumber.set('h', 7)
 
 interface pieceType {
     position: number
@@ -50,15 +59,35 @@ interface pieceType {
     attackRange: number
 }
 
+interface gameState {
+    fen: string,
+    board: [PieceColour | null, PieceVariant | null][],
+    activeColour: PieceColour,
+    blackCanKingSideCastle: boolean,
+    blackCanQueenSideCastle: boolean,
+    whiteCanKingSideCastle: boolean,
+    whiteCanQueenSideCastle: boolean,
+    enPassantSquare: number | null,
+}
+
 function Chess() {
 
 }
 
 
-export function parseBoardFromFEN(fen: string): [PieceColour | null, PieceVariant | null][] {
+export function parseGameStateFromFEN(fen: string): gameState {
     // Board, turn, castling, enpassant, halfmove, fullmove
     var args = fen.split(" ")
-    var pieces: [PieceColour | null, PieceVariant | null][] = []
+    var game: gameState = {
+        fen: fen,
+        board: [],
+        activeColour: PieceColour.White,
+        blackCanKingSideCastle: false,
+        blackCanQueenSideCastle: false,
+        whiteCanKingSideCastle: false,
+        whiteCanQueenSideCastle: false,
+        enPassantSquare: null
+    }
 
     for (let char of args[0]) {
         if (char == "/") {
@@ -68,28 +97,57 @@ export function parseBoardFromFEN(fen: string): [PieceColour | null, PieceVarian
         // Digit
         if (char >= '1' && char <= '8') {
             for (var i = 0; i < parseInt(char); i++) {
-                pieces.push([null, null])
+                game.board.push([null, null])
             }
             continue
         }
         
         var piece = charToPiece.get(char)
         if (piece) {
-            pieces.push(piece)
+            game.board.push(piece)
         }
 
     }
 
-    return pieces
+    if (args[1] == "b") {
+        game.activeColour = PieceColour.Black
+    }
+
+    for (let char of args[2]) {
+        switch (char) {
+            case "K":
+                game.whiteCanKingSideCastle = true
+                break
+            case "Q":
+                game.whiteCanQueenSideCastle = true
+                break
+            case "k":
+                game.blackCanKingSideCastle = true
+                break
+            case "q":
+                game.blackCanQueenSideCastle = true
+                break
+        }
+    }
+
+    if (args[3].length > 1) {
+        var file = fileToNumber.get(args[3][0])
+        var rank = parseInt(args[3][1])
+        if (file) {
+            game.enPassantSquare = file + rank * 8
+        }
+    }
+
+    return game
 }
 
-export function boardToFEN(board: [PieceColour | null, PieceVariant | null][]): string {
+export function gameStateToFEN(currentState: gameState): string {
     var fen: string[] = []
 
     var rowCount = 0
     var emptyCount = 0
 
-    for (let [colour, variant] of board) {
+    for (let [colour, variant] of currentState.board) {
         
         rowCount += 1
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
-import { parseBoardFromFEN, boardToFEN, PieceVariant, PieceColour } from './Chess.tsx'
+import { parseGameStateFromFEN, PieceVariant, PieceColour, gameStateToFEN } from './Chess.tsx'
 
 function App() {
   const [count, setCount] = useState(0)
@@ -97,11 +97,12 @@ function ChessBoard() {
   const [waiting, setWaiting] = useState(false)
   const [selectedPiece, setSelectedPiece] = useState<number | null>(null)
   const [moves, setMoves] = useState<number[]>([])
-  const [board, setBoard] = useState(parseBoardFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"))
+  const [captures, setCaptures] = useState<number[]>([])
+  const [gameState, setGameState] = useState(parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"))
 
 
   // var moves = [4, 12, 20]
-  var captures = [1, 8, 9]
+  // var captures = [1, 8, 9]
   var lastMove = [50, 58]
 
   var moveCache = new Map<number, number[]>()
@@ -127,6 +128,10 @@ function ChessBoard() {
     console.log(moves)
   }, [moves])
 
+  useEffect(() => {
+    console.log(captures)
+  }, [captures])
+
   async function clickHandler(event: React.MouseEvent) {
     if (rect === null) {
       throw new Error("Bounding rect for board is not defined")
@@ -147,7 +152,7 @@ function ChessBoard() {
 
     if (!selectedPiece) {
 
-      if (board[position][0] == null || board[position][1] == null) {
+      if (gameState.board[position][0] == null || gameState.board[position][1] == null) {
         setWaiting(false)
         return
       }
@@ -158,13 +163,14 @@ function ChessBoard() {
         fetch(import.meta.env.VITE_API_FETCH_MOVES_URL, {
           "method": "POST",
           "body": JSON.stringify({
-            "fen": boardToFEN(board),
+            "fen": gameState.fen,
             "piece": position,
           })}).then((response) => {
             response.json().then((data) => {
               // Add to cache
-              setMoves(data["moves"])
-              moveCache.set(position, data["moves"])
+              setMoves(data["moves"] || [])
+              setCaptures(data["captures"] || [])
+              moveCache.set(position, data["moves"] || [])
               console.log(moveCache)
             })
           })
@@ -178,12 +184,13 @@ function ChessBoard() {
 
       // Clear Waiting
       setWaiting(false)
-    } else if (!moves.includes(position)) {
+    } else if (!moves.includes(position) && !captures.includes(position)) {
       // If not clicked on move
       setSelectedPiece(null)
 
       // Clear Moves
       setMoves([])
+      setCaptures([])
 
       // Clear Waiting
       setWaiting(false)
@@ -193,16 +200,15 @@ function ChessBoard() {
 
       // Send current FEN, piece, move, new FEN
       try {
-        var newBoard = [...board]
+        var newBoard = [...gameState.board]
         newBoard[position] = newBoard[selectedPiece]
         newBoard[selectedPiece] = [null, null]
         var response = await fetch(import.meta.env.VITE_API_MAKE_MOVE_URL, {
           "method": "POST",
           "body": JSON.stringify({
-            "currentFEN": boardToFEN(board),
+            "currentFEN": gameState.fen,
             "piece": selectedPiece,
             "move": position,
-            "newFEN": boardToFEN(newBoard)
           })})
           if (!response.ok) {
             throw new Error(`Response status: ${response.status}`)
@@ -212,12 +218,13 @@ function ChessBoard() {
 
           // If accepted update board
           if (data["isValid"]) {
-            setBoard(parseBoardFromFEN(data["newFEN"]))
+            setGameState(parseGameStateFromFEN(data["newFEN"]))
           } 
 
           // Clear cache, clear moves
           moveCache.clear()
           setMoves([])
+          setCaptures([])
 
       } catch (error: any) {
         console.error(error.message)
@@ -230,7 +237,7 @@ function ChessBoard() {
     setWaiting(false)
   }
 
-  const PiecesComponent = board.map((square, idx) => {
+  const PiecesComponent = gameState.board.map((square, idx) => {
     const [colour, variant] = square
     if (colour === null || variant === null) {
       return
@@ -242,7 +249,7 @@ function ChessBoard() {
       <div className={`${colourToString.get(colour)}-${variantToString.get(variant)}`} style={{transform: `translate(${col * 50}px, ${row * 50}px)`}}/>
     )})
 
-  const MovesComponent = moves.map(move => {
+  const MovesComponent = (moves).map(move => {
     var row = Math.floor(move / 8)
     var col = move % 8
     return (

@@ -370,7 +370,7 @@ func isSquareUnderAttack(board [64]square, position int, defendingColour pieceCo
 			if targetPiece == nil {
 				continue
 			}
-			if (targetPiece.variant == Rook || targetPiece.variant == Queen) && targetPiece.colour != defendingColour {
+			if (targetPiece.variant == Rook || targetPiece.variant == Queen || (targetPiece.variant == King && attackRange == 1)) && targetPiece.colour != defendingColour {
 				return true
 			}
 			break
@@ -392,7 +392,7 @@ func isSquareUnderAttack(board [64]square, position int, defendingColour pieceCo
 			if targetPiece == nil {
 				continue
 			}
-			if (targetPiece.variant == Bishop || targetPiece.variant == Queen) && targetPiece.colour != defendingColour {
+			if (targetPiece.variant == Bishop || targetPiece.variant == Queen || (targetPiece.variant == King && attackRange == 1)) && targetPiece.colour != defendingColour {
 				return true
 			}
 			break
@@ -417,6 +417,11 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 	var enpassantActive = currentGameState.enPassantAvailable
 	var enpassantSquare = currentGameState.enPassantTargetSquare
 	var piece = board[piecePosition].piece
+
+	// Not your turn
+	if piece.colour != currentGameState.turn {
+		return []int{}, []int{}
+	}
 
 	var shortCastleAvailable bool
 	var longCastleAvailable bool
@@ -542,46 +547,6 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 		}
 	}
 
-	/*King Checks: square attacked, castling*/
-	if piece.variant == King {
-		for _, moveDirection := range piece.moves {
-			currentSquare = piece.position + moveDirection
-
-			if !isSquareInBoard(currentSquare) {
-				continue
-			}
-
-			/*Check if move goes over edge*/
-			if hasMoveCrossedEdge(piecePosition, currentSquare, King) {
-				continue
-			}
-
-			targetPiece = board[currentSquare].piece
-			if targetPiece == nil || targetPiece.colour != piece.colour {
-				if isSquareUnderAttack(board, currentSquare, piece.colour) {
-					continue
-				}
-				moves = append(moves, currentSquare)
-			}
-		}
-
-		if shortCastleAvailable {
-			if board[piece.position+1].piece == nil && board[piece.position+2].piece == nil {
-				if !isSquareUnderAttack(board, piece.position+1, piece.colour) && !isSquareUnderAttack(board, piece.position+2, piece.colour) {
-					moves = append(moves, piece.position+2)
-				}
-			}
-		}
-
-		if longCastleAvailable {
-			if board[piece.position-1].piece == nil && board[piece.position-2].piece == nil && board[piece.position-3].piece == nil {
-				if !isSquareUnderAttack(board, piece.position-1, piece.colour) && !isSquareUnderAttack(board, piece.position-2, piece.colour) && !isSquareUnderAttack(board, piece.position-3, piece.colour) {
-					moves = append(moves, piece.position-2)
-				}
-			}
-		}
-	}
-
 	/*
 		Check for pins or checks
 		If single check, must take piece or block, so keep track of squares along check direction
@@ -595,7 +560,8 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 	var dummyRook pieceType
 	var dummyBishop pieceType
 
-	if piece.variant != King {
+	// if piece.variant != King {
+	if true {
 
 		/*Check for checks*/
 
@@ -691,7 +657,7 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 				}
 
 				/* Target Piece is attacking or pinning to king*/
-				if (targetPiece.variant == Rook || targetPiece.variant == Queen) && targetPiece.colour != piece.colour {
+				if (targetPiece.variant == Rook || targetPiece.variant == Queen || (targetPiece.variant == King && moveRange == 1)) && targetPiece.colour != piece.colour {
 
 					intermediateBlockingSquares = append(intermediateBlockingSquares, currentSquare)
 					for _, v := range intermediateBlockingSquares {
@@ -742,7 +708,7 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 				}
 
 				/* Target Piece is attacking or pinning to king*/
-				if (targetPiece.variant == Bishop || targetPiece.variant == Queen) && targetPiece.colour != piece.colour {
+				if (targetPiece.variant == Bishop || targetPiece.variant == Queen || (targetPiece.variant == King && moveRange == 1)) && targetPiece.colour != piece.colour {
 
 					intermediateBlockingSquares = append(intermediateBlockingSquares, currentSquare)
 					for _, v := range intermediateBlockingSquares {
@@ -757,12 +723,52 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 		}
 	}
 
+	/*King Checks: square attacked, castling*/
+	if piece.variant == King {
+		for _, moveDirection := range piece.moves {
+			currentSquare = piece.position + moveDirection
+
+			if !isSquareInBoard(currentSquare) {
+				continue
+			}
+
+			/*Check if move goes over edge*/
+			if hasMoveCrossedEdge(piecePosition, currentSquare, King) {
+				continue
+			}
+
+			targetPiece = board[currentSquare].piece
+			if targetPiece == nil || targetPiece.colour != piece.colour {
+				if isSquareUnderAttack(board, currentSquare, piece.colour) {
+					continue
+				}
+				moves = append(moves, currentSquare)
+			}
+		}
+
+		if shortCastleAvailable && checkCount == 0 {
+			if board[piece.position+1].piece == nil && board[piece.position+2].piece == nil {
+				if !isSquareUnderAttack(board, piece.position+1, piece.colour) && !isSquareUnderAttack(board, piece.position+2, piece.colour) {
+					moves = append(moves, piece.position+2)
+				}
+			}
+		}
+
+		if longCastleAvailable && checkCount == 0 {
+			if board[piece.position-1].piece == nil && board[piece.position-2].piece == nil && board[piece.position-3].piece == nil {
+				if !isSquareUnderAttack(board, piece.position-1, piece.colour) && !isSquareUnderAttack(board, piece.position-2, piece.colour) && !isSquareUnderAttack(board, piece.position-3, piece.colour) {
+					moves = append(moves, piece.position-2)
+				}
+			}
+		}
+	}
+
 	/*King must move, checkCount only calculated for non-king pieces*/
 	if checkCount >= 2 {
 		return []int{}, []int{}
 	}
 
-	if checkCount == 1 {
+	if checkCount == 1 && piece.variant != King {
 		moves = filter(moves, lambdaMapGet(blockingSquares))
 		captures = filter(captures, lambdaMapGet(blockingSquares))
 	}
@@ -962,6 +968,203 @@ func IsMoveValid(fen string, piece int, move int) bool {
 	}
 
 	return false
+}
+
+func getFENAfterMove(currentFEN string, piece int, move int) string {
+	var currentGameState = boardFromFEN(currentFEN)
+	currentGameState.board[move].piece = currentGameState.board[piece].piece
+	currentGameState.board[piece].piece = nil
+	// Check for promotion
+
+	var newGameState = currentGameState
+	// Check for king move
+	if newGameState.board[move].piece.variant == King {
+		// Check for castling
+		if abs(move-piece) == 2 {
+			if newGameState.board[move+1].piece != nil && newGameState.board[move+1].piece.variant == Rook {
+				newGameState.board[move-1].piece = newGameState.board[move+1].piece
+				newGameState.board[move+1].piece = nil
+			} else if newGameState.board[move-2].piece != nil && newGameState.board[move-2].piece.variant == Rook {
+				newGameState.board[move+1].piece = newGameState.board[move-2].piece
+				newGameState.board[move-2].piece = nil
+			}
+		}
+		if newGameState.turn == White {
+			newGameState.whiteCanKingSideCastle = false
+			newGameState.whiteCanQueenSideCastle = false
+		} else {
+			newGameState.blackCanKingSideCastle = false
+			newGameState.blackCanQueenSideCastle = false
+		}
+	}
+
+	// Check for rook moves or captures
+	if move == 0 || piece == 0 {
+		newGameState.blackCanQueenSideCastle = false
+	}
+
+	if move == 7 || piece == 7 {
+		newGameState.blackCanKingSideCastle = false
+	}
+
+	if move == 56 || piece == 56 {
+		newGameState.whiteCanQueenSideCastle = false
+	}
+
+	if move == 63 || piece == 63 {
+		newGameState.whiteCanKingSideCastle = false
+	}
+
+	// Check for enpassant
+	if newGameState.board[move].piece.variant == Pawn && abs(move-piece) == 16 {
+		newGameState.enPassantAvailable = true
+		if newGameState.turn == White {
+			newGameState.enPassantTargetSquare = move + 8
+		} else {
+			newGameState.enPassantTargetSquare = move - 8
+		}
+	} else {
+		newGameState.enPassantAvailable = false
+	}
+
+	// Change Turn
+	if newGameState.turn == White {
+		newGameState.turn = Black
+	} else {
+		newGameState.turn = White
+	}
+
+	return gameStateToFEN(newGameState)
+}
+
+func gameStateToFEN(newGameState gameState) string {
+	var newFEN []rune
+
+	var rowCount int
+	var emptyCount int
+	var colour pieceColour
+	var variant pieceVariant
+
+	var variantToRune = make(map[pieceVariant]rune)
+
+	variantToRune[Pawn] = 'p'
+	variantToRune[Knight] = 'n'
+	variantToRune[Bishop] = 'b'
+	variantToRune[Rook] = 'r'
+	variantToRune[Queen] = 'q'
+	variantToRune[King] = 'k'
+
+	var intToFile = make(map[int]rune)
+
+	intToFile[0] = 'a'
+	intToFile[1] = 'b'
+	intToFile[2] = 'c'
+	intToFile[3] = 'd'
+	intToFile[4] = 'e'
+	intToFile[5] = 'f'
+	intToFile[6] = 'g'
+	intToFile[7] = 'h'
+
+	var intToRune = make(map[int]rune)
+
+	intToRune[1] = '1'
+	intToRune[2] = '2'
+	intToRune[3] = '3'
+	intToRune[4] = '4'
+	intToRune[5] = '5'
+	intToRune[6] = '6'
+	intToRune[7] = '7'
+	intToRune[8] = '8'
+
+	var char rune
+
+	for _, value := range newGameState.board {
+		rowCount += 1
+
+		if value.piece == nil {
+			emptyCount += 1
+		} else {
+			colour = value.piece.colour
+			variant = value.piece.variant
+
+			if emptyCount > 0 {
+				newFEN = append(newFEN, intToRune[emptyCount])
+				emptyCount = 0
+			}
+
+			char = variantToRune[variant]
+
+			if colour == White {
+				char = unicode.To(0, char)
+			}
+
+			newFEN = append(newFEN, char)
+		}
+
+		if rowCount >= 8 {
+			if emptyCount > 0 {
+				newFEN = append(newFEN, intToRune[emptyCount])
+				emptyCount = 0
+			}
+			newFEN = append(newFEN, '/')
+			rowCount = 0
+		}
+
+	}
+
+	newFEN = append(newFEN, ' ')
+
+	// Turn
+	if newGameState.turn == White {
+		newFEN = append(newFEN, 'w')
+	} else {
+		newFEN = append(newFEN, 'b')
+	}
+
+	newFEN = append(newFEN, ' ')
+
+	// Castling
+	if newGameState.whiteCanKingSideCastle {
+		newFEN = append(newFEN, 'K')
+	}
+
+	if newGameState.whiteCanQueenSideCastle {
+		newFEN = append(newFEN, 'Q')
+	}
+
+	if newGameState.blackCanKingSideCastle {
+		newFEN = append(newFEN, 'k')
+	}
+
+	if newGameState.blackCanQueenSideCastle {
+		newFEN = append(newFEN, 'q')
+	}
+
+	// If no castling info added
+	if newFEN[len(newFEN)-1] == ' ' {
+		newFEN = append(newFEN, '-')
+	}
+
+	newFEN = append(newFEN, ' ')
+
+	// En passant
+	if newGameState.enPassantAvailable {
+		file := newGameState.enPassantTargetSquare % 8
+		rank := 8 - (newGameState.enPassantTargetSquare / 8)
+
+		newFEN = append(newFEN, intToFile[file])
+		newFEN = append(newFEN, intToRune[rank])
+	} else {
+		newFEN = append(newFEN, '-')
+	}
+
+	newFEN = append(newFEN, ' ')
+
+	newFEN = append(newFEN, '0')
+	newFEN = append(newFEN, ' ')
+	newFEN = append(newFEN, '1')
+
+	return string(newFEN)
 }
 
 func chessMain() {

@@ -119,7 +119,8 @@ func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
 		data = postChessMoveReply{IsValid: false, NewFEN: ""}
 	} else {
 		// Need to generate the new FEN
-		data = postChessMoveReply{IsValid: true, NewFEN: chessMove.NewFEN}
+		newFEN := getFENAfterMove(chessMove.CurrentFEN, chessMove.Piece, chessMove.Move)
+		data = postChessMoveReply{IsValid: true, NewFEN: newFEN}
 	}
 
 	jsonStr, err := json.Marshal(data)
@@ -129,6 +130,7 @@ func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write(jsonStr)
+	fmt.Printf("Sending body: %+v\n", data)
 
 	elapsed := time.Since(start)
 	fmt.Printf("Took %s\n", elapsed)
