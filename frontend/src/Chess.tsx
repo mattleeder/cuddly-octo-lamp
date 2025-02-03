@@ -49,16 +49,6 @@ fileToNumber.set('f', 5)
 fileToNumber.set('g', 6)
 fileToNumber.set('h', 7)
 
-interface pieceType {
-    position: number
-    colour: PieceColour
-    variant: PieceVariant
-    moves: number[]
-    attacks: number[]
-    moveRange: number
-    attackRange: number
-}
-
 interface gameState {
     fen: string,
     board: [PieceColour | null, PieceVariant | null][],
@@ -68,10 +58,6 @@ interface gameState {
     whiteCanKingSideCastle: boolean,
     whiteCanQueenSideCastle: boolean,
     enPassantSquare: number | null,
-}
-
-function Chess() {
-
 }
 
 

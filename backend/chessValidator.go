@@ -367,7 +367,7 @@ func isSquareUnderAttack(board [64]square, position int, defendingColour pieceCo
 				break
 			}
 			targetPiece = board[attackingSquare].piece
-			if targetPiece == nil {
+			if targetPiece == nil || targetPiece.variant == King {
 				continue
 			}
 			if (targetPiece.variant == Rook || targetPiece.variant == Queen || (targetPiece.variant == King && attackRange == 1)) && targetPiece.colour != defendingColour {
@@ -389,7 +389,7 @@ func isSquareUnderAttack(board [64]square, position int, defendingColour pieceCo
 				break
 			}
 			targetPiece = board[attackingSquare].piece
-			if targetPiece == nil {
+			if targetPiece == nil || targetPiece.variant == King {
 				continue
 			}
 			if (targetPiece.variant == Bishop || targetPiece.variant == Queen || (targetPiece.variant == King && attackRange == 1)) && targetPiece.colour != defendingColour {
@@ -402,7 +402,7 @@ func isSquareUnderAttack(board [64]square, position int, defendingColour pieceCo
 	return false
 }
 
-func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGameState gameState) (moves []int, captures []int) {
+func getMovesandCapturesForPiece(piecePosition int, currentGameState gameState) (moves []int, captures []int, triggerPromotion bool) {
 	/*
 		Pawns must check for: promotion, double move, en passant.
 		Kings must check for: castling, square attacked
@@ -414,13 +414,19 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 	var currentSquare int
 	var targetPiece *pieceType
 	var moveDirection int
+	var board = currentGameState.board
 	var enpassantActive = currentGameState.enPassantAvailable
 	var enpassantSquare = currentGameState.enPassantTargetSquare
 	var piece = board[piecePosition].piece
+	triggerPromotion = false
+
+	if piece == nil {
+		return []int{}, []int{}, triggerPromotion
+	}
 
 	// Not your turn
 	if piece.colour != currentGameState.turn {
-		return []int{}, []int{}
+		return []int{}, []int{}, triggerPromotion
 	}
 
 	var shortCastleAvailable bool
@@ -436,10 +442,6 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 		shortCastleAvailable = currentGameState.blackCanKingSideCastle
 		longCastleAvailable = currentGameState.blackCanQueenSideCastle
 		friendlyKingPosition = currentGameState.blackKingPosition
-	}
-
-	if piece == nil {
-		return []int{}, []int{}
 	}
 
 	/*Check basic moves for non-kings*/
@@ -470,7 +472,6 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 
 					/*Add currentSquare to captures*/
 					captures = append(captures, currentSquare)
-
 					break
 				}
 
@@ -518,6 +519,10 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 
 	/*Pawn checks: double move, en passant, promotion*/
 	if piece.variant == Pawn {
+
+		if (8 <= piecePosition && piecePosition <= 15) || (48 <= piecePosition && piecePosition <= 55) {
+			triggerPromotion = true
+		}
 
 		/*Double move*/
 		if (piece.colour == Black && piece.position/8 == 1 && board[piece.position+8].piece == nil) || (piece.colour == White && piece.position/8 == 6 && board[piece.position-8].piece == nil) {
@@ -742,7 +747,11 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 				if isSquareUnderAttack(board, currentSquare, piece.colour) {
 					continue
 				}
-				moves = append(moves, currentSquare)
+				if targetPiece != nil {
+					captures = append(captures, currentSquare)
+				} else {
+					moves = append(moves, currentSquare)
+				}
 			}
 		}
 
@@ -765,7 +774,7 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 
 	/*King must move, checkCount only calculated for non-king pieces*/
 	if checkCount >= 2 {
-		return []int{}, []int{}
+		return []int{}, []int{}, false
 	}
 
 	if checkCount == 1 && piece.variant != King {
@@ -773,7 +782,7 @@ func getMovesandCapturesForPiece(board [64]square, piecePosition int, currentGam
 		captures = filter(captures, lambdaMapGet(blockingSquares))
 	}
 
-	return moves, captures
+	return moves, captures, triggerPromotion
 }
 
 type setup struct {
@@ -823,8 +832,9 @@ func createBoard() [64]square {
 	return board
 }
 
-func getValidMovesForPiece(piecePosition int, currentGameState gameState) (moves []int, captures []int) {
-	moves, captures = getMovesandCapturesForPiece(currentGameState.board, piecePosition, currentGameState)
+func getValidMovesForPiece(piecePosition int, currentGameState gameState) (moves []int, captures []int, triggerPromotion bool) {
+	moves, captures, triggerPromotion = getMovesandCapturesForPiece(piecePosition, currentGameState)
+	fmt.Printf("Moves for piece: %v\n", append(moves, captures...))
 	return
 }
 
@@ -958,8 +968,10 @@ func boardFromFEN(fen string) gameState {
 
 func IsMoveValid(fen string, piece int, move int) bool {
 	var currentGameState = boardFromFEN(fen)
-	var moves, captures = getValidMovesForPiece(piece, currentGameState)
+	var moves, captures, _ = getValidMovesForPiece(piece, currentGameState)
 	fmt.Printf("Moves for piece: %v\n", append(moves, captures...))
+	fmt.Println(moves)
+	fmt.Println(captures)
 
 	for _, possibleMove := range append(moves, captures...) {
 		if move == possibleMove {
@@ -1015,7 +1027,16 @@ func getFENAfterMove(currentFEN string, piece int, move int) string {
 		newGameState.whiteCanKingSideCastle = false
 	}
 
-	// Check for enpassant
+	// Check for enpassant capture
+	if move == newGameState.enPassantTargetSquare && newGameState.board[move].piece.variant == Pawn && abs(move-piece) != 8 {
+		if newGameState.board[move].piece.colour == White {
+			newGameState.board[move+8].piece = nil
+		} else {
+			newGameState.board[move-8].piece = nil
+		}
+	}
+
+	// Check for enpassant available
 	if newGameState.board[move].piece.variant == Pawn && abs(move-piece) == 16 {
 		newGameState.enPassantAvailable = true
 		if newGameState.turn == White {
@@ -1204,7 +1225,7 @@ func chessMain() {
 	var out []string
 	var testPosition = 60
 
-	moves, captures = getValidMovesForPiece(testPosition, currentGameState)
+	moves, captures, _ = getValidMovesForPiece(testPosition, currentGameState)
 
 	for _, v := range append(moves, captures...) {
 		row := v / 8

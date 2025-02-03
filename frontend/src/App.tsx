@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
-import { parseGameStateFromFEN, PieceVariant, PieceColour, gameStateToFEN } from './Chess.tsx'
+import { parseGameStateFromFEN, PieceVariant, PieceColour } from './Chess.tsx'
 
 function App() {
   const [count, setCount] = useState(0)
@@ -62,7 +62,7 @@ function App() {
                 () => setResponseText("Could Not Read")
               )
             },
-            (response) => setResponseText("Failed")
+            () => setResponseText("Failed")
           )
         }}/>
       </div>
@@ -98,12 +98,14 @@ function ChessBoard() {
   const [selectedPiece, setSelectedPiece] = useState<number | null>(null)
   const [moves, setMoves] = useState<number[]>([])
   const [captures, setCaptures] = useState<number[]>([])
+  const [lastMove, setLastMove] = useState<number[]>([])
+  const [promotion, setPromotion] = useState(false)
   const [gameState, setGameState] = useState(parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"))
 
 
   // var moves = [4, 12, 20]
   // var captures = [1, 8, 9]
-  var lastMove = [50, 58]
+  // var lastMove = [50, 58]
 
   var moveCache = new Map<number, number[]>()
 
@@ -150,7 +152,7 @@ function ChessBoard() {
     // Set Waiting
     setWaiting(true)
 
-    if (!selectedPiece) {
+    if (selectedPiece === null) {
 
       if (gameState.board[position][0] == null || gameState.board[position][1] == null) {
         setWaiting(false)
@@ -170,8 +172,9 @@ function ChessBoard() {
               // Add to cache
               setMoves(data["moves"] || [])
               setCaptures(data["captures"] || [])
+              setPromotion(data["promotion"])
               moveCache.set(position, data["moves"] || [])
-              console.log(moveCache)
+              console.log(captures)
             })
           })
       }
@@ -191,12 +194,13 @@ function ChessBoard() {
       // Clear Moves
       setMoves([])
       setCaptures([])
+      setPromotion(false)
 
       // Clear Waiting
       setWaiting(false)
     }
 
-    else if (selectedPiece) {
+    else if (selectedPiece !== null) {
 
       // Send current FEN, piece, move, new FEN
       try {
@@ -219,12 +223,14 @@ function ChessBoard() {
           // If accepted update board
           if (data["isValid"]) {
             setGameState(parseGameStateFromFEN(data["newFEN"]))
+            setLastMove(data["lastMove"])
           } 
 
           // Clear cache, clear moves
           moveCache.clear()
           setMoves([])
           setCaptures([])
+          setPromotion(false)
 
       } catch (error: any) {
         console.error(error.message)
@@ -270,13 +276,18 @@ function ChessBoard() {
     <div className='last-move' style={{transform: `translate(${col * 50}px, ${row * 50}px)`}}/>
   )})
 
+  const PromotionComponent = (promotionSquare: number) => {
+    return (
+      <div></div>
+    )
+  }
+
   return (
     <div className='chessboard' onClick={clickHandler} ref={boardRef}>
-      {selectedPiece ? MovesComponent : <></>}
-      {selectedPiece ? CapturesComponent : <></>}
       {LastMoveComponent}
       {PiecesComponent}
       {MovesComponent}
+      {CapturesComponent}
     </div>
   )
 }
