@@ -257,6 +257,23 @@ func getBoardEdges() map[int]bool {
 	return boardEdges
 }
 
+func hasQueenCrossedEdgeThroughDiagonal(direction int, piecePosition int, movePosition int) bool {
+	// Function is used to prevent Queen jumping 7 squares left or right
+	// Not diagonal
+	if !(abs(direction) == 7 || abs(direction) == 9) {
+		return false
+	}
+
+	var pieceRow = getRow(piecePosition)
+	var pieceCol = getCol(piecePosition)
+	var moveRow = getRow(movePosition)
+	var moveCol = getCol(movePosition)
+	var rowChange = abs(pieceRow - moveRow)
+	var colChange = abs(pieceCol - moveCol)
+
+	return rowChange != colChange
+}
+
 func hasMoveCrossedEdge(piecePosition int, movePosition int, pieceVariant pieceVariant) bool {
 	var pieceRow = getRow(piecePosition)
 	var pieceCol = getCol(piecePosition)
@@ -402,6 +419,10 @@ func isSquareUnderAttack(board [64]square, position int, defendingColour pieceCo
 	return false
 }
 
+func squareOnEdgeOfBoard(square int) bool {
+	return square <= 7 || square >= 56 || square%8 == 0 || square%7 == 0
+}
+
 func getMovesandCapturesForPiece(piecePosition int, currentGameState gameState) (moves []int, captures []int, triggerPromotion bool) {
 	/*
 		Pawns must check for: promotion, double move, en passant.
@@ -458,6 +479,11 @@ func getMovesandCapturesForPiece(piecePosition int, currentGameState gameState) 
 
 				/*Check if move goes over edge*/
 				if hasMoveCrossedEdge(piecePosition, currentSquare, piece.variant) {
+					break
+				}
+
+				// For queen, to stop jumping 7 squares left / right
+				if piece.variant == Queen && hasQueenCrossedEdgeThroughDiagonal(moveDirection, piecePosition, currentSquare) {
 					break
 				}
 
@@ -520,7 +546,7 @@ func getMovesandCapturesForPiece(piecePosition int, currentGameState gameState) 
 	/*Pawn checks: double move, en passant, promotion*/
 	if piece.variant == Pawn {
 
-		if (8 <= piecePosition && piecePosition <= 15) || (48 <= piecePosition && piecePosition <= 55) {
+		if (8 <= piecePosition && piecePosition <= 15 && piece.colour == White) || (48 <= piecePosition && piecePosition <= 55 && piece.colour == Black) {
 			triggerPromotion = true
 		}
 
@@ -982,13 +1008,30 @@ func IsMoveValid(fen string, piece int, move int) bool {
 	return false
 }
 
-func getFENAfterMove(currentFEN string, piece int, move int) string {
+func getFENAfterMove(currentFEN string, piece int, move int, promotionString string) string {
 	var currentGameState = boardFromFEN(currentFEN)
 	currentGameState.board[move].piece = currentGameState.board[piece].piece
 	currentGameState.board[piece].piece = nil
-	// Check for promotion
 
 	var newGameState = currentGameState
+
+	var runeToVariant = make(map[string]pieceVariant)
+	runeToVariant["n"] = Knight
+	runeToVariant["b"] = Bishop
+	runeToVariant["r"] = Rook
+	runeToVariant["q"] = Queen
+
+	// Check for promotion
+	if newGameState.board[move].piece.variant == Pawn && (move <= 7 || move >= 56) {
+		var promotionColour pieceColour = Black
+		if move <= 7 {
+			promotionColour = White
+		}
+		var promotionVariant = runeToVariant[promotionString]
+
+		newGameState.board[move].piece = createPiece(move, promotionColour, promotionVariant)
+	}
+
 	// Check for king move
 	if newGameState.board[move].piece.variant == King {
 		// Check for castling

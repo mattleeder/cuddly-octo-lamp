@@ -91,6 +91,13 @@ const colourToString = new Map<PieceColour, string>()
 colourToString.set(PieceColour.White, 'white')
 colourToString.set(PieceColour.Black, 'black')
 
+enum ClickAction {
+  clear,
+  showMoves,
+  makeMove,
+  choosePromotion,
+}
+
 function ChessBoard() {
   const boardRef = useRef<HTMLDivElement | null>(null)
   const [rect, setRect] = useState<DOMRect | null>(null)
@@ -99,7 +106,9 @@ function ChessBoard() {
   const [moves, setMoves] = useState<number[]>([])
   const [captures, setCaptures] = useState<number[]>([])
   const [lastMove, setLastMove] = useState<number[]>([])
-  const [promotion, setPromotion] = useState(false)
+  const [promotionNextMove, setPromotionNextMove] = useState(false)
+  const [promotionActive, setPromotionActive] = useState(false)
+  const [promotionSquare, setPromotionSquare] = useState(0)
   const [gameState, setGameState] = useState(parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"))
 
 
@@ -134,15 +143,75 @@ function ChessBoard() {
     console.log(captures)
   }, [captures])
 
+  async function fetchPossibleMoves(position: number) {
+    try {
+      var response = await fetch(import.meta.env.VITE_API_FETCH_MOVES_URL, {
+        "method": "POST",
+        "body": JSON.stringify({
+          "fen": gameState.fen,
+          "piece": position,
+      })})
+
+      if (!response.ok) {
+        throw new Error(`Response status: ${response.status}`)
+      }
+
+      var data = await response.json()
+      return data
+    }
+
+    catch (error: any) {
+      console.error(error.message)
+    }
+
+    return {}
+
+  }
+
+  async function postMove(position: number, piece: number, promotion: string) {
+    try {
+      var newBoard = [...gameState.board]
+      newBoard[position] = newBoard[piece]
+      newBoard[piece] = [null, null]
+
+      var response = await fetch(import.meta.env.VITE_API_MAKE_MOVE_URL, {
+        "method": "POST",
+        "body": JSON.stringify({
+          "currentFEN": gameState.fen,
+          "piece": selectedPiece,
+          "move": position,
+          "promotionString": promotion,
+        })})
+        if (!response.ok) {
+          throw new Error(`Response status: ${response.status}`)
+        }
+
+        var data = await response.json()
+
+        return data
+
+    } catch (error: any) {
+      console.error(error.message)
+    }
+  }
+
+  function setToBare() {
+    setSelectedPiece(null)
+    setMoves([])
+    setCaptures([])
+    setPromotionNextMove(false)
+    setPromotionActive(false)
+    setPromotionSquare(0)
+  }
+
   async function clickHandler(event: React.MouseEvent) {
+    // Calculate board position
     if (rect === null) {
       throw new Error("Bounding rect for board is not defined")
     }
     var boardXPosition = Math.floor((event.clientX - rect.left) / (rect.width / 8))
     var boardYPosition = Math.floor((event.clientY - rect.top) / (rect.height / 8))
     var position = boardYPosition * 8 + boardXPosition
-    console.log(boardXPosition)
-    console.log(boardYPosition)
 
     // If waiting do nothing
     if (waiting) { 
@@ -152,94 +221,81 @@ function ChessBoard() {
     // Set Waiting
     setWaiting(true)
 
-    if (selectedPiece === null) {
+    // Get clickAction state
+    var clickAction = ClickAction.clear
+    if (promotionActive && [0, 8, 16, 24].includes(Math.abs(position - promotionSquare))) {
+      clickAction = ClickAction.choosePromotion
+    } else if ([...moves, ...captures].includes(position)) {
+      clickAction = ClickAction.makeMove
+    }else if (gameState.board[position][0] != null && position != selectedPiece) {
+      clickAction = ClickAction.showMoves
+    }
 
-      if (gameState.board[position][0] == null || gameState.board[position][1] == null) {
-        setWaiting(false)
-        return
-      }
+    console.log(`Click Action: ${clickAction}`)
 
-      // Check cache
-      if (!moveCache.get(position)) {
+    // If showing promotion, check promotion selection, if promoting submit move and reset to bare
+
+    // If showing moves, check for move click, if move clicked, submit and reset to bare
+
+    // If clicked on piece, select piece
+
+    // If clicked on board, reset to bare
+
+    switch (clickAction) {
+      case ClickAction.clear:
+        setToBare()
+        break;
+
+      case ClickAction.makeMove:
+      case ClickAction.choosePromotion:
+        if (selectedPiece === null) {
+          throw new Error("Posting move with no piece")
+        }
+
+        // Render promotion component
+        if (promotionNextMove) {
+          setPromotionActive(true)
+          setPromotionSquare(position)
+          setPromotionNextMove(false)
+          break;
+        }
+
+        var promotionString = ""
+        if (clickAction == ClickAction.choosePromotion) {
+          var promotionIndex = [0, 8, 16, 24].indexOf(Math.abs(position - promotionSquare))
+          console.log(promotionIndex)
+          promotionString = "qnrb"[promotionIndex]
+          position = promotionSquare
+        }
+        // Send current FEN, piece, move, new FEN
+        console.log("Post move")
+        var data = await postMove(position, selectedPiece, promotionString)
+        console.log(data)
+
+        // If accepted update board
+        if (data["isValid"]) {
+          setGameState(parseGameStateFromFEN(data["newFEN"]))
+          setLastMove(data["lastMove"])
+        } 
+
+        // Clear cache, clear moves
+        setToBare()
+        break;
+
+      case ClickAction.showMoves:
         // Fetch moves
-        fetch(import.meta.env.VITE_API_FETCH_MOVES_URL, {
-          "method": "POST",
-          "body": JSON.stringify({
-            "fen": gameState.fen,
-            "piece": position,
-          })}).then((response) => {
-            response.json().then((data) => {
-              // Add to cache
-              setMoves(data["moves"] || [])
-              setCaptures(data["captures"] || [])
-              setPromotion(data["promotion"])
-              moveCache.set(position, data["moves"] || [])
-              console.log(captures)
-            })
-          })
-      }
-      
-      // Set Moves
-      // setMoves(data["moves"])
+        data = await fetchPossibleMoves(position)
+        
+        // Set Moves
+        setMoves(data["moves"] || [])
+        setCaptures(data["captures"] || [])
+        setPromotionNextMove(data["triggerPromotion"])
 
-      // Show Moves
-      setSelectedPiece(position)
-
-      // Clear Waiting
-      setWaiting(false)
-    } else if (!moves.includes(position) && !captures.includes(position)) {
-      // If not clicked on move
-      setSelectedPiece(null)
-
-      // Clear Moves
-      setMoves([])
-      setCaptures([])
-      setPromotion(false)
-
-      // Clear Waiting
-      setWaiting(false)
+        // Show Moves
+        setSelectedPiece(position)
+        break;
     }
-
-    else if (selectedPiece !== null) {
-
-      // Send current FEN, piece, move, new FEN
-      try {
-        var newBoard = [...gameState.board]
-        newBoard[position] = newBoard[selectedPiece]
-        newBoard[selectedPiece] = [null, null]
-        var response = await fetch(import.meta.env.VITE_API_MAKE_MOVE_URL, {
-          "method": "POST",
-          "body": JSON.stringify({
-            "currentFEN": gameState.fen,
-            "piece": selectedPiece,
-            "move": position,
-          })})
-          if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`)
-          }
-
-          var data = await response.json()
-
-          // If accepted update board
-          if (data["isValid"]) {
-            setGameState(parseGameStateFromFEN(data["newFEN"]))
-            setLastMove(data["lastMove"])
-          } 
-
-          // Clear cache, clear moves
-          moveCache.clear()
-          setMoves([])
-          setCaptures([])
-          setPromotion(false)
-
-      } catch (error: any) {
-        console.error(error.message)
-      }
-      setSelectedPiece(null)
-
-    }
-
-    // Clear Waiting
+    
     setWaiting(false)
   }
 
@@ -276,9 +332,31 @@ function ChessBoard() {
     <div className='last-move' style={{transform: `translate(${col * 50}px, ${row * 50}px)`}}/>
   )})
 
-  const PromotionComponent = (promotionSquare: number) => {
+  const PromotionComponent = ({ promotionSquare }: { promotionSquare: number }) => {
+    if (!promotionActive) {
+      return <></>
+    }
+
+    var row = Math.floor(promotionSquare / 8)
+    var col = promotionSquare % 8
+
+    var promotionColour = colourToString.get(PieceColour.Black)
+    var promotionDirection = -1
+    var verticalOffset = 350
+
+    if (promotionSquare <= 7) {
+      promotionColour = colourToString.get(PieceColour.White)
+      promotionDirection = 1
+      verticalOffset = 0
+    }
+
     return (
-      <div></div>
+      <>
+      <div className={`${promotionColour}-queen promotion`} style={{transform: `translate(${col * 50}px, ${verticalOffset}px)`}}/>
+      <div className={`${promotionColour}-knight promotion`} style={{transform: `translate(${col * 50}px, ${verticalOffset + promotionDirection * 50}px)`}}/>
+      <div className={`${promotionColour}-rook promotion`} style={{transform: `translate(${col * 50}px, ${verticalOffset + promotionDirection * 50 * 2}px)`}}/>
+      <div className={`${promotionColour}-bishop promotion`} style={{transform: `translate(${col * 50}px, ${verticalOffset + promotionDirection * 50 * 3}px)`}}/>
+      </>
     )
   }
 
@@ -288,6 +366,7 @@ function ChessBoard() {
       {PiecesComponent}
       {MovesComponent}
       {CapturesComponent}
+      <PromotionComponent promotionSquare={promotionSquare}/>
     </div>
   )
 }

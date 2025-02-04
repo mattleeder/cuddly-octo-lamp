@@ -26,10 +26,10 @@ type getChessMoveDataJSON struct {
 }
 
 type postChessMove struct {
-	CurrentFEN string
-	Piece      int
-	Move       int
-	NewFEN     string
+	CurrentFEN      string `json:"currentFEN"`
+	Piece           int    `json:"piece"`
+	Move            int    `json:"move"`
+	PromotionString string `json:"promotionString"`
 }
 
 type postChessMoveReply struct {
@@ -122,7 +122,7 @@ func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
 		data = postChessMoveReply{IsValid: false, NewFEN: "", LastMove: [2]int{0, 0}}
 	} else {
 		// Need to generate the new FEN
-		newFEN := getFENAfterMove(chessMove.CurrentFEN, chessMove.Piece, chessMove.Move)
+		newFEN := getFENAfterMove(chessMove.CurrentFEN, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
 		data = postChessMoveReply{IsValid: true, NewFEN: newFEN, LastMove: [2]int{chessMove.Piece, chessMove.Move}}
 	}
 
