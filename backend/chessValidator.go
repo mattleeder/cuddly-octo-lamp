@@ -79,6 +79,16 @@ var pieceVariantName = map[pieceVariant]string{
 	King:   "king",
 }
 
+type gameOverStatusCode int
+
+const (
+	Ongoing = iota
+	Stalemate
+	Checkmate
+	ThreefoldRepetition
+	InsufficientMaterial
+)
+
 type pieceType struct {
 	position               int
 	colour                 pieceColour
@@ -384,7 +394,7 @@ func isSquareUnderAttack(board [64]square, position int, defendingColour pieceCo
 				break
 			}
 			targetPiece = board[attackingSquare].piece
-			if targetPiece == nil || targetPiece.variant == King {
+			if targetPiece == nil || (targetPiece.variant == King && targetPiece.colour == defendingColour) {
 				continue
 			}
 			if (targetPiece.variant == Rook || targetPiece.variant == Queen || (targetPiece.variant == King && attackRange == 1)) && targetPiece.colour != defendingColour {
@@ -406,7 +416,7 @@ func isSquareUnderAttack(board [64]square, position int, defendingColour pieceCo
 				break
 			}
 			targetPiece = board[attackingSquare].piece
-			if targetPiece == nil || targetPiece.variant == King {
+			if targetPiece == nil || (targetPiece.variant == King && targetPiece.colour == defendingColour) {
 				continue
 			}
 			if (targetPiece.variant == Bishop || targetPiece.variant == Queen || (targetPiece.variant == King && attackRange == 1)) && targetPiece.colour != defendingColour {
@@ -423,7 +433,7 @@ func squareOnEdgeOfBoard(square int) bool {
 	return square <= 7 || square >= 56 || square%8 == 0 || square%7 == 0
 }
 
-func getMovesandCapturesForPiece(piecePosition int, currentGameState gameState) (moves []int, captures []int, triggerPromotion bool) {
+func getMovesandCapturesForPiece(piecePosition int, currentGameState gameState) (moves []int, captures []int, triggerPromotion bool, friendlyKingInCheck bool) {
 	/*
 		Pawns must check for: promotion, double move, en passant.
 		Kings must check for: castling, square attacked
@@ -442,12 +452,12 @@ func getMovesandCapturesForPiece(piecePosition int, currentGameState gameState) 
 	triggerPromotion = false
 
 	if piece == nil {
-		return []int{}, []int{}, triggerPromotion
+		return []int{}, []int{}, triggerPromotion, false
 	}
 
 	// Not your turn
 	if piece.colour != currentGameState.turn {
-		return []int{}, []int{}, triggerPromotion
+		return []int{}, []int{}, triggerPromotion, false
 	}
 
 	var shortCastleAvailable bool
@@ -800,7 +810,7 @@ func getMovesandCapturesForPiece(piecePosition int, currentGameState gameState) 
 
 	/*King must move, checkCount only calculated for non-king pieces*/
 	if checkCount >= 2 {
-		return []int{}, []int{}, false
+		return []int{}, []int{}, false, true
 	}
 
 	if checkCount == 1 && piece.variant != King {
@@ -808,7 +818,7 @@ func getMovesandCapturesForPiece(piecePosition int, currentGameState gameState) 
 		captures = filter(captures, lambdaMapGet(blockingSquares))
 	}
 
-	return moves, captures, triggerPromotion
+	return moves, captures, triggerPromotion, checkCount > 0
 }
 
 type setup struct {
@@ -858,8 +868,8 @@ func createBoard() [64]square {
 	return board
 }
 
-func getValidMovesForPiece(piecePosition int, currentGameState gameState) (moves []int, captures []int, triggerPromotion bool) {
-	moves, captures, triggerPromotion = getMovesandCapturesForPiece(piecePosition, currentGameState)
+func getValidMovesForPiece(piecePosition int, currentGameState gameState) (moves []int, captures []int, triggerPromotion bool, friendlyKingInCheck bool) {
+	moves, captures, triggerPromotion, friendlyKingInCheck = getMovesandCapturesForPiece(piecePosition, currentGameState)
 	fmt.Printf("Moves for piece: %v\n", append(moves, captures...))
 	return
 }
@@ -994,7 +1004,7 @@ func boardFromFEN(fen string) gameState {
 
 func IsMoveValid(fen string, piece int, move int) bool {
 	var currentGameState = boardFromFEN(fen)
-	var moves, captures, _ = getValidMovesForPiece(piece, currentGameState)
+	var moves, captures, _, _ = getValidMovesForPiece(piece, currentGameState)
 	fmt.Printf("Moves for piece: %v\n", append(moves, captures...))
 	fmt.Println(moves)
 	fmt.Println(captures)
@@ -1008,7 +1018,71 @@ func IsMoveValid(fen string, piece int, move int) bool {
 	return false
 }
 
-func getFENAfterMove(currentFEN string, piece int, move int, promotionString string) string {
+func canColourMove(currentGameState gameState, colour pieceColour) bool {
+	var piece *pieceType
+	for i := range currentGameState.board {
+		piece = currentGameState.board[i].piece
+		if piece != nil && piece.colour == colour {
+			var moves, captures, _, _ = getValidMovesForPiece(i, currentGameState)
+			if len(moves) > 0 || len(captures) > 0 {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func gameHasSufficientMaterial(currentGameState gameState) bool {
+	// Insufficient Scenarios
+	// K v K
+	// K & B vs K
+	// K & N vs K
+	// K & B vs K & B of same colour
+	var piece *pieceType
+	var freqDict = make(map[pieceVariant]int)
+	var totalPieceCount int
+	var darkSquareBishopPresent = false
+	var lightSquareBishopPresent = false
+	for i := range currentGameState.board {
+		piece = currentGameState.board[i].piece
+		if piece != nil {
+			freqDict[piece.variant] += 1
+			totalPieceCount += 1
+			if piece.variant == Bishop {
+				fmt.Println(i)
+				row := getRow(i)
+				col := getCol(i)
+				if (row+col)%2 == 0 {
+					lightSquareBishopPresent = true
+				} else {
+					darkSquareBishopPresent = true
+				}
+			}
+		}
+	}
+
+	fmt.Println("Sufficient?")
+	fmt.Println(freqDict)
+	fmt.Println(darkSquareBishopPresent)
+	fmt.Println(lightSquareBishopPresent)
+
+	if totalPieceCount == 2 {
+		return false
+	}
+
+	if totalPieceCount == 3 && (freqDict[Knight] >= 1 || freqDict[Bishop] >= 1) {
+		return false
+	}
+
+	if totalPieceCount-2 == freqDict[Bishop] && !(darkSquareBishopPresent && lightSquareBishopPresent) {
+		return false
+	}
+
+	return true
+}
+
+func getFENAfterMove(currentFEN string, piece int, move int, promotionString string) (string, gameOverStatusCode) {
 	var currentGameState = boardFromFEN(currentFEN)
 	currentGameState.board[move].piece = currentGameState.board[piece].piece
 	currentGameState.board[piece].piece = nil
@@ -1098,7 +1172,38 @@ func getFENAfterMove(currentFEN string, piece int, move int, promotionString str
 		newGameState.turn = White
 	}
 
-	return gameStateToFEN(newGameState)
+	newFEN := gameStateToFEN(newGameState)
+
+	sufficientMaterial := gameHasSufficientMaterial(currentGameState)
+
+	if !sufficientMaterial {
+		return newFEN, InsufficientMaterial
+	}
+
+	// Check for checkmate / stalemate
+	var gameOverStatus gameOverStatusCode = Ongoing
+	var enemyKing = newGameState.blackKingPosition
+	var enemyKingColour = Black
+	if currentGameState.board[move].piece.colour == Black {
+		enemyKing = newGameState.whiteKingPosition
+		enemyKingColour = White
+	}
+
+	var moves, captures, _, enemyKingInCheck = getValidMovesForPiece(enemyKing, newGameState)
+	var enemyKingMoves = append(moves, captures...)
+
+	// If king has no moves, check if colour can move
+	if len(enemyKingMoves) == 0 {
+		if !canColourMove(newGameState, pieceColour(enemyKingColour)) {
+			if enemyKingInCheck {
+				gameOverStatus = Checkmate
+			} else {
+				gameOverStatus = Stalemate
+			}
+		}
+	}
+
+	return newFEN, gameOverStatus
 }
 
 func gameStateToFEN(newGameState gameState) string {
@@ -1268,7 +1373,7 @@ func chessMain() {
 	var out []string
 	var testPosition = 60
 
-	moves, captures, _ = getValidMovesForPiece(testPosition, currentGameState)
+	moves, captures, _, _ = getValidMovesForPiece(testPosition, currentGameState)
 
 	for _, v := range append(moves, captures...) {
 		row := v / 8

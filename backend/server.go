@@ -33,10 +33,11 @@ type postChessMove struct {
 }
 
 type postChessMoveReply struct {
-	IsValid                  bool   `json:"isValid"`
-	NewFEN                   string `json:"newFEN"`
-	LastMove                 [2]int `json:"lastMove"`
-	MoveWillTriggerPromotion bool   `json:"triggerPromotion"`
+	IsValid                  bool               `json:"isValid"`
+	NewFEN                   string             `json:"newFEN"`
+	LastMove                 [2]int             `json:"lastMove"`
+	MoveWillTriggerPromotion bool               `json:"triggerPromotion"`
+	GameOverStatus           gameOverStatusCode `json:"gameOverStatus"`
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +84,7 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("Received body: %+v\n", chessMoveData)
 
 	var currentGameState = boardFromFEN(chessMoveData.Fen)
-	var moves, captures, triggerPromotion = getValidMovesForPiece(chessMoveData.Piece, currentGameState)
+	var moves, captures, triggerPromotion, _ = getValidMovesForPiece(chessMoveData.Piece, currentGameState)
 
 	var data = getChessMoveDataJSON{Moves: moves, Captures: captures, TriggerPromotion: triggerPromotion}
 
@@ -122,8 +123,8 @@ func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
 		data = postChessMoveReply{IsValid: false, NewFEN: "", LastMove: [2]int{0, 0}}
 	} else {
 		// Need to generate the new FEN
-		newFEN := getFENAfterMove(chessMove.CurrentFEN, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
-		data = postChessMoveReply{IsValid: true, NewFEN: newFEN, LastMove: [2]int{chessMove.Piece, chessMove.Move}}
+		newFEN, gameOverStatus := getFENAfterMove(chessMove.CurrentFEN, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
+		data = postChessMoveReply{IsValid: true, NewFEN: newFEN, LastMove: [2]int{chessMove.Piece, chessMove.Move}, GameOverStatus: gameOverStatus}
 	}
 
 	jsonStr, err := json.Marshal(data)

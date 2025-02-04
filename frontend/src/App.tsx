@@ -110,6 +110,7 @@ function ChessBoard() {
   const [promotionActive, setPromotionActive] = useState(false)
   const [promotionSquare, setPromotionSquare] = useState(0)
   const [gameState, setGameState] = useState(parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"))
+  const [gameOverStatus, setGameOverStatus] = useState(0)
 
 
   // var moves = [4, 12, 20]
@@ -276,6 +277,7 @@ function ChessBoard() {
         if (data["isValid"]) {
           setGameState(parseGameStateFromFEN(data["newFEN"]))
           setLastMove(data["lastMove"])
+          setGameOverStatus(data["gameOverStatus"])
         } 
 
         // Clear cache, clear moves
@@ -360,6 +362,17 @@ function ChessBoard() {
     )
   }
 
+  const GameOverComponent = () => {
+    if (gameOverStatus == 0) {
+      return <></>
+    }
+
+    var gameOverStatusCodes = ["Ongoing", "Stalemate", "Checkmate", "Threefold Repetition", "Insufficient Material"]
+    var gameOverText = gameOverStatusCodes[gameOverStatus]
+
+    return <div style={{transform: `translate(${0}px, ${180}px)`, color: "black"}}>{gameOverText}</div>
+  }
+
   return (
     <div className='chessboard' onClick={clickHandler} ref={boardRef}>
       {LastMoveComponent}
@@ -367,6 +380,7 @@ function ChessBoard() {
       {MovesComponent}
       {CapturesComponent}
       <PromotionComponent promotionSquare={promotionSquare}/>
+      <GameOverComponent />
     </div>
   )
 }
