@@ -72,7 +72,8 @@ function App() {
       <p className="read-the-docs">
         Click on the Vite and React logos to learn more
       </p>
-      <ChessBoard/>
+      <ChessBoard />
+      <JoinQueue />
     </>
   )
 }
@@ -96,6 +97,40 @@ enum ClickAction {
   showMoves,
   makeMove,
   choosePromotion,
+}
+
+function JoinQueue() {
+  const [inQueue, setInQueue] = useState(false)
+
+  enum ClickAction {
+    leaveQueue,
+    joinQueue,
+  }
+
+  function joinQueue() {
+    window.addEventListener('beforeunload', leaveQueue)
+  }
+
+  function leaveQueue() {
+    window.removeEventListener('beforeunload', leaveQueue)
+  }
+
+  function toggleQueue() {
+    var clickAction = inQueue ? ClickAction.leaveQueue : ClickAction.joinQueue
+
+    if (clickAction == ClickAction.leaveQueue) {
+      leaveQueue()
+    } else {
+      joinQueue()
+    }
+
+    setInQueue(!inQueue)
+  }
+
+  var buttonText = inQueue ? "In Queue" : "Join Queue"
+  return (
+    <button onClick={toggleQueue}>{buttonText}</button>
+  )
 }
 
 function ChessBoard() {

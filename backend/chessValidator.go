@@ -1006,8 +1006,6 @@ func IsMoveValid(fen string, piece int, move int) bool {
 	var currentGameState = boardFromFEN(fen)
 	var moves, captures, _, _ = getValidMovesForPiece(piece, currentGameState)
 	fmt.Printf("Moves for piece: %v\n", append(moves, captures...))
-	fmt.Println(moves)
-	fmt.Println(captures)
 
 	for _, possibleMove := range append(moves, captures...) {
 		if move == possibleMove {
@@ -1050,7 +1048,6 @@ func gameHasSufficientMaterial(currentGameState gameState) bool {
 			freqDict[piece.variant] += 1
 			totalPieceCount += 1
 			if piece.variant == Bishop {
-				fmt.Println(i)
 				row := getRow(i)
 				col := getCol(i)
 				if (row+col)%2 == 0 {
@@ -1061,11 +1058,6 @@ func gameHasSufficientMaterial(currentGameState gameState) bool {
 			}
 		}
 	}
-
-	fmt.Println("Sufficient?")
-	fmt.Println(freqDict)
-	fmt.Println(darkSquareBishopPresent)
-	fmt.Println(lightSquareBishopPresent)
 
 	if totalPieceCount == 2 {
 		return false
