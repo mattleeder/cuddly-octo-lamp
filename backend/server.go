@@ -129,7 +129,7 @@ func generateNewPlayerId() int64 {
 }
 
 func chessMoveValidationHandler(w http.ResponseWriter, r *http.Request) {
-
+	fmt.Println()
 	start := time.Now()
 
 	var chessMove userMoveData
@@ -141,7 +141,6 @@ func chessMoveValidationHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println(chessMove)
 	fmt.Printf("Received body: %+v\n", chessMove)
 
 	var validMove = IsMoveValid(chessMove.Fen, chessMove.Piece, chessMove.Move)
@@ -153,6 +152,7 @@ func chessMoveValidationHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println()
 	start := time.Now()
 
 	var chessMoveData getChessMoveData
@@ -164,7 +164,6 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println(chessMoveData)
 	fmt.Printf("Received body: %+v\n", chessMoveData)
 
 	var currentGameState = boardFromFEN(chessMoveData.Fen)
@@ -185,7 +184,7 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
-
+	fmt.Println()
 	start := time.Now()
 
 	var chessMove postChessMove
@@ -197,7 +196,6 @@ func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println(chessMove)
 	fmt.Printf("Received body: %+v\n", chessMove)
 
 	var validMove = IsMoveValid(chessMove.CurrentFEN, chessMove.Piece, chessMove.Move)
@@ -307,34 +305,10 @@ func main() {
 
 	defer db.Close()
 
-	for i := 0; i < 5; i++ {
-		insertNewLiveMatch()
-	}
-
-	rows, err := db.Query("select id, current_fen from live_matches")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	defer rows.Close()
-	for rows.Next() {
-		var id int
-		var fen string
-		err = rows.Scan(&id, &fen)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println(id, fen)
-	}
-	err = rows.Err()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	http.HandleFunc("/", chessMoveValidationHandler)
 	http.HandleFunc("/getMoves", getChessMovesHandler)
 	http.HandleFunc("/makeMove", postChessMoveHandler)
 	http.HandleFunc("/joinQueue", joinQueueHandler)
-	// log.Fatal(http.ListenAndServe(":8080", nil))
+
 	log.Fatal(http.ListenAndServeTLS(":8080", "burrchess.crt", "burrchess.key", nil))
 }

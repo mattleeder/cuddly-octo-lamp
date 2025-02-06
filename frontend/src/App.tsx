@@ -103,13 +103,18 @@ function JoinQueue() {
   const [inQueue, setInQueue] = useState(false)
   const [waiting, setWaiting] = useState(false)
 
+  useEffect(() => {
+    return () => {
+      leaveQueue()
+    }
+  }, [])
+
   enum ClickAction {
     leaveQueue,
     joinQueue,
   }
 
   async function joinQueue() {
-    window.addEventListener('beforeunload', leaveQueue)
 
     try {
       var response = await fetch(import.meta.env.VITE_API_JOIN_QUEUE_URL, {
@@ -138,7 +143,6 @@ function JoinQueue() {
   }
 
   async function leaveQueue() {
-    window.removeEventListener('beforeunload', leaveQueue)
 
     try {
       var response = await fetch(import.meta.env.VITE_API_JOIN_QUEUE_URL, {
