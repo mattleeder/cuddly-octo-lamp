@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 
@@ -23,6 +24,9 @@ func initDatabase() *sql.DB {
 	sqlStmt := `
 	create table live_matches (id integer not null primary key, current_fen text default "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 	delete from live_matches;
+
+	create table matchmaking_queue (playerid integer not null primary key);
+	delete from matchmaking_queue
 	`
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
@@ -76,4 +80,56 @@ func insertNewLiveMatch() (int64, error) {
 	}
 
 	return res.LastInsertId()
+}
+
+func addPlayerToQueue(playerid int64, time int, increment int) error {
+	sqlStmt := `
+	insert or ignore into matchmaking_queue (playerid) VALUES(?);
+	`
+
+	_, err := db.Exec(sqlStmt, playerid)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return nil
+}
+
+func removePlayerFromQueue(playerid int64, time int, increment int) error {
+	sqlStmt := `
+	delete from matchmaking_queue where playerid = ?;
+	`
+
+	_, err := db.Exec(sqlStmt, playerid)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return nil
+}
+
+func checkQueue() {
+	fmt.Println("Queue state")
+
+	rows, err := db.Query("select playerid from matchmaking_queue")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var playerid int
+		err = rows.Scan(&playerid)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(playerid)
+	}
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }

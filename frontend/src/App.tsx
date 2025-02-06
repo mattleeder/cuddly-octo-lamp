@@ -101,30 +101,86 @@ enum ClickAction {
 
 function JoinQueue() {
   const [inQueue, setInQueue] = useState(false)
+  const [waiting, setWaiting] = useState(false)
 
   enum ClickAction {
     leaveQueue,
     joinQueue,
   }
 
-  function joinQueue() {
+  async function joinQueue() {
     window.addEventListener('beforeunload', leaveQueue)
+
+    try {
+      var response = await fetch(import.meta.env.VITE_API_JOIN_QUEUE_URL, {
+        method: "POST",
+        credentials: 'include',
+        body: JSON.stringify({
+          "time": 3,
+          "increment": 0,
+          "action": "join",
+        })
+      })
+
+      if (!response.ok) {
+        console.error(response.status)
+      }
+
+      // Joined
+      return true
+
+    } catch (error) {
+      console.error(error)
+    }
+
+    // Did not join
+    return false
   }
 
-  function leaveQueue() {
+  async function leaveQueue() {
     window.removeEventListener('beforeunload', leaveQueue)
+
+    try {
+      var response = await fetch(import.meta.env.VITE_API_JOIN_QUEUE_URL, {
+        method: "POST",
+        credentials: 'include',
+        body: JSON.stringify({
+          "action": "leave"
+        })
+      })
+
+      if (!response.ok) {
+        console.error(response.status)
+      }
+
+      // Left
+      return true
+
+    } catch (error) {
+      console.error(error)
+    }
+
+    // Did not leave
+    return false
   }
 
-  function toggleQueue() {
+  async function toggleQueue() {
+    if (waiting) {
+      return
+    }
+
+    setWaiting(true)
     var clickAction = inQueue ? ClickAction.leaveQueue : ClickAction.joinQueue
 
     if (clickAction == ClickAction.leaveQueue) {
-      leaveQueue()
+      var result = await leaveQueue()
+      setInQueue(!result)
     } else {
-      joinQueue()
+      var result = await joinQueue()
+      setInQueue(result)
     }
 
-    setInQueue(!inQueue)
+    setWaiting(false)
   }
 
   var buttonText = inQueue ? "In Queue" : "Join Queue"

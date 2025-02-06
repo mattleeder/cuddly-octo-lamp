@@ -57,9 +57,9 @@ type postChessMoveReply struct {
 }
 
 type joinQueueRequest struct {
-	time      int
-	increment int
-	playerID  int
+	Time      int    `json:"time"`
+	Increment int    `json:"increment"`
+	Action    string `json:"action"`
 }
 
 func Write(w http.ResponseWriter, cookie http.Cookie) error {
@@ -110,7 +110,7 @@ func ReadSigned(r *http.Request, secretKey []byte, name string) (string, error) 
 	}
 
 	signature := signedValue[:sha256.Size]
-	value := signedValue[:sha256.Size]
+	value := signedValue[sha256.Size:]
 
 	mac := hmac.New(sha256.New, secretKey)
 	mac.Write([]byte(name))
@@ -133,7 +133,7 @@ func chessMoveValidationHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	var chessMove userMoveData
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 
 	err := json.NewDecoder(r.Body).Decode(&chessMove)
 	if err != nil {
@@ -156,7 +156,7 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	var chessMoveData getChessMoveData
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 
 	err := json.NewDecoder(r.Body).Decode(&chessMoveData)
 	if err != nil {
@@ -189,7 +189,7 @@ func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	var chessMove postChessMove
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 
 	err := json.NewDecoder(r.Body).Decode(&chessMove)
 	if err != nil {
@@ -225,10 +225,13 @@ func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println()
+	defer checkQueue()
 	start := time.Now()
 
 	var joinQueue joinQueueRequest
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 	err := json.NewDecoder(r.Body).Decode(&joinQueue)
 	if err != nil {
@@ -236,31 +239,60 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Printf("Received body: %+v\n", joinQueue)
+	fmt.Println(r.Cookies())
+
+	// Read cookie
 	playerid, err := ReadSigned(r, secretKey, "playerid")
-	if err == http.ErrNoCookie {
+
+	fmt.Println(err)
+
+	// Generate new cookie if it does not exists
+	if errors.Is(err, http.ErrNoCookie) && joinQueue.Action == "join" {
 		playerid = strconv.FormatInt(generateNewPlayerId(), 10)
 
 		cookie := http.Cookie{
-			Name:  "playerid",
-			Value: playerid,
+			Name:     "playerid",
+			Value:    playerid,
+			Domain:   "localhost",
+			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
+			Secure:   true,
 		}
 
 		err = WriteSigned(w, cookie, secretKey)
 		if err != nil {
 			http.Error(w, "Unable to decode or write cookie", http.StatusInternalServerError)
+			return
 		}
+	} else if errors.Is(err, http.ErrNoCookie) && joinQueue.Action == "leave" {
+		http.Error(w, "Must provide playerid to leave", http.StatusBadRequest)
+		return
+	} else if err != nil {
+		http.Error(w, "Could not read cookie", http.StatusInternalServerError)
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:  "playerid",
-		Value: "",
-	})
+	fmt.Printf("Player ID: %v\n", playerid)
+	var playerIDasInt int64
+	playerIDasInt, err = strconv.ParseInt(playerid, 10, 64)
+	if err != nil {
+		http.Error(w, "Bad PlayerID", http.StatusInternalServerError)
+		return
+	}
 
-	fmt.Println(joinQueue)
-	fmt.Printf("Received body: %+v\n", joinQueue)
+	if joinQueue.Action == "join" {
+		err = addPlayerToQueue(playerIDasInt, joinQueue.Time, joinQueue.Increment)
+	} else {
+		err = removePlayerFromQueue(playerIDasInt, joinQueue.Time, joinQueue.Increment)
+	}
+
+	if err != nil {
+		http.Error(w, "Unable to add/remove player to/from queue", http.StatusInternalServerError)
+		return
+	}
 
 	elapsed := time.Since(start)
-	fmt.Printf("Took %s\n", elapsed)
+	fmt.Printf("Took %s\n\n", elapsed)
 }
 
 func main() {
@@ -303,5 +335,6 @@ func main() {
 	http.HandleFunc("/getMoves", getChessMovesHandler)
 	http.HandleFunc("/makeMove", postChessMoveHandler)
 	http.HandleFunc("/joinQueue", joinQueueHandler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	// log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServeTLS(":8080", "burrchess.crt", "burrchess.key", nil))
 }
