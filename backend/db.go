@@ -133,3 +133,7 @@ func checkQueue() {
 	}
 
 }
+
+func addMatchToDatabase(playerOneID int, playerTwoID int) {
+
+}

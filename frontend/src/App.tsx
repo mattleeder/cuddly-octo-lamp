@@ -102,6 +102,7 @@ enum ClickAction {
 function JoinQueue() {
   const [inQueue, setInQueue] = useState(false)
   const [waiting, setWaiting] = useState(false)
+  const [eventSource, setEventSource] = useState<EventSource | null>(null)
 
   useEffect(() => {
     return () => {
@@ -131,7 +132,14 @@ function JoinQueue() {
         console.error(response.status)
       }
 
-      // Joined
+      // Joined, start listening for events
+      var eventSource = new EventSource(import.meta.env.VITE_API_MATCH_LISTEN_URL, {
+        withCredentials: true,
+      })
+      eventSource.onmessage = (event) => {
+        console.log(`message: ${event.data}`)
+      }
+      setEventSource(eventSource)
       return true
 
     } catch (error) {
@@ -158,6 +166,7 @@ function JoinQueue() {
       }
 
       // Left
+      eventSource?.close()
       return true
 
     } catch (error) {
@@ -478,6 +487,17 @@ function ChessBoard() {
       <GameOverComponent />
     </div>
   )
+}
+
+function MatchRoom() {
+  const [connectionInfo, setConnectionInfo] = useState("")
+
+  useEffect(() => {
+    // Connect
+    return () => {
+      // Disconnect
+    }
+  }, [])
 }
 
 export default App

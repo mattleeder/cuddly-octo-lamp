@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -293,6 +294,65 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("Took %s\n\n", elapsed)
 }
 
+type Client struct {
+	id      int64
+	channel chan string
+}
+
+type Clients struct {
+	mu      sync.Mutex
+	clients map[int64]*Client
+}
+
+var clients = Clients{
+	clients: make(map[int64]*Client),
+}
+
+func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+	playerid, err := ReadSigned(r, secretKey, "playerid")
+	if err != nil {
+		http.Error(w, "Could not read cookies", http.StatusBadRequest)
+	}
+
+	var playerIDasInt int64
+
+	playerIDasInt, err = strconv.ParseInt(playerid, 10, 64)
+	if err != nil {
+		http.Error(w, "Bad PlayerID", http.StatusInternalServerError)
+		return
+	}
+
+	clientChannel := make(chan string)
+
+	clients.mu.Lock()
+	clients.clients[playerIDasInt] = &Client{id: playerIDasInt, channel: clientChannel}
+	clients.mu.Unlock()
+
+	// Set appropriate headers for SSE
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	defer func() {
+		clients.mu.Lock()
+		delete(clients.clients, playerIDasInt)
+		clients.mu.Unlock()
+	}()
+
+	for {
+		select {
+		case message := <-clientChannel:
+			// Send the message to the client in SSE format
+			fmt.Fprintf(w, "data: %s\n\n", message)
+			// Flush the response to send the data to the client
+			w.(http.Flusher).Flush()
+		}
+	}
+}
+
 func main() {
 
 	secretKey = []byte("}\xa4\xc3\x85D\x89\xb75\xf0\xe6\xcf\xcaZ\x00k\x88\xe4\x8f\xd0\xd6\x95\x0e\xa6\xf9\xc2;!\xa2\xc4[\xca\x91")
@@ -309,6 +369,8 @@ func main() {
 	http.HandleFunc("/getMoves", getChessMovesHandler)
 	http.HandleFunc("/makeMove", postChessMoveHandler)
 	http.HandleFunc("/joinQueue", joinQueueHandler)
+	http.HandleFunc("/listenformatch", matchFoundSSEHandler)
 
+	go matchmakingService()
 	log.Fatal(http.ListenAndServeTLS(":8080", "burrchess.crt", "burrchess.key", nil))
 }
