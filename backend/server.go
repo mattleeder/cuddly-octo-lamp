@@ -281,8 +281,10 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 
 	if joinQueue.Action == "join" {
 		err = addPlayerToQueue(playerIDasInt, joinQueue.Time, joinQueue.Increment)
+		addPlayerToWaitingPool(playerIDasInt)
 	} else {
 		err = removePlayerFromQueue(playerIDasInt, joinQueue.Time, joinQueue.Increment)
+		removePlayerFromWaitingPool(playerIDasInt)
 	}
 
 	if err != nil {
@@ -325,10 +327,14 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientChannel := make(chan string)
-
+	// Do the channels get properly closed on a leave queue?
+	// Do we send the proper message on a leave queue?
 	clients.mu.Lock()
-	clients.clients[playerIDasInt] = &Client{id: playerIDasInt, channel: clientChannel}
+	_, ok := clients.clients[playerIDasInt]
+	if !ok {
+		clients.clients[playerIDasInt] = &Client{id: playerIDasInt, channel: make(chan string)}
+	}
+	clientChannel := clients.clients[playerIDasInt].channel
 	clients.mu.Unlock()
 
 	// Set appropriate headers for SSE
@@ -344,7 +350,10 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		select {
-		case message := <-clientChannel:
+		case message, ok := <-clientChannel:
+			if !ok {
+				return
+			}
 			// Send the message to the client in SSE format
 			fmt.Fprintf(w, "data: %s\n\n", message)
 			// Flush the response to send the data to the client

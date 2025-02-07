@@ -26,7 +26,7 @@ func initDatabase() *sql.DB {
 	delete from live_matches;
 
 	create table matchmaking_queue (playerid integer not null primary key);
-	delete from matchmaking_queue
+	delete from matchmaking_queue;
 	`
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
@@ -113,7 +113,7 @@ func removePlayerFromQueue(playerid int64, time int, increment int) error {
 func checkQueue() {
 	fmt.Println("Queue state")
 
-	rows, err := db.Query("select playerid from matchmaking_queue")
+	rows, err := db.Query("select playerid from matchmaking_queue;")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -134,6 +134,15 @@ func checkQueue() {
 
 }
 
-func addMatchToDatabase(playerOneID int, playerTwoID int) {
+func addMatchToDatabase(playerOneID int64, playerTwoID int64) error {
+	sqlStmt := `
+	insert or ignore into live_matches (white_player_id, black_player_id) VALUES(?, ?);
+	`
+	_, err := db.Exec(sqlStmt, playerOneID, playerTwoID)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 
+	return nil
 }
