@@ -22,7 +22,7 @@ func initDatabase() *sql.DB {
 	}
 
 	sqlStmt := `
-	create table live_matches (id integer not null primary key, current_fen text default "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+	create table live_matches (match_id integer not null primary key, white_player_id integer not null, black_player_id integer not null, last_move_piece integer, last_move_move integer, current_fen text default "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 	delete from live_matches;
 
 	create table matchmaking_queue (playerid integer not null primary key);
@@ -134,15 +134,41 @@ func checkQueue() {
 
 }
 
-func addMatchToDatabase(playerOneID int64, playerTwoID int64) error {
+func addMatchToDatabase(playerOneID int64, playerTwoID int64, playerOneIsWhite bool) (int64, error) {
 	sqlStmt := `
 	insert or ignore into live_matches (white_player_id, black_player_id) VALUES(?, ?);
 	`
-	_, err := db.Exec(sqlStmt, playerOneID, playerTwoID)
-	if err != nil {
-		log.Println(err)
-		return err
+	var result sql.Result
+	var err error
+	if playerOneIsWhite {
+		result, err = db.Exec(sqlStmt, playerOneID, playerTwoID)
+	} else {
+		result, err = db.Exec(sqlStmt, playerTwoID, playerOneID)
 	}
 
-	return nil
+	if err != nil {
+		log.Println(err)
+		return 0, err
+	}
+
+	return result.LastInsertId()
+}
+
+func checkLiveMatches() {
+	fmt.Println("Queue state")
+
+	rows, err := db.Query("select * from live_matches;")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		fmt.Println(rows)
+	}
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }

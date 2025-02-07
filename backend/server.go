@@ -348,6 +348,8 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 		clients.mu.Unlock()
 	}()
 
+	defer checkLiveMatches()
+
 	for {
 		select {
 		case message, ok := <-clientChannel:

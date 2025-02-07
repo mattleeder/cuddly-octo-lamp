@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"math/rand"
 	"sort"
 	"sync"
 	"time"
@@ -119,7 +121,12 @@ func swapRemove[T any](arr []T, idx int) []T {
 	return arr[:len(arr)-1]
 }
 
-func createMatch(playerOneID int64, playerTwoID int64) {
+func createMatch(playerOneID int64, playerTwoID int64) error {
+	playerOneIsWhite := rand.Intn(2) == 1
+	matchID, err := addMatchToDatabase(playerOneID, playerTwoID, playerOneIsWhite)
+	if err != nil {
+		return err
+	}
 	clients.mu.Lock()
 	defer clients.mu.Unlock()
 	var ok bool
@@ -128,18 +135,17 @@ func createMatch(playerOneID int64, playerTwoID int64) {
 	if !ok {
 		clients.clients[playerOneID] = &Client{id: playerOneID, channel: make(chan string)}
 	}
-	clients.clients[playerOneID].channel <- fmt.Sprintf("Match found")
+	clients.clients[playerOneID].channel <- fmt.Sprintf("%v", matchID)
 
 	_, ok = clients.clients[playerTwoID]
 	if !ok {
 		clients.clients[playerTwoID] = &Client{id: playerTwoID, channel: make(chan string)}
 	}
-	clients.clients[playerTwoID].channel <- fmt.Sprintf("Match found")
+	clients.clients[playerTwoID].channel <- fmt.Sprintf("%v", matchID)
 
 	close(clients.clients[playerOneID].channel)
 	close(clients.clients[playerTwoID].channel)
-	// @TODO: implement this
-	addMatchToDatabase(playerOneID, playerTwoID)
+	return nil
 }
 
 func matchPlayers() {
@@ -210,7 +216,11 @@ func matchPlayers() {
 
 		awaitingRemoval.mu.Unlock()
 		// Match players
-		createMatch(playerOne.playerID, playerTwo.playerID)
+		err := createMatch(playerOne.playerID, playerTwo.playerID)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
 		playerOne.isMatched = true
 		playerTwo.isMatched = true
 
@@ -227,7 +237,6 @@ func matchPlayers() {
 			delete(awaitingRemoval.awaitingRemoval, player.playerID)
 		}
 		awaitingRemoval.mu.Unlock()
-
 	}
 
 }
