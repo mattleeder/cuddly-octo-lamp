@@ -239,7 +239,7 @@ function ChessBoard() {
   const { matchid } = useParams()
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
   const [matchState, setMatchState] = useState(null)
-  const [playerCode, setPlayerCode] = useState(2)
+  const [playerColour, setPlayerColour] = useState(PieceColour.Spectator)
 
 
   // var moves = [4, 12, 20]
@@ -280,13 +280,22 @@ function ChessBoard() {
     console.log("FROM WEBSOCKET")
     console.log(message)
     for (let msg of message.split("\n")) {
-      var parsedMsg = JSON.parse(msg)
+      var parsedMsg = JSON.parse(msg)[0]
+      console.log(parsedMsg)
       if (parsedMsg.hasOwnProperty("playerCode")) {
-        setPlayerCode(parsedMsg["playerCode"])
+        var playerCode = parsedMsg["playerCode"]
+        if (playerCode == 0) {
+          setPlayerColour(PieceColour.White)
+        } else if (playerCode == 1) {
+          setPlayerColour(PieceColour.Black)
+        }
       } else if (parsedMsg.hasOwnProperty("newFEN")) {
+        console.log("Setting")
         setGameState(parseGameStateFromFEN(parsedMsg["newFEN"]))
-        setLastMove(parsedMsg("lastMove"))
-        setGameOverStatus(parsedMsg("gameOverStatus"))
+        if (parsedMsg["lastMove"][0] != parsedMsg["lastMove"][1]) {
+          setLastMove(parsedMsg["lastMove"])
+        }
+        setGameOverStatus(parsedMsg["gameOverStatus"])
       }
     }
   }
@@ -384,7 +393,7 @@ function ChessBoard() {
       clickAction = ClickAction.choosePromotion
     } else if ([...moves, ...captures].includes(position)) {
       clickAction = ClickAction.makeMove
-    }else if (gameState.board[position][0] != null && position != selectedPiece) {
+    }else if (gameState.board[position][0] == playerColour && position != selectedPiece) {
       clickAction = ClickAction.showMoves
     }
 

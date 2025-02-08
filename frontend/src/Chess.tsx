@@ -1,6 +1,7 @@
 export enum PieceColour {
     White,
     Black,
+    Spectator,
 }
 
 export enum PieceVariant {
