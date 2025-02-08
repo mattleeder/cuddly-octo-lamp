@@ -106,7 +106,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 
 	var turn byte
 
-	currentGameState := postChessMoveReply{IsValid: true, NewFEN: matchState.current_fen, LastMove: [2]int{last_move_move, last_move_piece}, GameOverStatus: Ongoing}
+	currentGameState := []postChessMoveReply{{IsValid: true, NewFEN: matchState.current_fen, LastMove: [2]int{last_move_move, last_move_piece}, GameOverStatus: Ongoing}}
 	if strings.Split(matchState.current_fen, " ")[1] == "w" {
 		turn = byte(0)
 	} else {
@@ -173,13 +173,21 @@ func (hub *MatchRoomHub) run() {
 
 			newFEN, gameOverStatus := getFENAfterMove(hub.current_fen, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
 			// Need to put move into db
-			data := postChessMoveReply{IsValid: true, NewFEN: newFEN, LastMove: [2]int{chessMove.Piece, chessMove.Move}, GameOverStatus: gameOverStatus}
+			data := []postChessMoveReply{
+				{
+					IsValid:        true,
+					NewFEN:         newFEN,
+					LastMove:       [2]int{chessMove.Piece, chessMove.Move},
+					GameOverStatus: gameOverStatus,
+				},
+			}
 
 			jsonStr, err := json.Marshal(data)
 			if err != nil {
 				log.Printf("Error marshalling JSON: %v\n", err)
 				continue
 			}
+			fmt.Println(jsonStr)
 
 			for client := range hub.clients {
 				select {
@@ -320,6 +328,10 @@ func (c *MatchRoomHubClient) writePump() {
 	}
 }
 
+type sendPlayerCode struct {
+	PlayerCode playerCodeEnum `json:"playerCode"`
+}
+
 // serveWs handles websocket requests from the peer.
 func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
@@ -366,6 +378,18 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 		conn.Close()
 		return
 	}
+
+	// Send player code
+	var codeMessage [1]sendPlayerCode = [1]sendPlayerCode{{PlayerCode: client.playerCode}}
+	var jsonStr []byte
+	jsonStr, err = json.Marshal(codeMessage)
+	if err != nil {
+		fmt.Println(err)
+		conn.WriteMessage(websocket.CloseMessage, []byte{})
+		conn.Close()
+		return
+	}
+	client.send <- jsonStr
 	client.hub.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in

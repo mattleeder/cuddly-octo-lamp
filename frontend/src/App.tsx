@@ -239,6 +239,7 @@ function ChessBoard() {
   const { matchid } = useParams()
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
   const [matchState, setMatchState] = useState(null)
+  const [playerCode, setPlayerCode] = useState(2)
 
 
   // var moves = [4, 12, 20]
@@ -278,6 +279,16 @@ function ChessBoard() {
   function readMessage(message: any) {
     console.log("FROM WEBSOCKET")
     console.log(message)
+    for (let msg of message.split("\n")) {
+      var parsedMsg = JSON.parse(msg)
+      if (parsedMsg.hasOwnProperty("playerCode")) {
+        setPlayerCode(parsedMsg["playerCode"])
+      } else if (parsedMsg.hasOwnProperty("newFEN")) {
+        setGameState(parseGameStateFromFEN(parsedMsg["newFEN"]))
+        setLastMove(parsedMsg("lastMove"))
+        setGameOverStatus(parsedMsg("gameOverStatus"))
+      }
+    }
   }
 
   function wsPostMove(position: number, piece: number, promotion: string) {
@@ -419,11 +430,11 @@ function ChessBoard() {
         console.log(data)
 
         // If accepted update board
-        if (data["isValid"]) {
-          setGameState(parseGameStateFromFEN(data["newFEN"]))
-          setLastMove(data["lastMove"])
-          setGameOverStatus(data["gameOverStatus"])
-        } 
+        // if (data["isValid"]) {
+        //   setGameState(parseGameStateFromFEN(data["newFEN"]))
+        //   setLastMove(data["lastMove"])
+        //   setGameOverStatus(data["gameOverStatus"])
+        // } 
 
         // Clear cache, clear moves
         setToBare()
@@ -557,6 +568,7 @@ function MatchRoom() {
   function readMessage(message: any) {
     console.log("FROM WEBSOCKET")
     console.log(message)
+    JSON.parse(message)
   }
 
   return (
