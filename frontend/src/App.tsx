@@ -388,6 +388,8 @@ function ChessBoard() {
     setWaiting(true)
 
     // Get clickAction state
+    console.log(`Click Action: ${position}`)
+    console.log(`Click Action: ${gameState.board[position][0]}`)
     var clickAction = ClickAction.clear
     if (promotionActive && [0, 8, 16, 24].includes(Math.abs(position - promotionSquare))) {
       clickAction = ClickAction.choosePromotion
@@ -435,8 +437,9 @@ function ChessBoard() {
         }
         // Send current FEN, piece, move, new FEN
         console.log("Post move")
-        var data = await postMove(position, selectedPiece, promotionString)
-        console.log(data)
+        // var data = await postMove(position, selectedPiece, promotionString)
+        wsPostMove(position, selectedPiece, promotionString)
+        // console.log(data)
 
         // If accepted update board
         // if (data["isValid"]) {
@@ -451,7 +454,7 @@ function ChessBoard() {
 
       case ClickAction.showMoves:
         // Fetch moves
-        data = await fetchPossibleMoves(position)
+        var data = await fetchPossibleMoves(position)
         
         // Set Moves
         setMoves(data["moves"] || [])

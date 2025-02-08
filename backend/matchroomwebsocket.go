@@ -154,6 +154,9 @@ func (hub *MatchRoomHub) run() {
 				close(client.send)
 			}
 		case message := <-hub.broadcast:
+			fmt.Println("WS Message")
+			fmt.Println(message)
+			fmt.Println(hub.turn)
 			if message[0] != hub.turn {
 				continue
 			}
@@ -162,7 +165,7 @@ func (hub *MatchRoomHub) run() {
 			// Parse and validate move
 			err := json.Unmarshal(message[1:], &chessMove)
 			if err != nil {
-				log.Printf("Error unmarshalling JSON: %v\n", err)
+				fmt.Printf("Error unmarshalling JSON: %v\n", err)
 				continue
 			}
 
@@ -188,6 +191,9 @@ func (hub *MatchRoomHub) run() {
 				continue
 			}
 			fmt.Println(jsonStr)
+
+			hub.current_fen = newFEN
+			hub.currentGameState = jsonStr
 
 			for client := range hub.clients {
 				select {
