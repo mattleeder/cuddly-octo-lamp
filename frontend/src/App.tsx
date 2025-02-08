@@ -7,7 +7,9 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
-  useParams
+  useParams,
+  redirect,
+  useNavigate,
 } from "react-router-dom";
 
 function App() {
@@ -119,6 +121,7 @@ function JoinQueue() {
   const [inQueue, setInQueue] = useState(false)
   const [waiting, setWaiting] = useState(false)
   const [eventSource, setEventSource] = useState<EventSource | null>(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     return () => {
@@ -154,6 +157,7 @@ function JoinQueue() {
       })
       eventSource.onmessage = (event) => {
         console.log(`message: ${event.data}`)
+        navigate("matchroom/" + event.data)
       }
       setEventSource(eventSource)
       return true
