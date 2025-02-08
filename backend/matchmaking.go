@@ -243,11 +243,11 @@ func matchPlayers() {
 
 func matchmakingService() {
 	for {
-		fmt.Println("Matching")
-		fmt.Println(waitingToJoinPoolA)
-		fmt.Println(waitingToJoinPoolB)
-		fmt.Println(awaitingRemoval.awaitingRemoval)
-		fmt.Println(matchmakingPool)
+		// fmt.Println("Matching")
+		// fmt.Println(waitingToJoinPoolA)
+		// fmt.Println(waitingToJoinPoolB)
+		// fmt.Println(awaitingRemoval.awaitingRemoval)
+		// fmt.Println(matchmakingPool)
 		matchPlayers()
 		time.Sleep(500 * time.Millisecond)
 	}

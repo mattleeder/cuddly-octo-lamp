@@ -3,78 +3,23 @@ import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 import { parseGameStateFromFEN, PieceVariant, PieceColour } from './Chess.tsx'
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useParams
+} from "react-router-dom";
 
 function App() {
-  const [count, setCount] = useState(0)
-  const [responseText, setResponseText] = useState("")
-
-  const [fen, setFen] = useState("")
-  const [piece, setPiece] = useState("")
-  const [move, setMove] = useState("")
-
   console.log(import.meta.env.VITE_API_URL)
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <div>
-        <label htmlFor="fen">FEN</label>
-        <input type="text" id="fen" name="fen" value={fen} onChange={(event) => setFen(event.target.value)}/>
-        <br />
-
-        <label htmlFor="piece">Piece</label>
-        <input type="text" id="piece" name="piece" value={piece} onChange={(event) => setPiece(event.target.value)}/>
-        <br />
-
-        <label htmlFor="move">Move</label>
-        <input type="move" id="move" name="move" value={move} onChange={(event) => setMove(event.target.value)}/>
-        <br />
-
-        <input type="submit" onClick={() => {
-          setResponseText("Waiting")
-          fetch(import.meta.env.VITE_API_URL, {
-            "method": "POST",
-            "body": JSON.stringify({
-              "fen": fen,
-              "piece": parseInt(piece),
-              "move": parseInt(move),
-            })
-          }).then(
-            (response) => {
-              response.text().then(
-                (value) => setResponseText(value),
-                () => setResponseText("Could Not Read")
-              )
-            },
-            () => setResponseText("Failed")
-          )
-        }}/>
-      </div>
-      <div>
-        {responseText}
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-      <ChessBoard />
-      <JoinQueue />
-    </>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/matchroom/:matchid" element={<ChessBoard />} />
+      </Routes>
+    </Router>
   )
 }
 
@@ -97,6 +42,77 @@ enum ClickAction {
   showMoves,
   makeMove,
   choosePromotion,
+}
+
+function Home() {
+  const [count, setCount] = useState(0)
+  const [responseText, setResponseText] = useState("")
+
+  const [fen, setFen] = useState("")
+  const [piece, setPiece] = useState("")
+  const [move, setMove] = useState("")
+  return (
+    <>
+      <div>
+      <a href="https://vite.dev" target="_blank">
+        <img src={viteLogo} className="logo" alt="Vite logo" />
+      </a>
+      <a href="https://react.dev" target="_blank">
+        <img src={reactLogo} className="logo react" alt="React logo" />
+      </a>
+    </div>
+    <h1>Vite + React</h1>
+    <div className="card">
+      <button onClick={() => setCount((count) => count + 1)}>
+        count is {count}
+      </button>
+      <p>
+        Edit <code>src/App.tsx</code> and save to test HMR
+      </p>
+    </div>
+    <div>
+      <label htmlFor="fen">FEN</label>
+      <input type="text" id="fen" name="fen" value={fen} onChange={(event) => setFen(event.target.value)}/>
+      <br />
+
+      <label htmlFor="piece">Piece</label>
+      <input type="text" id="piece" name="piece" value={piece} onChange={(event) => setPiece(event.target.value)}/>
+      <br />
+
+      <label htmlFor="move">Move</label>
+      <input type="move" id="move" name="move" value={move} onChange={(event) => setMove(event.target.value)}/>
+      <br />
+
+      <input type="submit" onClick={() => {
+        setResponseText("Waiting")
+        fetch(import.meta.env.VITE_API_URL, {
+          "method": "POST",
+          "body": JSON.stringify({
+            "fen": fen,
+            "piece": parseInt(piece),
+            "move": parseInt(move),
+          })
+        }).then(
+          (response) => {
+            response.text().then(
+              (value) => setResponseText(value),
+              () => setResponseText("Could Not Read")
+            )
+          },
+          () => setResponseText("Failed")
+        )
+      }}/>
+    </div>
+    <div>
+      {responseText}
+    </div>
+    <p className="read-the-docs">
+      Click on the Vite and React logos to learn more
+    </p>
+    <ChessBoard />
+    <JoinQueue />
+  </>
+  )
 }
 
 function JoinQueue() {
@@ -216,6 +232,10 @@ function ChessBoard() {
   const [gameState, setGameState] = useState(parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"))
   const [gameOverStatus, setGameOverStatus] = useState(0)
 
+  const { matchid } = useParams()
+  const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
+  const [matchState, setMatchState] = useState(null)
+
 
   // var moves = [4, 12, 20]
   // var captures = [1, 8, 9]
@@ -241,12 +261,28 @@ function ChessBoard() {
   }, [])
 
   useEffect(() => {
-    console.log(moves)
-  }, [moves])
+    // Connect to websocket for matchroom
+    var ws = new WebSocket(import.meta.env.VITE_API_MATCHROOM_URL + matchid + '/ws')
+    ws.onmessage = (event) => readMessage(event.data)
+    setWebSocket(ws)
+    return () => {
+      // Disconnect
+      ws?.close()
+    }
+  }, [])
 
-  useEffect(() => {
-    console.log(captures)
-  }, [captures])
+  function readMessage(message: any) {
+    console.log("FROM WEBSOCKET")
+    console.log(message)
+  }
+
+  function wsPostMove(position: number, piece: number, promotion: string) {
+    webSocket?.send(JSON.stringify({
+      "piece": piece,
+      "move": position,
+      "promotionString": promotion,
+    }))
+  }
 
   async function fetchPossibleMoves(position: number) {
     try {
@@ -274,6 +310,7 @@ function ChessBoard() {
   }
 
   async function postMove(position: number, piece: number, promotion: string) {
+    wsPostMove(position, piece, promotion)
     try {
       var newBoard = [...gameState.board]
       newBoard[position] = newBoard[piece]
@@ -489,15 +526,38 @@ function ChessBoard() {
   )
 }
 
+interface matchState {
+  
+}
+
 function MatchRoom() {
-  const [connectionInfo, setConnectionInfo] = useState("")
+  // If match doesnt exist redirect to home
+  const { matchid } = useParams()
+  const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
+  const [matchState, setMatchState] = useState(null)
+
+  console.log(`Matchroom: ${matchid}`)
+  console.log(import.meta.env.VITE_API_MATCHROOM_URL + matchid + '/ws')
 
   useEffect(() => {
-    // Connect
+    // Connect to websocket for matchroom
+    var ws = new WebSocket(import.meta.env.VITE_API_MATCHROOM_URL + matchid + '/ws')
+    ws.onmessage = (event) => readMessage(event.data)
+    setWebSocket(ws)
     return () => {
       // Disconnect
+      ws?.close()
     }
   }, [])
+
+  function readMessage(message: any) {
+    console.log("FROM WEBSOCKET")
+    console.log(message)
+  }
+
+  return (
+    <ChessBoard />
+  )
 }
 
 export default App

@@ -18,6 +18,14 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+type playerCodeEnum int
+
+const (
+	WhitePieces = iota
+	BlackPieces
+	Spectator
+)
+
 var secretKey []byte
 
 var (
@@ -364,6 +372,68 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type MatchStateResponse struct {
+	PlayerCode playerCodeEnum `json:"playerCode"`
+	MatchState MatchStateData `json:"matchStateData"`
+}
+
+func getMatchStateHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+	var couldBePlayer = true
+	var err error
+	var playerid string
+	var matchID int64
+
+	playerid, err = ReadSigned(r, secretKey, "playerid")
+	if err != nil {
+		couldBePlayer = false
+	}
+
+	var playerIDasInt int64
+	if couldBePlayer {
+		playerIDasInt, err = strconv.ParseInt(playerid, 10, 64)
+		if err != nil {
+			couldBePlayer = false
+		}
+	}
+
+	matchID, err = strconv.ParseInt(r.PathValue("matchID"), 10, 64)
+	if err != nil {
+		http.Error(w, "Could not parse match room", http.StatusInternalServerError)
+		return
+	}
+
+	var matchStateData *MatchStateData
+	matchStateData, err = getLiveMatchStateFromInt64(matchID)
+	if err != nil {
+		http.Error(w, "Could not get match data", http.StatusInternalServerError)
+	}
+
+	var playerCode playerCodeEnum
+
+	if !couldBePlayer {
+		playerCode = Spectator
+	} else if playerIDasInt == matchStateData.white_player_id {
+		playerCode = WhitePieces
+	} else {
+		playerCode = BlackPieces
+	}
+
+	response := MatchStateResponse{PlayerCode: playerCode, MatchState: *matchStateData}
+
+	var jsonStr []byte
+
+	jsonStr, err = json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(jsonStr)
+}
+
 func main() {
 
 	secretKey = []byte("}\xa4\xc3\x85D\x89\xb75\xf0\xe6\xcf\xcaZ\x00k\x88\xe4\x8f\xd0\xd6\x95\x0e\xa6\xf9\xc2;!\xa2\xc4[\xca\x91")
@@ -381,6 +451,8 @@ func main() {
 	http.HandleFunc("/makeMove", postChessMoveHandler)
 	http.HandleFunc("/joinQueue", joinQueueHandler)
 	http.HandleFunc("/listenformatch", matchFoundSSEHandler)
+	http.HandleFunc("/matchroom/{matchID}", getMatchStateHandler)
+	http.HandleFunc("/matchroom/{matchID}/ws", serveMatchroomWs)
 
 	go matchmakingService()
 	log.Fatal(http.ListenAndServeTLS(":8080", "burrchess.crt", "burrchess.key", nil))

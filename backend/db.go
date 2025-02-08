@@ -154,6 +154,40 @@ func addMatchToDatabase(playerOneID int64, playerTwoID int64, playerOneIsWhite b
 	return result.LastInsertId()
 }
 
+type MatchStateData struct {
+	matchID         int64         `json:"matchID"`
+	white_player_id int64         `json:"whitePlayerID"`
+	black_player_id int64         `json:"blackPlayerID"`
+	last_move_piece sql.NullInt64 `json:"lastMovePiece"`
+	last_move_move  sql.NullInt64 `json:"lastMoveMove"`
+	current_fen     string        `json:"currentFEN"`
+}
+
+func getLiveMatchStateFromInt64(matchID int64) (*MatchStateData, error) {
+	row := db.QueryRow("select * from live_matches where match_id=?;", matchID)
+
+	var _matchID int64
+	var white_player_id int64
+	var black_player_id int64
+	var last_move_piece sql.NullInt64
+	var last_move_move sql.NullInt64
+	var current_fen string
+
+	err := row.Scan(&_matchID, &white_player_id, &black_player_id, &last_move_piece, &last_move_move, &current_fen)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MatchStateData{
+		matchID:         matchID,
+		white_player_id: white_player_id,
+		black_player_id: black_player_id,
+		last_move_piece: last_move_piece,
+		last_move_move:  last_move_move,
+		current_fen:     current_fen,
+	}, nil
+}
+
 func checkLiveMatches() {
 	fmt.Println("Queue state")
 
