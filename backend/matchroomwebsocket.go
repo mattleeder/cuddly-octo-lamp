@@ -194,6 +194,7 @@ func (hub *MatchRoomHub) run() {
 
 			hub.current_fen = newFEN
 			hub.currentGameState = jsonStr
+			go updateFENForLiveMatch(hub.matchID, newFEN, chessMove.Piece, chessMove.Move)
 
 			for client := range hub.clients {
 				select {

@@ -193,7 +193,7 @@ func checkLiveMatches() {
 
 	rows, err := db.Query("select * from live_matches;")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
 	}
 
 	defer rows.Close()
@@ -205,4 +205,20 @@ func checkLiveMatches() {
 		log.Fatal(err)
 	}
 
+}
+
+func updateFENForLiveMatch(matchID int64, newFEN string, lastMovePiece int, lastMoveMove int) error {
+	defer checkLiveMatches()
+	sqlStmt := `
+	UPDATE live_matches
+	SET last_move_piece = ?, last_move_move = ?, current_fen = ?
+	WHERE match_id = ?
+	`
+	_, err := db.Exec(sqlStmt, lastMovePiece, lastMoveMove, newFEN, matchID)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return nil
 }
