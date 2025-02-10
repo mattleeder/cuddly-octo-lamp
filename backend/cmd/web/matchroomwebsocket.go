@@ -357,7 +357,7 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 	var rawID int64
 	var playerIDasInt *int64
 
-	playerid, err = ReadSigned(r, secretKey, "playerid")
+	playerid, err = ReadSigned(r, app.secretKey, "playerid")
 	if err == nil {
 		rawID, err = strconv.ParseInt(playerid, 10, 64)
 		playerIDasInt = &rawID

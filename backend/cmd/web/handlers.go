@@ -7,11 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
-	"net/http/pprof"
-	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -26,8 +23,6 @@ const (
 	BlackPieces
 	Spectator
 )
-
-var secretKey []byte
 
 var (
 	ErrValueTooLong = errors.New("Cookie value too long")
@@ -164,6 +159,10 @@ func chessMoveValidationHandler(w http.ResponseWriter, r *http.Request) {
 func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println()
 	start := time.Now()
+	if r.Method != "POST" {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
 
 	var chessMoveData getChessMoveData
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
@@ -196,6 +195,11 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println()
 	start := time.Now()
+
+	if r.Method != "POST" {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
 
 	var chessMove postChessMove
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
@@ -237,6 +241,11 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 	defer checkQueue()
 	start := time.Now()
 
+	if r.Method != "POST" {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+
 	var joinQueue joinQueueRequest
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -253,7 +262,7 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(r.Cookies())
 
 	// Read cookie
-	playerid, err := ReadSigned(r, secretKey, "playerid")
+	playerid, err := ReadSigned(r, app.secretKey, "playerid")
 
 	fmt.Println(err)
 
@@ -270,7 +279,7 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 			Secure:   true,
 		}
 
-		err = WriteSigned(w, cookie, secretKey)
+		err = WriteSigned(w, cookie, app.secretKey)
 		if err != nil {
 			http.Error(w, "Unable to decode or write cookie", http.StatusInternalServerError)
 			return
@@ -298,11 +307,6 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 		removePlayerFromWaitingPool(playerIDasInt)
 	}
 
-	if err != nil {
-		http.Error(w, "Unable to add/remove player to/from queue", http.StatusInternalServerError)
-		return
-	}
-
 	elapsed := time.Since(start)
 	fmt.Printf("Took %s\n\n", elapsed)
 }
@@ -325,7 +329,7 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 
-	playerid, err := ReadSigned(r, secretKey, "playerid")
+	playerid, err := ReadSigned(r, app.secretKey, "playerid")
 	if err != nil {
 		http.Error(w, "Could not read cookies", http.StatusBadRequest)
 	}
@@ -383,13 +387,14 @@ type MatchStateResponse struct {
 func getMatchStateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
+	w.Header().Set("Content-Type", "application/json")
 
 	var couldBePlayer = true
 	var err error
 	var playerid string
 	var matchID int64
 
-	playerid, err = ReadSigned(r, secretKey, "playerid")
+	playerid, err = ReadSigned(r, app.secretKey, "playerid")
 	if err != nil {
 		couldBePlayer = false
 	}
@@ -435,42 +440,4 @@ func getMatchStateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write(jsonStr)
-}
-
-func main() {
-
-	secretKey = []byte("}\xa4\xc3\x85D\x89\xb75\xf0\xe6\xcf\xcaZ\x00k\x88\xe4\x8f\xd0\xd6\x95\x0e\xa6\xf9\xc2;!\xa2\xc4[\xca\x91")
-
-	fmt.Println(secretKey)
-
-	os.Remove("./chess_site.db")
-
-	db := initDatabase()
-
-	defer db.Close()
-
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/", chessMoveValidationHandler)
-	mux.HandleFunc("/getMoves", getChessMovesHandler)
-	mux.HandleFunc("/makeMove", postChessMoveHandler)
-	mux.HandleFunc("/joinQueue", joinQueueHandler)
-	mux.HandleFunc("/listenformatch", matchFoundSSEHandler)
-	mux.HandleFunc("/matchroom/{matchID}", getMatchStateHandler)
-	mux.HandleFunc("/matchroom/{matchID}/ws", serveMatchroomWs)
-
-	// Add the pprof routes
-	mux.HandleFunc("/debug/pprof/", pprof.Index)
-	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-
-	mux.Handle("/debug/pprof/block", pprof.Handler("block"))
-	mux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
-	mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
-	mux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
-
-	go matchmakingService()
-	log.Fatal(http.ListenAndServeTLS(":8080", "localhost.crt", "localhost.key", mux))
 }

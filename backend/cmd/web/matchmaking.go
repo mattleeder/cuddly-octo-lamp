@@ -56,9 +56,9 @@ type RemovalMap struct {
 
 // Lock openPol?
 var openPool = OpenPool{openPool: 0} // The pool to add waiting players too, 0 for A, 1 for B
-var waitingToJoinPoolA []playerMatchmakingData
-var waitingToJoinPoolB []playerMatchmakingData
-var matchmakingPool []playerMatchmakingData
+var waitingToJoinPoolA []*playerMatchmakingData
+var waitingToJoinPoolB []*playerMatchmakingData
+var matchmakingPool []*playerMatchmakingData
 var awaitingRemoval = RemovalMap{awaitingRemoval: make(map[int64]bool)}
 var pendingRemovalRequests []int // Array of playerIDs
 
@@ -76,12 +76,12 @@ func addPlayerToWaitingPool(playerID int64) {
 	}
 	awaitingRemoval.mu.Unlock()
 
-	var pools = []*[]playerMatchmakingData{&waitingToJoinPoolA, &waitingToJoinPoolB}
+	var pools = []*[]*playerMatchmakingData{&waitingToJoinPoolA, &waitingToJoinPoolB}
 
 	// Should openPool be locked?
 	openPool.mu.Lock()
 	*pools[openPool.openPool] = append(*pools[openPool.openPool],
-		playerMatchmakingData{
+		&playerMatchmakingData{
 			playerID:             playerID,
 			elo:                  1500,
 			matchmakingThreshold: defaultMatchmakingThreshold,
@@ -106,8 +106,8 @@ func removePlayerFromWaitingPool(playerID int64) {
 	return
 }
 
-func calculateMatchingScore(playerOne playerMatchmakingData, playerOneIdx int, playerTwo playerMatchmakingData, playerTwoIdx int) matchingScore {
-	return matchingScore{
+func calculateMatchingScore(playerOne *playerMatchmakingData, playerOneIdx int, playerTwo *playerMatchmakingData, playerTwoIdx int) *matchingScore {
+	return &matchingScore{
 		playerOneID:  playerOne.playerID,
 		playerOneIdx: playerOneIdx,
 		playerTwoID:  playerTwo.playerID,
@@ -173,11 +173,11 @@ func matchPlayers() {
 	openPool.mu.Unlock()
 
 	// Empty the pool
-	var pools = []*[]playerMatchmakingData{&waitingToJoinPoolA, &waitingToJoinPoolB}
+	var pools = []*[]*playerMatchmakingData{&waitingToJoinPoolA, &waitingToJoinPoolB}
 	matchmakingPool = append(matchmakingPool, *pools[poolToEmpty]...)
-	*pools[poolToEmpty] = []playerMatchmakingData{}
+	*pools[poolToEmpty] = []*playerMatchmakingData{}
 
-	var validMatches = []matchingScore{}
+	var validMatches = []*matchingScore{}
 
 	// Should we sort validMatches first?
 
@@ -202,8 +202,8 @@ func matchPlayers() {
 
 	// Go through all scores
 	for _, score := range validMatches {
-		playerOne := &matchmakingPool[score.playerOneIdx]
-		playerTwo := &matchmakingPool[score.playerTwoIdx]
+		playerOne := matchmakingPool[score.playerOneIdx]
+		playerTwo := matchmakingPool[score.playerTwoIdx]
 
 		awaitingRemoval.mu.Lock()
 		if playerOne.isMatched || awaitingRemoval.awaitingRemoval[playerOne.playerID] {
@@ -244,7 +244,8 @@ func matchPlayers() {
 }
 
 func matchmakingService() {
-	defer fmt.Println("Matchmaking service ended")
+	app.infoLog.Printf("Starting matchmakingService")
+	defer app.infoLog.Printf("Ending matchmakingService")
 	for {
 		fmt.Println("Matching")
 		fmt.Println(waitingToJoinPoolA)
