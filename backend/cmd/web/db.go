@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -19,7 +18,7 @@ func initDatabase() *sql.DB {
 	db, err = sql.Open("sqlite", "./chess_site.db")
 	if err != nil {
 		defer db.Close()
-		log.Fatal(err)
+		app.errorLog.Fatal(err)
 	}
 
 	sqlStmt := `
@@ -32,7 +31,7 @@ func initDatabase() *sql.DB {
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
 		defer db.Close()
-		log.Fatalf("%q: %s\n", err, sqlStmt)
+		app.errorLog.Fatalf("%q: %s\n", err, sqlStmt)
 	}
 
 	return db
@@ -77,7 +76,7 @@ func insertNewLiveMatch() (int64, error) {
 
 	res, err := db.Exec(sqlStmt)
 	if err != nil {
-		log.Println(err)
+		app.errorLog.Println(err)
 		return 0, err
 	}
 
@@ -91,7 +90,7 @@ func addPlayerToQueue(playerid int64, time int, increment int) error {
 
 	_, err := db.Exec(sqlStmt, playerid)
 	if err != nil {
-		log.Println(err)
+		app.errorLog.Println(err)
 		return err
 	}
 
@@ -105,7 +104,7 @@ func removePlayerFromQueue(playerid int64, time int, increment int) error {
 
 	_, err := db.Exec(sqlStmt, playerid)
 	if err != nil {
-		log.Println(err)
+		app.errorLog.Println(err)
 		return err
 	}
 
@@ -117,7 +116,7 @@ func checkQueue() {
 
 	rows, err := db.Query("select playerid from matchmaking_queue;")
 	if err != nil {
-		log.Println(err)
+		app.errorLog.Println(err)
 	}
 
 	defer rows.Close()
@@ -125,13 +124,13 @@ func checkQueue() {
 		var playerid int
 		err = rows.Scan(&playerid)
 		if err != nil {
-			log.Println(err)
+			app.errorLog.Println(err)
 		}
 		fmt.Println(playerid)
 	}
 	err = rows.Err()
 	if err != nil {
-		log.Println(err)
+		app.errorLog.Println(err)
 	}
 
 }
@@ -150,6 +149,7 @@ func addMatchToDatabase(playerOneID int64, playerTwoID int64, playerOneIsWhite b
 		}
 
 		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
+			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
@@ -158,7 +158,7 @@ func addMatchToDatabase(playerOneID int64, playerTwoID int64, playerOneIsWhite b
 	}
 
 	if err != nil {
-		log.Println(err)
+		app.errorLog.Println(err)
 		return 0, err
 	}
 
@@ -204,7 +204,7 @@ func checkLiveMatches() {
 
 	rows, err := db.Query("select * from live_matches;")
 	if err != nil {
-		fmt.Println(err)
+		app.errorLog.Println(err)
 		return
 	}
 
@@ -214,7 +214,7 @@ func checkLiveMatches() {
 	}
 	err = rows.Err()
 	if err != nil {
-		log.Println(err)
+		app.errorLog.Println(err)
 	}
 
 }
@@ -228,7 +228,7 @@ func updateFENForLiveMatch(matchID int64, newFEN string, lastMovePiece int, last
 	`
 	_, err := db.Exec(sqlStmt, lastMovePiece, lastMoveMove, newFEN, matchID)
 	if err != nil {
-		log.Println(err)
+		app.errorLog.Println(err)
 		return err
 	}
 

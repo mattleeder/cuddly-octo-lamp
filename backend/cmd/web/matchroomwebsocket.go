@@ -9,7 +9,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -140,9 +139,9 @@ type wsChessMove struct {
 }
 
 func (hub *MatchRoomHub) run() {
-	defer fmt.Println("Hub stopped")
+	defer app.infoLog.Println("Hub stopped")
 	for {
-		fmt.Println("Hub running")
+		app.infoLog.Println("Hub running")
 		select {
 		// Clients get currentGameState on register
 		case client := <-hub.register:
@@ -154,9 +153,9 @@ func (hub *MatchRoomHub) run() {
 				close(client.send)
 			}
 		case message := <-hub.broadcast:
-			fmt.Println("WS Message")
-			fmt.Println(message)
-			fmt.Println(hub.turn)
+			app.infoLog.Println("WS Message")
+			app.infoLog.Println(message)
+			app.infoLog.Println(hub.turn)
 			if message[0] != hub.turn {
 				continue
 			}
@@ -165,7 +164,7 @@ func (hub *MatchRoomHub) run() {
 			// Parse and validate move
 			err := json.Unmarshal(message[1:], &chessMove)
 			if err != nil {
-				fmt.Printf("Error unmarshalling JSON: %v\n", err)
+				app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
 				continue
 			}
 
@@ -187,10 +186,9 @@ func (hub *MatchRoomHub) run() {
 
 			jsonStr, err := json.Marshal(data)
 			if err != nil {
-				log.Printf("Error marshalling JSON: %v\n", err)
+				app.errorLog.Printf("Error marshalling JSON: %v\n", err)
 				continue
 			}
-			fmt.Println(jsonStr)
 
 			hub.current_fen = newFEN
 			hub.currentGameState = jsonStr
@@ -270,9 +268,9 @@ func (c *MatchRoomHubClient) readPump() {
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
-		fmt.Println("Checking for client sent messages")
+		app.infoLog.Println("Checking for client sent messages")
 		_, message, err := c.conn.ReadMessage()
-		fmt.Println(message)
+		app.infoLog.Println(message)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error: %v", err)
@@ -300,7 +298,6 @@ func (c *MatchRoomHubClient) writePump() {
 		c.conn.Close()
 	}()
 	for {
-		fmt.Println("Checking for client read messages")
 		select {
 		case message, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
@@ -344,7 +341,7 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 
-	fmt.Println("WS Request")
+	app.infoLog.Println("WS Request")
 
 	matchID, err := strconv.ParseInt(r.PathValue("matchID"), 10, 64)
 	if err != nil {
@@ -380,7 +377,7 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 
 	client, err = matchRoomHubManager.registerClientToMatchRoomHub(conn, matchID, playerIDasInt)
 	if err != nil {
-		fmt.Println(err)
+		app.errorLog.Println(err)
 		conn.WriteMessage(websocket.CloseMessage, []byte{})
 		conn.Close()
 		return
@@ -391,7 +388,7 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 	var jsonStr []byte
 	jsonStr, err = json.Marshal(codeMessage)
 	if err != nil {
-		fmt.Println(err)
+		app.errorLog.Println(err)
 		conn.WriteMessage(websocket.CloseMessage, []byte{})
 		conn.Close()
 		return

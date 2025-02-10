@@ -247,11 +247,11 @@ func matchmakingService() {
 	app.infoLog.Printf("Starting matchmakingService")
 	defer app.infoLog.Printf("Ending matchmakingService")
 	for {
-		fmt.Println("Matching")
-		fmt.Println(waitingToJoinPoolA)
-		fmt.Println(waitingToJoinPoolB)
-		fmt.Println(awaitingRemoval.awaitingRemoval)
-		fmt.Println(matchmakingPool)
+		app.infoLog.Println("Matching")
+		app.infoLog.Println(waitingToJoinPoolA)
+		app.infoLog.Println(waitingToJoinPoolB)
+		app.infoLog.Println(awaitingRemoval.awaitingRemoval)
+		app.infoLog.Println(matchmakingPool)
 		matchPlayers()
 		time.Sleep(500 * time.Millisecond)
 	}
