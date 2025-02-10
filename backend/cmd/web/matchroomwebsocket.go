@@ -88,25 +88,25 @@ type MatchRoomHub struct {
 }
 
 func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
-	matchState, err := getLiveMatchStateFromInt64(matchID)
+	matchState, err := app.liveMatches.GetFromMatchID(matchID)
 
 	if err != nil {
 		return nil, err
 	}
 
 	var last_move_move, last_move_piece int
-	if !matchState.Last_move_move.Valid {
+	if !matchState.LastMoveMove.Valid {
 		last_move_move = 0
 	}
 
-	if !matchState.Last_move_piece.Valid {
+	if !matchState.LastMovePiece.Valid {
 		last_move_piece = 0
 	}
 
 	var turn byte
 
-	currentGameState := []postChessMoveReply{{IsValid: true, NewFEN: matchState.Current_fen, LastMove: [2]int{last_move_move, last_move_piece}, GameOverStatus: Ongoing}}
-	if strings.Split(matchState.Current_fen, " ")[1] == "w" {
+	currentGameState := []postChessMoveReply{{IsValid: true, NewFEN: matchState.CurrentFEN, LastMove: [2]int{last_move_move, last_move_piece}, GameOverStatus: Ongoing}}
+	if strings.Split(matchState.CurrentFEN, " ")[1] == "w" {
 		turn = byte(0)
 	} else {
 		turn = byte(1)
@@ -124,11 +124,11 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		register:         make(chan *MatchRoomHubClient),
 		unregister:       make(chan *MatchRoomHubClient),
 		clients:          make(map[*MatchRoomHubClient]bool),
-		whitePlayerID:    matchState.White_player_id,
-		blackPlayerID:    matchState.Black_player_id,
+		whitePlayerID:    matchState.WhitePlayerID,
+		blackPlayerID:    matchState.BlackPlayerID,
 		turn:             turn,
 		currentGameState: jsonStr,
-		current_fen:      matchState.Current_fen,
+		current_fen:      matchState.CurrentFEN,
 	}, nil
 }
 
@@ -192,7 +192,7 @@ func (hub *MatchRoomHub) run() {
 
 			hub.current_fen = newFEN
 			hub.currentGameState = jsonStr
-			go updateFENForLiveMatch(hub.matchID, newFEN, chessMove.Piece, chessMove.Move)
+			go app.liveMatches.UpdateFENForLiveMatch(hub.matchID, newFEN, chessMove.Piece, chessMove.Move)
 
 			for client := range hub.clients {
 				select {

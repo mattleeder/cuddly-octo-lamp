@@ -1,6 +1,7 @@
 package main
 
 import (
+	"burrchess/internal/models"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -154,7 +155,7 @@ func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
 func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	defer func() { app.infoLog.Printf("joinQueueHandler took: %s\n", time.Since(start)) }()
-	defer checkQueue()
+	defer app.matchmakingQueue.LogQueue()
 
 	if r.Method != "POST" {
 		w.Header().Set("Allow", "POST")
@@ -277,7 +278,7 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 		clients.mu.Unlock()
 	}()
 
-	defer checkLiveMatches()
+	defer app.liveMatches.LogAll()
 
 	for {
 		select {
@@ -294,8 +295,8 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type MatchStateResponse struct {
-	PlayerCode playerCodeEnum `json:"playerCode"`
-	MatchState MatchStateData `json:"matchStateData"`
+	PlayerCode playerCodeEnum   `json:"playerCode"`
+	MatchState models.LiveMatch `json:"matchStateData"`
 }
 
 func getMatchStateHandler(w http.ResponseWriter, r *http.Request) {
@@ -327,8 +328,8 @@ func getMatchStateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var matchStateData *MatchStateData
-	matchStateData, err = getLiveMatchStateFromInt64(matchID)
+	var matchStateData *models.LiveMatch
+	matchStateData, err = app.liveMatches.GetFromMatchID(matchID)
 	if err != nil {
 		app.serverError(w, err)
 	}
@@ -337,7 +338,7 @@ func getMatchStateHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !couldBePlayer {
 		playerCode = Spectator
-	} else if playerIDasInt == matchStateData.White_player_id {
+	} else if playerIDasInt == matchStateData.WhitePlayerID {
 		playerCode = WhitePieces
 	} else {
 		playerCode = BlackPieces

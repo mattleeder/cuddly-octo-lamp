@@ -123,7 +123,7 @@ func swapRemove[T any](arr []T, idx int) []T {
 
 func createMatch(playerOneID int64, playerTwoID int64) error {
 	playerOneIsWhite := rand.Intn(2) == 1
-	matchID, err := addMatchToDatabase(playerOneID, playerTwoID, playerOneIsWhite)
+	matchID, err := app.liveMatches.InsertNew(playerOneID, playerTwoID, playerOneIsWhite)
 	if err != nil {
 		return err
 	}
@@ -244,15 +244,19 @@ func matchPlayers() {
 }
 
 func matchmakingService() {
+	iterations := 0
 	app.infoLog.Printf("Starting matchmakingService")
 	defer app.infoLog.Printf("Ending matchmakingService")
 	for {
-		app.infoLog.Println("Matching")
-		app.infoLog.Println(waitingToJoinPoolA)
-		app.infoLog.Println(waitingToJoinPoolB)
-		app.infoLog.Println(awaitingRemoval.awaitingRemoval)
-		app.infoLog.Println(matchmakingPool)
+		if iterations%20 == 0 {
+			app.infoLog.Println("Matching")
+			app.infoLog.Println(waitingToJoinPoolA)
+			app.infoLog.Println(waitingToJoinPoolB)
+			app.infoLog.Println(awaitingRemoval.awaitingRemoval)
+			app.infoLog.Println(matchmakingPool)
+		}
 		matchPlayers()
 		time.Sleep(500 * time.Millisecond)
+		iterations += 1
 	}
 }
