@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -73,6 +74,7 @@ func insertNewLiveMatch() (int64, error) {
 	insert into live_matches DEFAULT VALUES;
 	`
 	// Res will give last insert id
+
 	res, err := db.Exec(sqlStmt)
 	if err != nil {
 		log.Println(err)
@@ -115,7 +117,7 @@ func checkQueue() {
 
 	rows, err := db.Query("select playerid from matchmaking_queue;")
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
 	defer rows.Close()
@@ -123,13 +125,13 @@ func checkQueue() {
 		var playerid int
 		err = rows.Scan(&playerid)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 		fmt.Println(playerid)
 	}
 	err = rows.Err()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
 }
@@ -140,10 +142,19 @@ func addMatchToDatabase(playerOneID int64, playerTwoID int64, playerOneIsWhite b
 	`
 	var result sql.Result
 	var err error
-	if playerOneIsWhite {
-		result, err = db.Exec(sqlStmt, playerOneID, playerTwoID)
-	} else {
-		result, err = db.Exec(sqlStmt, playerTwoID, playerOneID)
+	for {
+		if playerOneIsWhite {
+			result, err = db.Exec(sqlStmt, playerOneID, playerTwoID)
+		} else {
+			result, err = db.Exec(sqlStmt, playerTwoID, playerOneID)
+		}
+
+		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+
+		break
 	}
 
 	if err != nil {
@@ -194,6 +205,7 @@ func checkLiveMatches() {
 	rows, err := db.Query("select * from live_matches;")
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 
 	defer rows.Close()
@@ -202,7 +214,7 @@ func checkLiveMatches() {
 	}
 	err = rows.Err()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
 }

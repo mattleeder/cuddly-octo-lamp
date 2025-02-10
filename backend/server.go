@@ -10,6 +10,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"strconv"
 	"sync"
@@ -240,9 +241,11 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 
+	fmt.Printf("%v\n", r.Body)
+
 	err := json.NewDecoder(r.Body).Decode(&joinQueue)
 	if err != nil {
-		http.Error(w, "Could not decode join queue request", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Could not decode join queue request: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -288,10 +291,10 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if joinQueue.Action == "join" {
-		err = addPlayerToQueue(playerIDasInt, joinQueue.Time, joinQueue.Increment)
+		// err = addPlayerToQueue(playerIDasInt, joinQueue.Time, joinQueue.Increment)
 		addPlayerToWaitingPool(playerIDasInt)
 	} else {
-		err = removePlayerFromQueue(playerIDasInt, joinQueue.Time, joinQueue.Increment)
+		// err = removePlayerFromQueue(playerIDasInt, joinQueue.Time, joinQueue.Increment)
 		removePlayerFromWaitingPool(playerIDasInt)
 	}
 
@@ -446,14 +449,28 @@ func main() {
 
 	defer db.Close()
 
-	http.HandleFunc("/", chessMoveValidationHandler)
-	http.HandleFunc("/getMoves", getChessMovesHandler)
-	http.HandleFunc("/makeMove", postChessMoveHandler)
-	http.HandleFunc("/joinQueue", joinQueueHandler)
-	http.HandleFunc("/listenformatch", matchFoundSSEHandler)
-	http.HandleFunc("/matchroom/{matchID}", getMatchStateHandler)
-	http.HandleFunc("/matchroom/{matchID}/ws", serveMatchroomWs)
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", chessMoveValidationHandler)
+	mux.HandleFunc("/getMoves", getChessMovesHandler)
+	mux.HandleFunc("/makeMove", postChessMoveHandler)
+	mux.HandleFunc("/joinQueue", joinQueueHandler)
+	mux.HandleFunc("/listenformatch", matchFoundSSEHandler)
+	mux.HandleFunc("/matchroom/{matchID}", getMatchStateHandler)
+	mux.HandleFunc("/matchroom/{matchID}/ws", serveMatchroomWs)
+
+	// Add the pprof routes
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+	mux.Handle("/debug/pprof/block", pprof.Handler("block"))
+	mux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+	mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+	mux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
 
 	go matchmakingService()
-	log.Fatal(http.ListenAndServeTLS(":8080", "burrchess.crt", "burrchess.key", nil))
+	log.Fatal(http.ListenAndServeTLS(":8080", "localhost.crt", "localhost.key", mux))
 }

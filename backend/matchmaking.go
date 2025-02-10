@@ -127,19 +127,21 @@ func createMatch(playerOneID int64, playerTwoID int64) error {
 	if err != nil {
 		return err
 	}
+
 	clients.mu.Lock()
 	defer clients.mu.Unlock()
 	var ok bool
 
 	_, ok = clients.clients[playerOneID]
 	if !ok {
-		clients.clients[playerOneID] = &Client{id: playerOneID, channel: make(chan string)}
+		clients.clients[playerOneID] = &Client{id: playerOneID, channel: make(chan string, 1)}
 	}
+
 	clients.clients[playerOneID].channel <- fmt.Sprintf("%v", matchID)
 
 	_, ok = clients.clients[playerTwoID]
 	if !ok {
-		clients.clients[playerTwoID] = &Client{id: playerTwoID, channel: make(chan string)}
+		clients.clients[playerTwoID] = &Client{id: playerTwoID, channel: make(chan string, 1)}
 	}
 	clients.clients[playerTwoID].channel <- fmt.Sprintf("%v", matchID)
 
@@ -242,12 +244,13 @@ func matchPlayers() {
 }
 
 func matchmakingService() {
+	defer fmt.Println("Matchmaking service ended")
 	for {
-		// fmt.Println("Matching")
-		// fmt.Println(waitingToJoinPoolA)
-		// fmt.Println(waitingToJoinPoolB)
-		// fmt.Println(awaitingRemoval.awaitingRemoval)
-		// fmt.Println(matchmakingPool)
+		fmt.Println("Matching")
+		fmt.Println(waitingToJoinPoolA)
+		fmt.Println(waitingToJoinPoolB)
+		fmt.Println(awaitingRemoval.awaitingRemoval)
+		fmt.Println(matchmakingPool)
 		matchPlayers()
 		time.Sleep(500 * time.Millisecond)
 	}

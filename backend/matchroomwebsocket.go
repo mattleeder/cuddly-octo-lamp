@@ -396,6 +396,8 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 		conn.Close()
 		return
 	}
+
+	// Is this blocking? Should the goroutines come first? Should we use a buffered channel?
 	client.send <- jsonStr
 	client.hub.register <- client
 
