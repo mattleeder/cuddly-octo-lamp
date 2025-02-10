@@ -9,7 +9,7 @@ func (app *application) routes() *http.ServeMux {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", chessMoveValidationHandler)
+	mux.HandleFunc("/", rootHandler)
 	mux.HandleFunc("/getMoves", getChessMovesHandler)
 	mux.HandleFunc("/makeMove", postChessMoveHandler)
 	mux.HandleFunc("/joinQueue", joinQueueHandler)

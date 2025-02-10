@@ -166,12 +166,12 @@ func addMatchToDatabase(playerOneID int64, playerTwoID int64, playerOneIsWhite b
 }
 
 type MatchStateData struct {
-	matchID         int64         `json:"matchID"`
-	white_player_id int64         `json:"whitePlayerID"`
-	black_player_id int64         `json:"blackPlayerID"`
-	last_move_piece sql.NullInt64 `json:"lastMovePiece"`
-	last_move_move  sql.NullInt64 `json:"lastMoveMove"`
-	current_fen     string        `json:"currentFEN"`
+	MatchID         int64         `json:"matchID"`
+	White_player_id int64         `json:"whitePlayerID"`
+	Black_player_id int64         `json:"blackPlayerID"`
+	Last_move_piece sql.NullInt64 `json:"lastMovePiece"`
+	Last_move_move  sql.NullInt64 `json:"lastMoveMove"`
+	Current_fen     string        `json:"currentFEN"`
 }
 
 func getLiveMatchStateFromInt64(matchID int64) (*MatchStateData, error) {
@@ -190,12 +190,12 @@ func getLiveMatchStateFromInt64(matchID int64) (*MatchStateData, error) {
 	}
 
 	return &MatchStateData{
-		matchID:         matchID,
-		white_player_id: white_player_id,
-		black_player_id: black_player_id,
-		last_move_piece: last_move_piece,
-		last_move_move:  last_move_move,
-		current_fen:     current_fen,
+		MatchID:         matchID,
+		White_player_id: white_player_id,
+		Black_player_id: black_player_id,
+		Last_move_piece: last_move_piece,
+		Last_move_move:  last_move_move,
+		Current_fen:     current_fen,
 	}, nil
 }
 

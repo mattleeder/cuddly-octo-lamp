@@ -1,9 +1,6 @@
 package main
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -67,113 +64,35 @@ type joinQueueRequest struct {
 	Action    string `json:"action"`
 }
 
-func Write(w http.ResponseWriter, cookie http.Cookie) error {
-	cookie.Value = base64.URLEncoding.EncodeToString([]byte(cookie.Value))
-
-	if len(cookie.String()) > 4096 {
-		return ErrValueTooLong
-	}
-
-	http.SetCookie(w, &cookie)
-
-	return nil
-}
-
-func Read(r *http.Request, name string) (string, error) {
-	cookie, err := r.Cookie(name)
-	if err != nil {
-		return "", err
-	}
-
-	value, err := base64.URLEncoding.DecodeString(cookie.Value)
-	if err != nil {
-		return "", ErrInvalidValue
-	}
-
-	return string(value), nil
-}
-
-func WriteSigned(w http.ResponseWriter, cookie http.Cookie, secretKey []byte) error {
-	mac := hmac.New(sha256.New, secretKey)
-	mac.Write([]byte(cookie.Name))
-	mac.Write([]byte(cookie.Value))
-	signature := mac.Sum(nil)
-
-	cookie.Value = string(signature) + cookie.Value
-
-	return Write(w, cookie)
-}
-
-func ReadSigned(r *http.Request, secretKey []byte, name string) (string, error) {
-	signedValue, err := Read(r, name)
-	if err != nil {
-		return "", err
-	}
-
-	if len(signedValue) < sha256.Size {
-		return "", ErrInvalidValue
-	}
-
-	signature := signedValue[:sha256.Size]
-	value := signedValue[sha256.Size:]
-
-	mac := hmac.New(sha256.New, secretKey)
-	mac.Write([]byte(name))
-	mac.Write([]byte(value))
-	expectedMAC := mac.Sum(nil)
-
-	if !hmac.Equal([]byte(signature), expectedMAC) {
-		return "", ErrInvalidValue
-	}
-
-	return value, nil
-}
-
 func generateNewPlayerId() int64 {
 	return rand.Int63()
 }
 
-func chessMoveValidationHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println()
-	start := time.Now()
+func rootHandler(w http.ResponseWriter, r *http.Request) {
 
-	var chessMove userMoveData
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-
-	err := json.NewDecoder(r.Body).Decode(&chessMove)
-	if err != nil {
-		http.Error(w, "Could not decode request", http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Printf("Received body: %+v\n", chessMove)
-
-	var validMove = IsMoveValid(chessMove.Fen, chessMove.Piece, chessMove.Move)
-
-	fmt.Fprintln(w, validMove)
-
-	elapsed := time.Since(start)
-	fmt.Printf("Took %s\n", elapsed)
 }
 
 func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println()
 	start := time.Now()
+	defer func() { app.infoLog.Printf("getChessMovesHandler took: %s\n", time.Since(start)) }()
+
 	if r.Method != "POST" {
 		w.Header().Set("Allow", "POST")
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
 
-	var chessMoveData getChessMoveData
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+	w.Header().Set("Content-Type", "application/json")
+
+	var chessMoveData getChessMoveData
 
 	err := json.NewDecoder(r.Body).Decode(&chessMoveData)
 	if err != nil {
-		http.Error(w, "Could not decode request", http.StatusInternalServerError)
+		app.serverError(w, err)
 		return
 	}
 
-	fmt.Printf("Received body: %+v\n", chessMoveData)
+	app.infoLog.Printf("Received body: %+v\n", chessMoveData)
 
 	var currentGameState = boardFromFEN(chessMoveData.Fen)
 	var moves, captures, triggerPromotion, _ = getValidMovesForPiece(chessMoveData.Piece, currentGameState)
@@ -182,35 +101,34 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 
 	jsonStr, err := json.Marshal(data)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		app.serverError(w, err)
 		return
 	}
 
 	w.Write(jsonStr)
-
-	elapsed := time.Since(start)
-	fmt.Printf("Took %s\n", elapsed)
 }
 
 func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println()
 	start := time.Now()
+	defer func() { app.infoLog.Printf("postChessMoveHandler took: %s\n", time.Since(start)) }()
 
 	if r.Method != "POST" {
 		w.Header().Set("Allow", "POST")
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
 
-	var chessMove postChessMove
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+	w.Header().Set("Content-Type", "application/json")
+
+	var chessMove postChessMove
 
 	err := json.NewDecoder(r.Body).Decode(&chessMove)
 	if err != nil {
-		http.Error(w, "Could not decode request", http.StatusInternalServerError)
+		app.serverError(w, err)
 		return
 	}
 
-	fmt.Printf("Received body: %+v\n", chessMove)
+	app.infoLog.Printf("Received body: %+v\n", chessMove)
 
 	var validMove = IsMoveValid(chessMove.CurrentFEN, chessMove.Piece, chessMove.Move)
 
@@ -225,46 +143,44 @@ func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
 
 	jsonStr, err := json.Marshal(data)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		app.serverError(w, err)
 		return
 	}
 
 	w.Write(jsonStr)
-	fmt.Printf("Sending body: %+v\n", data)
-
-	elapsed := time.Since(start)
-	fmt.Printf("Took %s\n", elapsed)
+	app.infoLog.Printf("Sending body: %+v\n", data)
 }
 
 func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println()
-	defer checkQueue()
 	start := time.Now()
+	defer func() { app.infoLog.Printf("joinQueueHandler took: %s\n", time.Since(start)) }()
+	defer checkQueue()
 
 	if r.Method != "POST" {
 		w.Header().Set("Allow", "POST")
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		app.clientError(w, http.StatusMethodNotAllowed)
 	}
 
-	var joinQueue joinQueueRequest
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 
-	fmt.Printf("%v\n", r.Body)
+	var joinQueue joinQueueRequest
+
+	app.infoLog.Printf("%v\n", r.Body)
 
 	err := json.NewDecoder(r.Body).Decode(&joinQueue)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Could not decode join queue request: %v", err), http.StatusInternalServerError)
+		app.serverError(w, err)
 		return
 	}
 
-	fmt.Printf("Received body: %+v\n", joinQueue)
-	fmt.Println(r.Cookies())
+	app.infoLog.Printf("Received body: %+v\n", joinQueue)
+	app.infoLog.Println(r.Cookies())
 
 	// Read cookie
 	playerid, err := ReadSigned(r, app.secretKey, "playerid")
 
-	fmt.Println(err)
+	app.infoLog.Println(err)
 
 	// Generate new cookie if it does not exists
 	if errors.Is(err, http.ErrNoCookie) && joinQueue.Action == "join" {
@@ -281,34 +197,32 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 
 		err = WriteSigned(w, cookie, app.secretKey)
 		if err != nil {
-			http.Error(w, "Unable to decode or write cookie", http.StatusInternalServerError)
+			app.serverError(w, err)
 			return
 		}
 	} else if errors.Is(err, http.ErrNoCookie) && joinQueue.Action == "leave" {
-		http.Error(w, "Must provide playerid to leave", http.StatusBadRequest)
+		app.clientError(w, http.StatusBadRequest)
 		return
 	} else if err != nil {
-		http.Error(w, "Could not read cookie", http.StatusInternalServerError)
+		app.serverError(w, err)
 	}
 
-	fmt.Printf("Player ID: %v\n", playerid)
+	app.infoLog.Printf("Player ID: %v\n", playerid)
 	var playerIDasInt int64
 	playerIDasInt, err = strconv.ParseInt(playerid, 10, 64)
 	if err != nil {
-		http.Error(w, "Bad PlayerID", http.StatusInternalServerError)
+		app.serverError(w, err)
 		return
 	}
 
 	if joinQueue.Action == "join" {
-		// err = addPlayerToQueue(playerIDasInt, joinQueue.Time, joinQueue.Increment)
+
 		addPlayerToWaitingPool(playerIDasInt)
 	} else {
 		// err = removePlayerFromQueue(playerIDasInt, joinQueue.Time, joinQueue.Increment)
 		removePlayerFromWaitingPool(playerIDasInt)
 	}
 
-	elapsed := time.Since(start)
-	fmt.Printf("Took %s\n\n", elapsed)
 }
 
 type Client struct {
@@ -331,14 +245,14 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 
 	playerid, err := ReadSigned(r, app.secretKey, "playerid")
 	if err != nil {
-		http.Error(w, "Could not read cookies", http.StatusBadRequest)
+		app.serverError(w, err)
 	}
 
 	var playerIDasInt int64
 
 	playerIDasInt, err = strconv.ParseInt(playerid, 10, 64)
 	if err != nil {
-		http.Error(w, "Bad PlayerID", http.StatusInternalServerError)
+		app.serverError(w, err)
 		return
 	}
 
@@ -416,14 +330,14 @@ func getMatchStateHandler(w http.ResponseWriter, r *http.Request) {
 	var matchStateData *MatchStateData
 	matchStateData, err = getLiveMatchStateFromInt64(matchID)
 	if err != nil {
-		http.Error(w, "Could not get match data", http.StatusInternalServerError)
+		app.serverError(w, err)
 	}
 
 	var playerCode playerCodeEnum
 
 	if !couldBePlayer {
 		playerCode = Spectator
-	} else if playerIDasInt == matchStateData.white_player_id {
+	} else if playerIDasInt == matchStateData.White_player_id {
 		playerCode = WhitePieces
 	} else {
 		playerCode = BlackPieces
@@ -435,7 +349,7 @@ func getMatchStateHandler(w http.ResponseWriter, r *http.Request) {
 
 	jsonStr, err = json.Marshal(response)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		app.serverError(w, err)
 		return
 	}
 
