@@ -249,7 +249,7 @@ func matchmakingService() {
 	defer app.infoLog.Printf("Ending matchmakingService")
 	for {
 		if iterations%20 == 0 {
-			app.infoLog.Println("Matching")
+			app.infoLog.Printf("Matching iteration: %v\n", iterations)
 			app.infoLog.Println(waitingToJoinPoolA)
 			app.infoLog.Println(waitingToJoinPoolB)
 			app.infoLog.Println(awaitingRemoval.awaitingRemoval)

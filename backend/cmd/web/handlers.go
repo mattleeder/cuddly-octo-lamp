@@ -75,7 +75,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	defer func() { app.infoLog.Printf("getChessMovesHandler took: %s\n", time.Since(start)) }()
+	defer func() { app.perfLog.Printf("getChessMovesHandler took: %s\n", time.Since(start)) }()
 
 	if r.Method != "POST" {
 		w.Header().Set("Allow", "POST")
@@ -111,7 +111,7 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 
 func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	defer func() { app.infoLog.Printf("postChessMoveHandler took: %s\n", time.Since(start)) }()
+	defer func() { app.perfLog.Printf("postChessMoveHandler took: %s\n", time.Since(start)) }()
 
 	if r.Method != "POST" {
 		w.Header().Set("Allow", "POST")
@@ -154,7 +154,7 @@ func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
 
 func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	defer func() { app.infoLog.Printf("joinQueueHandler took: %s\n", time.Since(start)) }()
+	defer func() { app.perfLog.Printf("joinQueueHandler took: %s\n", time.Since(start)) }()
 	defer app.matchmakingQueue.LogQueue()
 
 	if r.Method != "POST" {
@@ -300,6 +300,9 @@ type MatchStateResponse struct {
 }
 
 func getMatchStateHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() { app.perfLog.Printf("getMatchStateHandler took: %s\n", time.Since(start)) }()
+
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 	w.Header().Set("Content-Type", "application/json")

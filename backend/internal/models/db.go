@@ -11,6 +11,7 @@ type application struct {
 	errorLog *log.Logger
 	infoLog  *log.Logger
 	rowsLog  *log.Logger
+	perfLog  *log.Logger
 }
 
 var app *application
@@ -20,11 +21,13 @@ func init() {
 	infoLog := log.New(os.Stdout, "DB INFO\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr, "DB ERROR\t", log.Ldate|log.Ltime|log.Llongfile)
 	rowsLog := log.New(os.Stdout, "DB ROW\t", 0)
+	perfLog := log.New(os.Stdout, "DB PERF\t", log.Lshortfile)
 
 	app = &application{
 		errorLog: errorLog,
 		infoLog:  infoLog,
 		rowsLog:  rowsLog,
+		perfLog:  perfLog,
 	}
 
 	app.infoLog.Println("RAN MODELS INIT")
