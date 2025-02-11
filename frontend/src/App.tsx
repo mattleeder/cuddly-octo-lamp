@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
@@ -8,7 +8,6 @@ import {
   Routes,
   Route,
   useParams,
-  redirect,
   useNavigate,
 } from "react-router-dom";
 import { AlignJustify, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, CornerUpLeft, Equal, Flag, Microscope } from 'lucide-react'
@@ -49,11 +48,7 @@ enum ClickAction {
 
 function Home() {
   const [count, setCount] = useState(0)
-  const [responseText, setResponseText] = useState("")
 
-  const [fen, setFen] = useState("")
-  const [piece, setPiece] = useState("")
-  const [move, setMove] = useState("")
   return (
     <>
       <div>
@@ -185,6 +180,8 @@ function JoinQueue() {
     <button onClick={toggleQueue}>{buttonText}</button>
   )
 }
+
+const GameContext = createContext(null)
 
 function ChessBoard() {
   const boardRef = useRef<HTMLDivElement | null>(null)
@@ -445,45 +442,72 @@ function ChessBoard() {
       )
     }
 
-    function Moves() {
+    interface moveHistoryRowData {
+      rowNumber: string,
+      leftMove: string,
+      leftFEN: string,
+      rightMove: string | null,
+      rightFEN: string | null
+    }
+
+    var moveMap = new Map([
+      ["e4", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"],
+      ["d5", "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"],
+      ["nf3", "rnbqkbnr/ppp1pppp/8/3p4/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"],
+      ["bg4", "rn1qkbnr/ppp1pppp/8/3p4/4P1b1/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3"],
+      ["d4", "rn1qkbnr/ppp1pppp/8/3p4/3PP1b1/5N2/PPP2PPP/RNBQKB1R b KQkq - 0 3"],
+    ])
+
+    function Moves({ moveMap } : { moveMap: Map<string, string> }) {
+      const [orderedMap, setOrderedMap] = useState([...moveMap.entries()])
+      const [selectedMove, setSelectedMove] = useState(orderedMap.length)
+
+      var tableData = []
+
+      for (var i = 0; i < orderedMap.length; i+=2) {
+        var rowNumber = `${Math.floor(i / 2) + 1}.`
+        var leftMove = orderedMap[i][0]
+        var leftFEN = orderedMap[i][1]
+        var rightMove, rightFEN: string | null
+
+        if ((i+1) < orderedMap.length) {
+          rightMove = orderedMap[i+1][0]
+          rightFEN = orderedMap[i+1][1]
+        } else {
+          rightMove = null
+          rightFEN = null
+        }
+
+        var rowData: moveHistoryRowData = {
+          rowNumber,
+          leftMove,
+          leftFEN,
+          rightMove,
+          rightFEN,
+        }
+
+        tableData.push(rowData)
+      }
+
+
       return (
         <div className='movesContainer'>
           <table>
             <tbody>
-              <tr className='movesRow'>
-                <td>1.</td>
-                <td>e4</td>
-                <td>e5</td>
-              </tr>
-              <tr className='movesRow'>
-                <td>2.</td>
-                <td>d4</td>
-                <td>d5</td>
-              </tr>
-              <tr className='movesRow'>
-                <td>3.</td>
-                <td>d4</td>
-                <td>d5</td>
-              </tr>
-              <tr className='movesRow'>
-                <td>4.</td>
-                <td>d4</td>
-                <td>d5</td>
-              </tr>
-              <tr className='movesRow'>
-                <td>5.</td>
-                <td>d4</td>
-                <td>d5</td>
-              </tr>
-              <tr className='movesRow'>
-                <td>6.</td>
-                <td>d4</td>
-                <td>d5</td>
-              </tr>
+              {tableData.map((rowData) => {
+                return (
+                  <tr className='movesRow'>
+                    <td>{rowData.rowNumber}</td>
+                    <td onClick={() => setGameState(parseGameStateFromFEN(rowData.leftFEN))}>{rowData.leftMove}</td>
+                    {rowData.rightMove ? <td onClick={() => setGameState(parseGameStateFromFEN(rowData.rightFEN as string))}>{rowData.rightMove}</td> : <></>}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       )
+
     }
 
 
@@ -491,7 +515,7 @@ function ChessBoard() {
       <div className='gameInfo'>
         <PlayerInfo />
         <MoveHistoryControls />
-        <Moves />
+        <Moves moveMap={moveMap}/>
         <GameControls />
         <PlayerInfo />
       </div>
@@ -536,7 +560,6 @@ function ChessBoard() {
       return <></>
     }
 
-    var row = Math.floor(promotionSquare / 8)
     var col = promotionSquare % 8
 
     var promotionColour = colourToString.get(PieceColour.Black)
