@@ -55,7 +55,7 @@ type postChessMoveReply struct {
 	NewFEN         string             `json:"newFEN"`
 	LastMove       [2]int             `json:"lastMove"`
 	GameOverStatus gameOverStatusCode `json:"gameOverStatus"`
-	PastMoves      [][2]int           `json:"pastMoves"`
+	PastMoves      [][2]string        `json:"pastMoves"`
 }
 
 type joinQueueRequest struct {

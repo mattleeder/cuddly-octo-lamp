@@ -9,6 +9,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -86,7 +87,15 @@ type MatchRoomHub struct {
 
 	current_fen string
 
-	pastMoves [][2]int
+	pastMoves [][2]string
+}
+
+func intToAlgebraicNotation(position int) string {
+	var columns = []string{"a", "b", "c", "d", "e", "f", "g", "h"}
+	row := 8 - position/8
+	col := position % 8
+
+	return fmt.Sprintf("%s%v", columns[col], row)
 }
 
 func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
@@ -131,7 +140,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		turn:             turn,
 		currentGameState: jsonStr,
 		current_fen:      matchState.CurrentFEN,
-		pastMoves:        [][2]int{},
+		pastMoves:        [][2]string{[2]string{"", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}},
 	}, nil
 }
 
@@ -183,7 +192,7 @@ func (hub *MatchRoomHub) run() {
 					NewFEN:         newFEN,
 					LastMove:       [2]int{chessMove.Piece, chessMove.Move},
 					GameOverStatus: gameOverStatus,
-					PastMoves:      append(hub.pastMoves, [2]int{chessMove.Piece, chessMove.Move}),
+					PastMoves:      append(hub.pastMoves, [2]string{intToAlgebraicNotation(chessMove.Move), newFEN}),
 				},
 			}
 
@@ -195,7 +204,7 @@ func (hub *MatchRoomHub) run() {
 
 			hub.current_fen = newFEN
 			hub.currentGameState = jsonStr
-			hub.pastMoves = append(hub.pastMoves, [2]int{chessMove.Piece, chessMove.Move})
+			hub.pastMoves = append(hub.pastMoves, [2]string{intToAlgebraicNotation(chessMove.Move), newFEN})
 			go app.liveMatches.UpdateFENForLiveMatch(hub.matchID, newFEN, chessMove.Piece, chessMove.Move)
 
 			for client := range hub.clients {

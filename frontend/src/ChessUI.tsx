@@ -403,6 +403,7 @@ interface matchState {
   activeColour: PieceColour,
   lastMove: number[],
   gameOverStatus: number,
+  pastMoves: [string, string][],
 }
 
 interface gameContext {
@@ -420,6 +421,7 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
         ...parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
         lastMove: [],
         gameOverStatus: 0,
+        pastMoves: [["", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"]]
       })
     const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
     const [playerColour, setPlayerColour] = useState(PieceColour.Spectator)
@@ -463,6 +465,7 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
           var newMatchState: matchState = {
             ...parseGameStateFromFEN(parsedMsg["newFEN"]),
             gameOverStatus: parsedMsg["gameOverStatus"],
+            pastMoves: parsedMsg["pastMoves"],
             lastMove,
           }
   
@@ -546,29 +549,19 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
       rightFEN: string | null
     }
   
-    var moveMap = new Map([
-      ["e4", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 1 1"],
-      ["d5", "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d4 2 2"],
-      ["nf3", "rnbqkbnr/ppp1pppp/8/3p4/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 3 2"],
-      ["bg4", "rn1qkbnr/ppp1pppp/8/3p4/4P1b1/5N2/PPPP1PPP/RNBQKB1R w KQkq - 4 3"],
-      ["d4", "rn1qkbnr/ppp1pppp/8/3p4/3PP1b1/5N2/PPP2PPP/RNBQKB1R b KQkq - 5 3"],
-    ])
-  
-    function Moves({ moveMap } : { moveMap: Map<string, string> }) {
-      const [orderedMap, setOrderedMap] = useState([...moveMap.entries()])
-      const [selectedMove, setSelectedMove] = useState(orderedMap.length)
+    function Moves({ moveMap } : { moveMap: [string, string][]}) {
   
       var tableData = []
   
-      for (var i = 0; i < orderedMap.length; i+=2) {
+      for (var i = 1; i < moveMap.length; i+=2) {
         var rowNumber = `${Math.floor(i / 2) + 1}.`
-        var leftMove = orderedMap[i][0]
-        var leftFEN = orderedMap[i][1]
+        var leftMove = moveMap[i][0]
+        var leftFEN = moveMap[i][1]
         var rightMove, rightFEN: string | null
   
-        if ((i+1) < orderedMap.length) {
-          rightMove = orderedMap[i+1][0]
-          rightFEN = orderedMap[i+1][1]
+        if ((i+1) < moveMap.length) {
+          rightMove = moveMap[i+1][0]
+          rightFEN = moveMap[i+1][1]
         } else {
           rightMove = null
           rightFEN = null
@@ -590,8 +583,12 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
           ...parseGameStateFromFEN(fen),
           lastMove: [0, 0],
           gameOverStatus: 0,
+          pastMoves: [],
         }
       }
+
+      //@TODO
+      // Make some setBoardState instead for move history to use
   
   
       return (
@@ -632,7 +629,7 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
       <div className='gameInfo'>
         <PlayerInfo />
         <MoveHistoryControls />
-        <Moves moveMap={moveMap}/>
+        <Moves moveMap={game.matchState.pastMoves}/>
         <GameControls />
         <PlayerInfo />
       </div>
