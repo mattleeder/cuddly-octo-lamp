@@ -70,7 +70,7 @@ func generateNewPlayerId() int64 {
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
-
+	app.clientError(w, http.StatusNotFound)
 }
 
 func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {

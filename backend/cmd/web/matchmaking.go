@@ -248,6 +248,7 @@ func matchmakingService() {
 	app.infoLog.Printf("Starting matchmakingService")
 	defer app.infoLog.Printf("Ending matchmakingService")
 	for {
+		// Could use time.After to ensure service runs every 500ms
 		if iterations%20 == 0 {
 			app.infoLog.Printf("Matching iteration: %v\n", iterations)
 			app.infoLog.Println(waitingToJoinPoolA)

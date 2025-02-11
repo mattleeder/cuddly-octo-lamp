@@ -41,9 +41,126 @@
   color: #888;
 }
 
+.chessMatch {
+  position: relative;
+  width: 510px;
+  height: 400px;
+  margin: 0 auto;
+  background-color: transparent;
+}
+
+.gameInfo {
+	width: 100px;
+  height: 125px;
+  transform: translateY(138px);
+  float: right;
+	margin: 0 auto;
+  margin-left: 10px;
+  background-color: #343232;
+  box-shadow: 2px 2px #131313;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.playerInfo {
+  display: flex;
+  width: 100%;
+  height: 12.5%;
+  font-size: 10px;
+}
+
+.playerPingStatus {
+  width: 10%;
+  height: 100%;
+}
+
+.playerName {
+  width: 90%;
+  height: 100%;
+  text-align: left;
+  color: black;
+  overflow: hidden;
+}
+
+.moveHistoryControlsContainer {
+  display: flex;
+  justify-content: space-between;
+  height: 12.5%;
+  color: black;
+  overflow: visible;
+  padding-bottom: 2px;
+  box-shadow: 0 0px #131313;
+}
+
+.moveHistoryControlsButton {
+  display: flex;
+  width: 15%;
+  height: 15px;
+  background-color: transparent;
+  border: #000000;
+  justify-content: center;
+  align-items: center;
+}
+
+.moveHistoryControlsButton:hover {
+  background-color: orange;
+  cursor: pointer;
+}
+
+.movesContainer {
+  height: 50%;
+  color: black;
+  overflow: hidden;
+  font-size: 9px;
+  text-align: left;
+  overflow-y: auto;
+}
+
+.movesContainer table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.movesRow td {
+  width: 40%;
+  background-color: grey;
+}
+
+.movesRow td:hover {
+  background-color: aqua;
+  cursor: pointer;
+}
+
+.movesRow td:first-child {
+  width: 20%;
+  background-color: transparent;
+}
+
+.gameControlsContainer {
+  display: flex;
+  justify-content: space-between;
+  height: 12.5%;
+  overflow: hidden;
+}
+
+.gameControlsButton {
+  display: flex;
+  width: 15%;
+  height: 15px;
+  background-color: transparent;
+  border: #000000;
+  justify-content: center;
+  align-items: center;
+}
+
+.gameControlsButton:hover {
+  background-color: orange;
+  cursor: pointer;
+}
+
 .chessboard {
 	width: 400px;
 	height: 400px;
+  float: right;
 	margin: 0 auto;
 	background-image: url('data:image/svg+xml,%3Csvg%20width%3D%27100%27%20height%3D%27100%27%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%3E%3Crect%20width%3D%27100%27%20height%3D%27100%27%20x%3D%270%27%20y%3D%270%27%20fill%3D%27%23f0d9b5%27%20%2F%3E%3Crect%20width%3D%2750%27%20height%3D%2750%27%20x%3D%2750%27%20y%3D%270%27%20fill%3D%27%23b58863%27%20%2F%3E%3Crect%20width%3D%2750%27%20height%3D%2750%27%20x%3D%270%27%20y%3D%2750%27%20fill%3D%27%23b58863%27%20%2F%3E%3C%2Fsvg%3E');
 }

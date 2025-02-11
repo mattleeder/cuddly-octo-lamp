@@ -11,6 +11,7 @@ import {
   redirect,
   useNavigate,
 } from "react-router-dom";
+import { AlignJustify, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, CornerUpLeft, Equal, Flag, Microscope } from 'lucide-react'
 
 function App() {
   console.log(import.meta.env.VITE_API_URL)
@@ -72,46 +73,9 @@ function Home() {
         Edit <code>src/App.tsx</code> and save to test HMR
       </p>
     </div>
-    <div>
-      <label htmlFor="fen">FEN</label>
-      <input type="text" id="fen" name="fen" value={fen} onChange={(event) => setFen(event.target.value)}/>
-      <br />
-
-      <label htmlFor="piece">Piece</label>
-      <input type="text" id="piece" name="piece" value={piece} onChange={(event) => setPiece(event.target.value)}/>
-      <br />
-
-      <label htmlFor="move">Move</label>
-      <input type="move" id="move" name="move" value={move} onChange={(event) => setMove(event.target.value)}/>
-      <br />
-
-      <input type="submit" onClick={() => {
-        setResponseText("Waiting")
-        fetch(import.meta.env.VITE_API_URL, {
-          "method": "POST",
-          "body": JSON.stringify({
-            "fen": fen,
-            "piece": parseInt(piece),
-            "move": parseInt(move),
-          })
-        }).then(
-          (response) => {
-            response.text().then(
-              (value) => setResponseText(value),
-              () => setResponseText("Could Not Read")
-            )
-          },
-          () => setResponseText("Failed")
-        )
-      }}/>
-    </div>
-    <div>
-      {responseText}
-    </div>
     <p className="read-the-docs">
       Click on the Vite and React logos to learn more
     </p>
-    <ChessBoard />
     <JoinQueue />
   </>
   )
@@ -238,15 +202,8 @@ function ChessBoard() {
 
   const { matchid } = useParams()
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
-  const [matchState, setMatchState] = useState(null)
   const [playerColour, setPlayerColour] = useState(PieceColour.Spectator)
 
-
-  // var moves = [4, 12, 20]
-  // var captures = [1, 8, 9]
-  // var lastMove = [50, 58]
-
-  var moveCache = new Map<number, number[]>()
 
   useEffect(() => {
     const updateRect = () => {
@@ -333,34 +290,6 @@ function ChessBoard() {
 
   }
 
-  async function postMove(position: number, piece: number, promotion: string) {
-    wsPostMove(position, piece, promotion)
-    try {
-      var newBoard = [...gameState.board]
-      newBoard[position] = newBoard[piece]
-      newBoard[piece] = [null, null]
-
-      var response = await fetch(import.meta.env.VITE_API_MAKE_MOVE_URL, {
-        "method": "POST",
-        "body": JSON.stringify({
-          "currentFEN": gameState.fen,
-          "piece": selectedPiece,
-          "move": position,
-          "promotionString": promotion,
-        })})
-        if (!response.ok) {
-          throw new Error(`Response status: ${response.status}`)
-        }
-
-        var data = await response.json()
-
-        return data
-
-    } catch (error: any) {
-      console.error(error.message)
-    }
-  }
-
   function setToBare() {
     setSelectedPiece(null)
     setMoves([])
@@ -371,10 +300,12 @@ function ChessBoard() {
   }
 
   async function clickHandler(event: React.MouseEvent) {
+    console.log(`${event.clientX}, ${event.clientY}`)
     // Calculate board position
     if (rect === null) {
       throw new Error("Bounding rect for board is not defined")
     }
+    console.log(rect)
     var boardXPosition = Math.floor((event.clientX - rect.left) / (rect.width / 8))
     var boardYPosition = Math.floor((event.clientY - rect.top) / (rect.height / 8))
     var position = boardYPosition * 8 + boardXPosition
@@ -437,16 +368,7 @@ function ChessBoard() {
         }
         // Send current FEN, piece, move, new FEN
         console.log("Post move")
-        // var data = await postMove(position, selectedPiece, promotionString)
         wsPostMove(position, selectedPiece, promotionString)
-        // console.log(data)
-
-        // If accepted update board
-        // if (data["isValid"]) {
-        //   setGameState(parseGameStateFromFEN(data["newFEN"]))
-        //   setLastMove(data["lastMove"])
-        //   setGameOverStatus(data["gameOverStatus"])
-        // } 
 
         // Clear cache, clear moves
         setToBare()
@@ -467,6 +389,113 @@ function ChessBoard() {
     }
     
     setWaiting(false)
+  }
+
+  function GameInfo() {
+
+    function PlayerInfo() {
+      return (
+        <div className='playerInfo'>
+          <div className='playerPingStatus'>O</div>
+          <div className='playerName'>Player</div>
+        </div>
+      )
+    }
+
+    function MoveHistoryControls() {
+      return (
+        <div className='moveHistoryControlsContainer'>
+          <div className='moveHistoryControlsButton'>
+            <Microscope size={12}/>
+          </ div>  
+          <div className='moveHistoryControlsButton'>
+            <ChevronFirst size={12}/>
+          </ div>
+          <div className='moveHistoryControlsButton'>
+            <ChevronLeft size={12}/>
+          </ div>          
+          <div className='moveHistoryControlsButton'>
+            <ChevronRight size={12}/>
+          </ div>          
+          <div className='moveHistoryControlsButton'>
+            <ChevronLast size={12}/>
+          </ div>          
+          <div className='moveHistoryControlsButton'>
+            <AlignJustify size={12}/>
+          </ div>
+        </div>
+      )
+    }
+
+    function GameControls() {
+      return (
+        <div className='gameControlsContainer'>
+          <div className='spacer' />
+          <div className='gameControlsButton'>
+            <CornerUpLeft size={12} color='#000000'/>
+          </div>
+          <div className='gameControlsButton'>
+            <Equal size={12} color='#000000'/>
+          </div>
+          <div className='gameControlsButton'>
+            <Flag size={12} color='#000000'/>
+          </div>
+          <div className='spacer' />
+        </div>
+      )
+    }
+
+    function Moves() {
+      return (
+        <div className='movesContainer'>
+          <table>
+            <tbody>
+              <tr className='movesRow'>
+                <td>1.</td>
+                <td>e4</td>
+                <td>e5</td>
+              </tr>
+              <tr className='movesRow'>
+                <td>2.</td>
+                <td>d4</td>
+                <td>d5</td>
+              </tr>
+              <tr className='movesRow'>
+                <td>3.</td>
+                <td>d4</td>
+                <td>d5</td>
+              </tr>
+              <tr className='movesRow'>
+                <td>4.</td>
+                <td>d4</td>
+                <td>d5</td>
+              </tr>
+              <tr className='movesRow'>
+                <td>5.</td>
+                <td>d4</td>
+                <td>d5</td>
+              </tr>
+              <tr className='movesRow'>
+                <td>6.</td>
+                <td>d4</td>
+                <td>d5</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+
+
+    return (
+      <div className='gameInfo'>
+        <PlayerInfo />
+        <MoveHistoryControls />
+        <Moves />
+        <GameControls />
+        <PlayerInfo />
+      </div>
+    )
   }
 
   const PiecesComponent = gameState.board.map((square, idx) => {
@@ -542,49 +571,17 @@ function ChessBoard() {
   }
 
   return (
-    <div className='chessboard' onClick={clickHandler} ref={boardRef}>
-      {LastMoveComponent}
-      {PiecesComponent}
-      {MovesComponent}
-      {CapturesComponent}
-      <PromotionComponent promotionSquare={promotionSquare}/>
-      <GameOverComponent />
+    <div className='chessMatch'>
+      <GameInfo />
+      <div className='chessboard' onClick={clickHandler} ref={boardRef}>
+        {LastMoveComponent}
+        {PiecesComponent}
+        {MovesComponent}
+        {CapturesComponent}
+        <PromotionComponent promotionSquare={promotionSquare}/>
+        <GameOverComponent />
+      </div>
     </div>
-  )
-}
-
-interface matchState {
-  
-}
-
-function MatchRoom() {
-  // If match doesnt exist redirect to home
-  const { matchid } = useParams()
-  const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
-  const [matchState, setMatchState] = useState(null)
-
-  console.log(`Matchroom: ${matchid}`)
-  console.log(import.meta.env.VITE_API_MATCHROOM_URL + matchid + '/ws')
-
-  useEffect(() => {
-    // Connect to websocket for matchroom
-    var ws = new WebSocket(import.meta.env.VITE_API_MATCHROOM_URL + matchid + '/ws')
-    ws.onmessage = (event) => readMessage(event.data)
-    setWebSocket(ws)
-    return () => {
-      // Disconnect
-      ws?.close()
-    }
-  }, [])
-
-  function readMessage(message: any) {
-    console.log("FROM WEBSOCKET")
-    console.log(message)
-    JSON.parse(message)
-  }
-
-  return (
-    <ChessBoard />
   )
 }
 
