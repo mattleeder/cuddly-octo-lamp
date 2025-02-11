@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 	"unicode"
 )
@@ -992,9 +993,21 @@ func boardFromFEN(fen string) gameState {
 
 		case 4:
 			// Parse Halfmove Clock
+			currentGameState.halfMoveClock *= 10
+			val, err := strconv.Atoi(string(char))
+			if err != nil {
+				app.errorLog.Println(err)
+			}
+			currentGameState.halfMoveClock += val
 
 		case 5:
 			// Parse fullmove number
+			currentGameState.fullMoveNumber *= 10
+			val, err := strconv.Atoi(string(char))
+			if err != nil {
+				app.errorLog.Println(err)
+			}
+			currentGameState.fullMoveNumber += val
 		}
 
 	}
@@ -1080,6 +1093,10 @@ func getFENAfterMove(currentFEN string, piece int, move int, promotionString str
 	currentGameState.board[piece].piece = nil
 
 	var newGameState = currentGameState
+	newGameState.halfMoveClock += 1
+	if newGameState.halfMoveClock%2 == 0 {
+		newGameState.fullMoveNumber += 1
+	}
 
 	var runeToVariant = make(map[string]pieceVariant)
 	runeToVariant["n"] = Knight
@@ -1273,6 +1290,7 @@ func gameStateToFEN(newGameState gameState) string {
 
 	}
 
+	newFEN = newFEN[:len(newFEN)-1]
 	newFEN = append(newFEN, ' ')
 
 	// Turn
@@ -1321,9 +1339,9 @@ func gameStateToFEN(newGameState gameState) string {
 
 	newFEN = append(newFEN, ' ')
 
-	newFEN = append(newFEN, '0')
+	newFEN = append(newFEN, []rune(fmt.Sprint(newGameState.halfMoveClock))...)
 	newFEN = append(newFEN, ' ')
-	newFEN = append(newFEN, '1')
+	newFEN = append(newFEN, []rune(fmt.Sprint(newGameState.fullMoveNumber))...)
 
 	return string(newFEN)
 }

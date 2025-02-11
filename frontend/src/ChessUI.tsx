@@ -547,11 +547,11 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
     }
   
     var moveMap = new Map([
-      ["e4", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"],
-      ["d5", "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"],
-      ["nf3", "rnbqkbnr/ppp1pppp/8/3p4/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"],
-      ["bg4", "rn1qkbnr/ppp1pppp/8/3p4/4P1b1/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3"],
-      ["d4", "rn1qkbnr/ppp1pppp/8/3p4/3PP1b1/5N2/PPP2PPP/RNBQKB1R b KQkq - 0 3"],
+      ["e4", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 1 1"],
+      ["d5", "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d4 2 2"],
+      ["nf3", "rnbqkbnr/ppp1pppp/8/3p4/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 3 2"],
+      ["bg4", "rn1qkbnr/ppp1pppp/8/3p4/4P1b1/5N2/PPPP1PPP/RNBQKB1R w KQkq - 4 3"],
+      ["d4", "rn1qkbnr/ppp1pppp/8/3p4/3PP1b1/5N2/PPP2PPP/RNBQKB1R b KQkq - 5 3"],
     ])
   
     function Moves({ moveMap } : { moveMap: Map<string, string> }) {
@@ -602,8 +602,22 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
                 return (
                   <tr className='movesRow'>
                     <td>{rowData.rowNumber}</td>
-                    <td onClick={() => game?.setMatchState(matchStateFromFEN(rowData.leftFEN))}>{rowData.leftMove}</td>
-                    {rowData.rightMove ? <td onClick={() => game?.setMatchState(matchStateFromFEN(rowData.rightFEN as string))}>{rowData.rightMove}</td> : <></>}
+                    <td 
+                    onClick={() => game?.setMatchState(matchStateFromFEN(rowData.leftFEN))}
+                    className={rowData.leftFEN == game?.matchState.fen ? "highlight" : ""}
+                    >
+                        {rowData.leftMove}
+                    </td>
+                    {
+                    rowData.rightMove ? 
+                    <td 
+                    onClick={() => game?.setMatchState(matchStateFromFEN(rowData.rightFEN as string))}
+                    className={rowData.rightFEN == game?.matchState.fen ? "highlight" : ""}
+                    >
+                        {rowData.rightMove}
+                    </td> 
+                    : 
+                    <></>}
                   </tr>
                 )
               })}
@@ -624,3 +638,4 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
       </div>
     )
   }
+

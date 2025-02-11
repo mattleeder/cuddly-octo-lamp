@@ -52,11 +52,10 @@ type postChessMove struct {
 }
 
 type postChessMoveReply struct {
-	IsValid                  bool               `json:"isValid"`
-	NewFEN                   string             `json:"newFEN"`
-	LastMove                 [2]int             `json:"lastMove"`
-	MoveWillTriggerPromotion bool               `json:"triggerPromotion"`
-	GameOverStatus           gameOverStatusCode `json:"gameOverStatus"`
+	NewFEN         string             `json:"newFEN"`
+	LastMove       [2]int             `json:"lastMove"`
+	GameOverStatus gameOverStatusCode `json:"gameOverStatus"`
+	PastMoves      [][2]int           `json:"pastMoves"`
 }
 
 type joinQueueRequest struct {
@@ -107,49 +106,6 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write(jsonStr)
-}
-
-func postChessMoveHandler(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
-	defer func() { app.perfLog.Printf("postChessMoveHandler took: %s\n", time.Since(start)) }()
-
-	if r.Method != "POST" {
-		w.Header().Set("Allow", "POST")
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-	}
-
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-	w.Header().Set("Content-Type", "application/json")
-
-	var chessMove postChessMove
-
-	err := json.NewDecoder(r.Body).Decode(&chessMove)
-	if err != nil {
-		app.serverError(w, err)
-		return
-	}
-
-	app.infoLog.Printf("Received body: %+v\n", chessMove)
-
-	var validMove = IsMoveValid(chessMove.CurrentFEN, chessMove.Piece, chessMove.Move)
-
-	var data postChessMoveReply
-	if !validMove {
-		data = postChessMoveReply{IsValid: false, NewFEN: "", LastMove: [2]int{0, 0}}
-	} else {
-		// Need to generate the new FEN
-		newFEN, gameOverStatus := getFENAfterMove(chessMove.CurrentFEN, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
-		data = postChessMoveReply{IsValid: true, NewFEN: newFEN, LastMove: [2]int{chessMove.Piece, chessMove.Move}, GameOverStatus: gameOverStatus}
-	}
-
-	jsonStr, err := json.Marshal(data)
-	if err != nil {
-		app.serverError(w, err)
-		return
-	}
-
-	w.Write(jsonStr)
-	app.infoLog.Printf("Sending body: %+v\n", data)
 }
 
 func joinQueueHandler(w http.ResponseWriter, r *http.Request) {

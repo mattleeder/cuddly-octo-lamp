@@ -85,6 +85,8 @@ type MatchRoomHub struct {
 	currentGameState []byte
 
 	current_fen string
+
+	pastMoves [][2]int
 }
 
 func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
@@ -105,7 +107,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 
 	var turn byte
 
-	currentGameState := []postChessMoveReply{{IsValid: true, NewFEN: matchState.CurrentFEN, LastMove: [2]int{last_move_move, last_move_piece}, GameOverStatus: Ongoing}}
+	currentGameState := []postChessMoveReply{{NewFEN: matchState.CurrentFEN, LastMove: [2]int{last_move_move, last_move_piece}, GameOverStatus: Ongoing}}
 	if strings.Split(matchState.CurrentFEN, " ")[1] == "w" {
 		turn = byte(0)
 	} else {
@@ -129,6 +131,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		turn:             turn,
 		currentGameState: jsonStr,
 		current_fen:      matchState.CurrentFEN,
+		pastMoves:        [][2]int{},
 	}, nil
 }
 
@@ -177,10 +180,10 @@ func (hub *MatchRoomHub) run() {
 			// Need to put move into db
 			data := []postChessMoveReply{
 				{
-					IsValid:        true,
 					NewFEN:         newFEN,
 					LastMove:       [2]int{chessMove.Piece, chessMove.Move},
 					GameOverStatus: gameOverStatus,
+					PastMoves:      append(hub.pastMoves, [2]int{chessMove.Piece, chessMove.Move}),
 				},
 			}
 
@@ -192,6 +195,7 @@ func (hub *MatchRoomHub) run() {
 
 			hub.current_fen = newFEN
 			hub.currentGameState = jsonStr
+			hub.pastMoves = append(hub.pastMoves, [2]int{chessMove.Piece, chessMove.Move})
 			go app.liveMatches.UpdateFENForLiveMatch(hub.matchID, newFEN, chessMove.Piece, chessMove.Move)
 
 			for client := range hub.clients {

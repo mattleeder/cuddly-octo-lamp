@@ -11,7 +11,6 @@ func (app *application) routes() *http.ServeMux {
 
 	mux.HandleFunc("/", rootHandler)
 	mux.HandleFunc("/getMoves", getChessMovesHandler)
-	mux.HandleFunc("/makeMove", postChessMoveHandler)
 	mux.HandleFunc("/joinQueue", joinQueueHandler)
 	mux.HandleFunc("/listenformatch", matchFoundSSEHandler)
 	mux.HandleFunc("/matchroom/{matchID}", getMatchStateHandler)
