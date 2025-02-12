@@ -188,7 +188,7 @@ export function ChessBoard() {
         var response = await fetch(import.meta.env.VITE_API_FETCH_MOVES_URL, {
           "method": "POST",
           "body": JSON.stringify({
-            "fen": game?.matchState.fen,
+            "fen": game?.matchData.stateHistory.at(-1)["FEN"],
             "piece": position,
         })})
   
@@ -237,8 +237,8 @@ export function ChessBoard() {
       setWaiting(true)
   
       // Get clickAction state
-      console.log(`Click Action: ${position}`)
-      console.log(`Click Action: ${game?.matchState.board[position][0]}`)
+      console.log(`Position : ${position}`)
+      console.log(`Clicked On: ${game?.matchData.activeState.board[position][0]}`)
       var clickAction = ClickAction.clear
       if (promotionActive && [0, 8, 16, 24].includes(Math.abs(position - promotionSquare))) {
         clickAction = ClickAction.choosePromotion
@@ -246,7 +246,7 @@ export function ChessBoard() {
         clickAction = ClickAction.makeMove
         // @TODO
         // null == null 
-      }else if (game?.matchState.board[position][0] == game?.playerColour && position != selectedPiece) {
+      }else if (game?.matchData.activeState.board[position][0] == game?.playerColour && position != selectedPiece) {
         clickAction = ClickAction.showMoves
       }
   
@@ -282,7 +282,6 @@ export function ChessBoard() {
           var promotionString = ""
           if (clickAction == ClickAction.choosePromotion) {
             var promotionIndex = [0, 8, 16, 24].indexOf(Math.abs(position - promotionSquare))
-            console.log(promotionIndex)
             promotionString = "qnrb"[promotionIndex]
             position = promotionSquare
           }
@@ -311,7 +310,7 @@ export function ChessBoard() {
       setWaiting(false)
     }
   
-    const PiecesComponent = game?.matchState.board.map((square, idx) => {
+    const PiecesComponent = game?.matchData.activeState.board.map((square, idx) => {
       const [colour, variant] = square
       if (colour === null || variant === null) {
         return
@@ -337,7 +336,7 @@ export function ChessBoard() {
       <div className='potential-capture' style={{transform: `translate(${col * 50}px, ${row * 50}px)`}}/>
     )})
   
-    const LastMoveComponent = game?.matchState.lastMove.map(move => {
+    const LastMoveComponent = game?.matchData.activeState.lastMove.map(move => {
       var row = Math.floor(move / 8)
       var col = move % 8
       return (
@@ -372,12 +371,12 @@ export function ChessBoard() {
     }
   
     const GameOverComponent = () => {
-      if (game?.matchState.gameOverStatus == 0) {
+      if (game?.matchData.gameOverStatus == 0) {
         return <></>
       }
   
       var gameOverStatusCodes = ["Ongoing", "Stalemate", "Checkmate", "Threefold Repetition", "Insufficient Material"]
-      var gameOverText = gameOverStatusCodes[game?.matchState.gameOverStatus || 0]
+      var gameOverText = gameOverStatusCodes[game?.matchData.gameOverStatus || 0]
   
       return <div style={{transform: `translate(${0}px, ${180}px)`, color: "black"}}>{gameOverText}</div>
     }
@@ -397,18 +396,28 @@ export function ChessBoard() {
     )
   }
 
-interface matchState {
-  fen: string,
-  board: [PieceColour | null, PieceVariant | null][],
+interface boardInfo {
+    board: [PieceColour | null, PieceVariant | null][],
+    lastMove: [number, number]
+}
+
+interface boardHistory {
+    fen: string,
+    lastMove: [number, number]
+    algebraicNotation: string
+}
+
+interface matchData {
+  activeState: boardInfo,
+  stateHistory: boardHistory[],
   activeColour: PieceColour,
-  lastMove: number[],
+  activeMove: number,
   gameOverStatus: number,
-  pastMoves: [string, string][],
 }
 
 interface gameContext {
-  matchState: matchState,
-  setMatchState: React.Dispatch<React.SetStateAction<matchState>>,
+  matchData: matchData,
+  setMatchData: React.Dispatch<React.SetStateAction<matchData>>,
   webSocket: WebSocket | null,
   playerColour: PieceColour,
 }
@@ -416,12 +425,20 @@ interface gameContext {
 const GameContext = createContext<gameContext | null>(null)
 
 function GameWrapper({ children, matchID }: { children: ReactElement, matchID: string}) {
-    const [matchState, setMatchState] = useState<matchState>(
+    const [matchData, setMatchData] = useState<matchData>(
       {
-        ...parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
-        lastMove: [],
+        activeState: {
+            ...parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+            lastMove: [0, 0],
+        },
+        stateHistory: [{
+            fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            lastMove: [0, 0],
+            algebraicNotation: "",
+        }],
+        activeColour: PieceColour.White,
+        activeMove: 0,
         gameOverStatus: 0,
-        pastMoves: [["", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"]]
       })
     const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
     const [playerColour, setPlayerColour] = useState(PieceColour.Spectator)
@@ -440,10 +457,14 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
     function readMessage(message: any) {
       console.log("FROM WEBSOCKET")
       console.log(message)
+      console.log("TESTTEST")
   
       for (let msg of message.split("\n")) {
         var parsedMsg = JSON.parse(msg)[0]
+        console.log("PARSEDMSG")
         console.log(parsedMsg)
+        console.log(parsedMsg.hasOwnProperty("playerCode"))
+        console.log(parsedMsg.hasOwnProperty("pastMoves"))
   
         if (parsedMsg.hasOwnProperty("playerCode")) {
           var playerCode = parsedMsg["playerCode"]
@@ -454,29 +475,41 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
             setPlayerColour(PieceColour.Black)
           }
   
-        } else if (parsedMsg.hasOwnProperty("newFEN")) {
+        } else if (parsedMsg.hasOwnProperty("pastMoves")) {
   
           console.log("Setting")
-          var lastMove = []
-          if (parsedMsg["lastMove"][0] != parsedMsg["lastMove"][1]) {
-            lastMove = parsedMsg["lastMove"]
+          var newHistory = parsedMsg["pastMoves"]
+          var activeColour = parseGameStateFromFEN(parsedMsg["pastMoves"].at(-1)["FEN"])["activeColour"]
+          var gameOverStatus = parsedMsg["gameOverStatus"]
+          var activeState = matchData.activeState
+          var activeMove = matchData.activeMove
+
+          if (activeMove == matchData.stateHistory.length - 1) {
+            activeState = {
+                board: parseGameStateFromFEN(newHistory.at(-1)["FEN"]).board,
+                lastMove: newHistory.at(-1)["lastMove"],   
+            }
+            activeMove += 1
           }
   
-          var newMatchState: matchState = {
-            ...parseGameStateFromFEN(parsedMsg["newFEN"]),
-            gameOverStatus: parsedMsg["gameOverStatus"],
-            pastMoves: parsedMsg["pastMoves"],
-            lastMove,
+          var newMatchData: matchData = {
+            activeState: activeState,
+            stateHistory: newHistory,
+            activeColour: activeColour,
+            gameOverStatus: gameOverStatus,
+            activeMove: activeMove,
           }
+
+          console.log("New Match Data: ", newMatchData)
   
-          setMatchState(newMatchState)
+          setMatchData(newMatchData)
   
         }
       }
     }
     
     return (
-      <GameContext.Provider value={{matchState, setMatchState, webSocket, playerColour}}>
+      <GameContext.Provider value={{matchData, setMatchData, webSocket, playerColour}}>
         {children}
       </GameContext.Provider>
     )
@@ -549,42 +582,27 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
       rightFEN: string | null
     }
   
-    function Moves({ moveMap } : { moveMap: [string, string][]}) {
-  
-      var tableData = []
-  
-      for (var i = 1; i < moveMap.length; i+=2) {
-        var rowNumber = `${Math.floor(i / 2) + 1}.`
-        var leftMove = moveMap[i][0]
-        var leftFEN = moveMap[i][1]
-        var rightMove, rightFEN: string | null
-  
-        if ((i+1) < moveMap.length) {
-          rightMove = moveMap[i+1][0]
-          rightFEN = moveMap[i+1][1]
-        } else {
-          rightMove = null
-          rightFEN = null
-        }
-  
-        var rowData: moveHistoryRowData = {
-          rowNumber,
-          leftMove,
-          leftFEN,
-          rightMove,
-          rightFEN,
-        }
-  
-        tableData.push(rowData)
+    function Moves({ boardHistory } : { boardHistory: boardHistory[]}) {
+      const gameCtx = useContext(GameContext)
+      if (!gameCtx) {
+        throw new Error('ChessBoard must be used within a GameContext Provider');
       }
-  
-      function matchStateFromFEN(fen: string): matchState {
-        return {
-          ...parseGameStateFromFEN(fen),
-          lastMove: [0, 0],
-          gameOverStatus: 0,
-          pastMoves: [],
+
+
+      const [activeMoveNumber, setActiveMoveNumber] = useState(boardHistory.length - 1)
+
+      useEffect(() => {
+
+      }, [activeMoveNumber])
+
+      var tableData: boardHistory[][] = []
+      for (var i = 1; i < boardHistory.length; i+=2) {
+        var rowData: boardHistory[] = []
+        rowData.push(boardHistory[i])
+        if (i+1 < boardHistory.length) {
+            rowData.push(boardHistory[i+1])
         }
+        tableData.push(rowData)
       }
 
       //@TODO
@@ -595,23 +613,23 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
         <div className='movesContainer'>
           <table>
             <tbody>
-              {tableData.map((rowData) => {
+              {tableData.map((data, idx) => {
                 return (
                   <tr className='movesRow'>
-                    <td>{rowData.rowNumber}</td>
+                    <td>{Math.floor(idx / 2)}</td>
                     <td 
-                    onClick={() => game?.setMatchState(matchStateFromFEN(rowData.leftFEN))}
-                    className={rowData.leftFEN == game?.matchState.fen ? "highlight" : ""}
+                    onClick={() => setActiveMoveNumber(idx*2 + 1)}
+                    className={activeMoveNumber == idx*2 + 1 ? "highlight" : ""}
                     >
-                        {rowData.leftMove}
+                        {data[0]["algebraicNotation"]}
                     </td>
                     {
-                    rowData.rightMove ? 
+                    data.length > 1 ? 
                     <td 
-                    onClick={() => game?.setMatchState(matchStateFromFEN(rowData.rightFEN as string))}
-                    className={rowData.rightFEN == game?.matchState.fen ? "highlight" : ""}
+                    onClick={() => setActiveMoveNumber(idx*2 + 2)}
+                    className={activeMoveNumber == idx*2 + 2 ? "highlight" : ""}
                     >
-                        {rowData.rightMove}
+                        {data[1]["algebraicNotation"]}
                     </td> 
                     : 
                     <></>}
@@ -629,7 +647,7 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
       <div className='gameInfo'>
         <PlayerInfo />
         <MoveHistoryControls />
-        <Moves moveMap={game.matchState.pastMoves}/>
+        <Moves boardHistory={game.matchData.stateHistory}/>
         <GameControls />
         <PlayerInfo />
       </div>

@@ -39,6 +39,7 @@ func (hubManager *MatchRoomHubManager) registerClientToMatchRoomHub(conn *websoc
 	if !ok {
 		newHub, err := newMatchRoomHub(matchID)
 		if err != nil {
+			app.errorLog.Println(err)
 			return nil, err
 		}
 		hubManager.hubs[matchID] = newHub
@@ -57,6 +58,12 @@ func (hubManager *MatchRoomHubManager) registerClientToMatchRoomHub(conn *websoc
 	}
 
 	return &MatchRoomHubClient{hub: val, conn: conn, playerCode: playerCode, send: make(chan []byte, 256)}, nil
+}
+
+type MatchStateHistory struct {
+	FEN               string `json:"FEN"`
+	LastMove          [2]int `json:"lastMove"`
+	AlgebraicNotation string `json:"algebraicNotation"`
 }
 
 var matchRoomHubManager = newMatchRoomHubManager()
@@ -87,7 +94,7 @@ type MatchRoomHub struct {
 
 	current_fen string
 
-	pastMoves [][2]string
+	moveHistory []MatchStateHistory
 }
 
 func intToAlgebraicNotation(position int) string {
@@ -102,6 +109,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 	matchState, err := app.liveMatches.GetFromMatchID(matchID)
 
 	if err != nil {
+		app.errorLog.Println(err)
 		return nil, err
 	}
 
@@ -116,7 +124,15 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 
 	var turn byte
 
-	currentGameState := []postChessMoveReply{{NewFEN: matchState.CurrentFEN, LastMove: [2]int{last_move_move, last_move_piece}, GameOverStatus: Ongoing}}
+	currentGameState := [1]postChessMoveReply{{
+		MatchStateHistory: []MatchStateHistory{{
+			FEN:               matchState.CurrentFEN,
+			LastMove:          [2]int{last_move_move, last_move_piece},
+			AlgebraicNotation: intToAlgebraicNotation(last_move_move),
+		}},
+		GameOverStatus: Ongoing,
+	}}
+
 	if strings.Split(matchState.CurrentFEN, " ")[1] == "w" {
 		turn = byte(0)
 	} else {
@@ -125,7 +141,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 
 	jsonStr, err := json.Marshal(currentGameState)
 	if err != nil {
-		log.Printf("Error marshalling JSON: %v\n", err)
+		app.errorLog.Printf("Error marshalling JSON: %v\n", err)
 		return nil, err
 	}
 
@@ -140,7 +156,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		turn:             turn,
 		currentGameState: jsonStr,
 		current_fen:      matchState.CurrentFEN,
-		pastMoves:        [][2]string{[2]string{"", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}},
+		moveHistory:      currentGameState[0].MatchStateHistory,
 	}, nil
 }
 
@@ -189,10 +205,12 @@ func (hub *MatchRoomHub) run() {
 			// Need to put move into db
 			data := []postChessMoveReply{
 				{
-					NewFEN:         newFEN,
-					LastMove:       [2]int{chessMove.Piece, chessMove.Move},
+					MatchStateHistory: append(hub.moveHistory, MatchStateHistory{
+						FEN:               newFEN,
+						LastMove:          [2]int{chessMove.Piece, chessMove.Move},
+						AlgebraicNotation: intToAlgebraicNotation(chessMove.Move),
+					}),
 					GameOverStatus: gameOverStatus,
-					PastMoves:      append(hub.pastMoves, [2]string{intToAlgebraicNotation(chessMove.Move), newFEN}),
 				},
 			}
 
@@ -204,7 +222,11 @@ func (hub *MatchRoomHub) run() {
 
 			hub.current_fen = newFEN
 			hub.currentGameState = jsonStr
-			hub.pastMoves = append(hub.pastMoves, [2]string{intToAlgebraicNotation(chessMove.Move), newFEN})
+			hub.moveHistory = append(hub.moveHistory, MatchStateHistory{
+				FEN:               newFEN,
+				LastMove:          [2]int{chessMove.Piece, chessMove.Move},
+				AlgebraicNotation: intToAlgebraicNotation(chessMove.Move),
+			})
 			go app.liveMatches.UpdateFENForLiveMatch(hub.matchID, newFEN, chessMove.Piece, chessMove.Move)
 
 			for client := range hub.clients {
