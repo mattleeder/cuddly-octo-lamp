@@ -63,114 +63,114 @@ interface gameState {
 
 
 export function parseGameStateFromFEN(fen: string): gameState {
-    // Board, turn, castling, enpassant, halfmove, fullmove
-    var args = fen.split(" ")
-    var game: gameState = {
-        fen: fen,
-        board: [],
-        activeColour: PieceColour.White,
-        blackCanKingSideCastle: false,
-        blackCanQueenSideCastle: false,
-        whiteCanKingSideCastle: false,
-        whiteCanQueenSideCastle: false,
-        enPassantSquare: null
+  // Board, turn, castling, enpassant, halfmove, fullmove
+  const args = fen.split(" ")
+  const game: gameState = {
+    fen: fen,
+    board: [],
+    activeColour: PieceColour.White,
+    blackCanKingSideCastle: false,
+    blackCanQueenSideCastle: false,
+    whiteCanKingSideCastle: false,
+    whiteCanQueenSideCastle: false,
+    enPassantSquare: null
+  }
+
+  for (const char of args[0]) {
+    if (char == "/") {
+      continue
     }
 
-    for (let char of args[0]) {
-        if (char == "/") {
-            continue
-        }
-
-        // Digit
-        if (char >= '1' && char <= '8') {
-            for (var i = 0; i < parseInt(char); i++) {
-                game.board.push([null, null])
-            }
-            continue
-        }
+    // Digit
+    if (char >= '1' && char <= '8') {
+      for (let i = 0; i < parseInt(char); i++) {
+        game.board.push([null, null])
+      }
+      continue
+    }
         
-        var piece = charToPiece.get(char)
-        if (piece) {
-            game.board.push(piece)
-        }
-
+    const piece = charToPiece.get(char)
+    if (piece) {
+      game.board.push(piece)
     }
 
-    if (args[1] == "b") {
-        game.activeColour = PieceColour.Black
-    }
+  }
 
-    for (let char of args[2]) {
-        switch (char) {
-            case "K":
-                game.whiteCanKingSideCastle = true
-                break
-            case "Q":
-                game.whiteCanQueenSideCastle = true
-                break
-            case "k":
-                game.blackCanKingSideCastle = true
-                break
-            case "q":
-                game.blackCanQueenSideCastle = true
-                break
-        }
-    }
+  if (args[1] == "b") {
+    game.activeColour = PieceColour.Black
+  }
 
-    if (args[3].length > 1) {
-        var file = fileToNumber.get(args[3][0])
-        var rank = parseInt(args[3][1])
-        if (file) {
-            game.enPassantSquare = file + rank * 8
-        }
+  for (const char of args[2]) {
+    switch (char) {
+    case "K":
+      game.whiteCanKingSideCastle = true
+      break
+    case "Q":
+      game.whiteCanQueenSideCastle = true
+      break
+    case "k":
+      game.blackCanKingSideCastle = true
+      break
+    case "q":
+      game.blackCanQueenSideCastle = true
+      break
     }
+  }
 
-    return game
+  if (args[3].length > 1) {
+    const file = fileToNumber.get(args[3][0])
+    const rank = parseInt(args[3][1])
+    if (file) {
+      game.enPassantSquare = file + rank * 8
+    }
+  }
+
+  return game
 }
 
 export function gameStateToFEN(currentState: gameState): string {
-    var fen: string[] = []
+  const fen: string[] = []
 
-    var rowCount = 0
-    var emptyCount = 0
+  let rowCount = 0
+  let emptyCount = 0
 
-    for (let [colour, variant] of currentState.board) {
+  for (const [colour, variant] of currentState.board) {
         
-        rowCount += 1
+    rowCount += 1
 
-        if (variant === null || colour === null) {
-            emptyCount += 1
-        } else {
+    if (variant === null || colour === null) {
+      emptyCount += 1
+    } else {
             
-            if (emptyCount > 0) {
-                fen.push(emptyCount.toString())
-                emptyCount = 0
-            }
+      if (emptyCount > 0) {
+        fen.push(emptyCount.toString())
+        emptyCount = 0
+      }
             
-            var char = variantToChar.get(variant)
+      let char = variantToChar.get(variant)
             
-            if (char == undefined) {
-                throw new Error("Unable to convert variant to char")
-            }
+      if (char == undefined) {
+        throw new Error("Unable to convert variant to char")
+      }
             
-            if (colour == PieceColour.White) {
-                char = char?.toUpperCase()
-            }
+      if (colour == PieceColour.White) {
+        char = char?.toUpperCase()
+      }
             
-            fen.push(char)
-        }
-
-        if (rowCount >= 8) {
-            if (emptyCount > 0) {
-                fen.push(emptyCount.toString())
-                emptyCount = 0
-            }
-            fen.push("/")
-            rowCount = 0
-        }
+      fen.push(char)
     }
 
-    fen.push(" w KQkq - 0 1")
+    if (rowCount >= 8) {
+      if (emptyCount > 0) {
+        fen.push(emptyCount.toString())
+        emptyCount = 0
+      }
+      fen.push("/")
+      rowCount = 0
+    }
+  }
 
-    return fen.join("")
+  fen.push(" w KQkq - 0 1")
+
+  return fen.join("")
 }

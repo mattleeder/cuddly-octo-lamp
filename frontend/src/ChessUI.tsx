@@ -1,5 +1,6 @@
 import { Microscope, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, AlignJustify, CornerUpLeft, Equal, Flag } from "lucide-react"
 import { useState, useEffect, useRef, useContext, createContext, ReactElement } from "react"
+import React from 'react';
 import { useParams, useNavigate } from "react-router-dom"
 import { PieceColour, PieceVariant, parseGameStateFromFEN } from "./ChessLogic"
 
@@ -18,14 +19,14 @@ colourToString.set(PieceColour.White, 'white')
 colourToString.set(PieceColour.Black, 'black')
 
 export function MatchRoom() {
-    const { matchid } = useParams()
+  const { matchid } = useParams()
   
-    return (
-      <GameWrapper matchID={matchid as string}>
-        <ChessBoard />
-      </GameWrapper>
-    )
-  }
+  return (
+    <GameWrapper matchID={matchid as string}>
+      <ChessBoard />
+    </GameWrapper>
+  )
+}
 
 export function JoinQueue() {
   const [inQueue, setInQueue] = useState(false)
@@ -47,7 +48,7 @@ export function JoinQueue() {
   async function joinQueue() {
 
     try {
-      var response = await fetch(import.meta.env.VITE_API_JOIN_QUEUE_URL, {
+      const response = await fetch(import.meta.env.VITE_API_JOIN_QUEUE_URL, {
         method: "POST",
         credentials: 'include',
         body: JSON.stringify({
@@ -62,7 +63,7 @@ export function JoinQueue() {
       }
 
       // Joined, start listening for events
-      var eventSource = new EventSource(import.meta.env.VITE_API_MATCH_LISTEN_URL, {
+      const eventSource = new EventSource(import.meta.env.VITE_API_MATCH_LISTEN_URL, {
         withCredentials: true,
       })
       eventSource.onmessage = (event) => {
@@ -83,7 +84,7 @@ export function JoinQueue() {
   async function leaveQueue() {
 
     try {
-      var response = await fetch(import.meta.env.VITE_API_JOIN_QUEUE_URL, {
+      const response = await fetch(import.meta.env.VITE_API_JOIN_QUEUE_URL, {
         method: "POST",
         credentials: 'include',
         body: JSON.stringify({
@@ -113,43 +114,43 @@ export function JoinQueue() {
     }
 
     setWaiting(true)
-    var clickAction = inQueue ? ClickAction.leaveQueue : ClickAction.joinQueue
+    const clickAction = inQueue ? ClickAction.leaveQueue : ClickAction.joinQueue
 
     if (clickAction == ClickAction.leaveQueue) {
-      var result = await leaveQueue()
+      const result = await leaveQueue()
       setInQueue(!result)
     } else {
-      var result = await joinQueue()
+      const result = await joinQueue()
       setInQueue(result)
     }
 
     setWaiting(false)
   }
 
-  var buttonText = inQueue ? "In Queue" : "Join Queue"
+  const buttonText = inQueue ? "In Queue" : "Join Queue"
   return (
     <button onClick={toggleQueue}>{buttonText}</button>
   )
 }
 
 export function ChessBoard() {
-    const boardRef = useRef<HTMLDivElement | null>(null)
-    const [rect, setRect] = useState<DOMRect | null>(null)
+  const boardRef = useRef<HTMLDivElement | null>(null)
+  const [rect, setRect] = useState<DOMRect | null>(null)
   
-    const [waiting, setWaiting] = useState(false)
+  const [waiting, setWaiting] = useState(false)
   
-    const [selectedPiece, setSelectedPiece] = useState<number | null>(null)
-    const [moves, setMoves] = useState<number[]>([])
-    const [captures, setCaptures] = useState<number[]>([])
+  const [selectedPiece, setSelectedPiece] = useState<number | null>(null)
+  const [moves, setMoves] = useState<number[]>([])
+  const [captures, setCaptures] = useState<number[]>([])
   
-    const [promotionNextMove, setPromotionNextMove] = useState(false)
-    const [promotionActive, setPromotionActive] = useState(false)
-    const [promotionSquare, setPromotionSquare] = useState(0)
+  const [promotionNextMove, setPromotionNextMove] = useState(false)
+  const [promotionActive, setPromotionActive] = useState(false)
+  const [promotionSquare, setPromotionSquare] = useState(0)
   
-    const game = useContext(GameContext)
-    if (!game) {
-      throw new Error('ChessBoard must be used within a GameContext Provider');
-    }
+  const game = useContext(GameContext)
+  if (!game) {
+    throw new Error('ChessBoard must be used within a GameContext Provider');
+  }
 
     enum ClickAction {
         clear,
@@ -184,23 +185,30 @@ export function ChessBoard() {
     }
   
     async function fetchPossibleMoves(position: number) {
+      if (!game) {
+        return
+      }
       try {
-        var response = await fetch(import.meta.env.VITE_API_FETCH_MOVES_URL, {
+        const mostRecentMove = game.matchData.stateHistory.at(-1)
+        if (!mostRecentMove) {
+          return
+        }
+        const response = await fetch(import.meta.env.VITE_API_FETCH_MOVES_URL, {
           "method": "POST",
           "body": JSON.stringify({
-            "fen": game?.matchData.stateHistory.at(-1)["FEN"],
+            "fen": mostRecentMove["FEN"],
             "piece": position,
-        })})
+          })})
   
         if (!response.ok) {
           throw new Error(`Response status: ${response.status}`)
         }
   
-        var data = await response.json()
+        const data = await response.json()
         return data
       }
   
-      catch (error: any) {
+      catch (error: unknown) {
         console.error(error.message)
       }
   
@@ -224,9 +232,9 @@ export function ChessBoard() {
         throw new Error("Bounding rect for board is not defined")
       }
       console.log(rect)
-      var boardXPosition = Math.floor((event.clientX - rect.left) / (rect.width / 8))
-      var boardYPosition = Math.floor((event.clientY - rect.top) / (rect.height / 8))
-      var position = boardYPosition * 8 + boardXPosition
+      const boardXPosition = Math.floor((event.clientX - rect.left) / (rect.width / 8))
+      const boardYPosition = Math.floor((event.clientY - rect.top) / (rect.height / 8))
+      let position = boardYPosition * 8 + boardXPosition
   
       // If waiting do nothing
       if (waiting) { 
@@ -239,7 +247,7 @@ export function ChessBoard() {
       // Get clickAction state
       console.log(`Position : ${position}`)
       console.log(`Clicked On: ${game?.matchData.activeState.board[position][0]}`)
-      var clickAction = ClickAction.clear
+      let clickAction = ClickAction.clear
       if (promotionActive && [0, 8, 16, 24].includes(Math.abs(position - promotionSquare))) {
         clickAction = ClickAction.choosePromotion
       } else if ([...moves, ...captures].includes(position)) {
@@ -261,50 +269,50 @@ export function ChessBoard() {
       // If clicked on board, reset to bare
   
       switch (clickAction) {
-        case ClickAction.clear:
-          setToBare()
-          break;
+      case ClickAction.clear:
+        setToBare()
+        break;
   
-        case ClickAction.makeMove:
-        case ClickAction.choosePromotion:
-          if (selectedPiece === null) {
-            throw new Error("Posting move with no piece")
-          }
+      case ClickAction.makeMove:
+      case ClickAction.choosePromotion:
+      { if (selectedPiece === null) {
+        throw new Error("Posting move with no piece")
+      }
   
-          // Render promotion component
-          if (promotionNextMove) {
-            setPromotionActive(true)
-            setPromotionSquare(position)
-            setPromotionNextMove(false)
-            break;
-          }
+      // Render promotion component
+      if (promotionNextMove) {
+        setPromotionActive(true)
+        setPromotionSquare(position)
+        setPromotionNextMove(false)
+        break;
+      }
   
-          var promotionString = ""
-          if (clickAction == ClickAction.choosePromotion) {
-            var promotionIndex = [0, 8, 16, 24].indexOf(Math.abs(position - promotionSquare))
-            promotionString = "qnrb"[promotionIndex]
-            position = promotionSquare
-          }
-          // Send current FEN, piece, move, new FEN
-          console.log("Post move")
-          wsPostMove(position, selectedPiece, promotionString)
+      let promotionString = ""
+      if (clickAction == ClickAction.choosePromotion) {
+        const promotionIndex = [0, 8, 16, 24].indexOf(Math.abs(position - promotionSquare))
+        promotionString = "qnrb"[promotionIndex]
+        position = promotionSquare
+      }
+      // Send current FEN, piece, move, new FEN
+      console.log("Post move")
+      wsPostMove(position, selectedPiece, promotionString)
   
-          // Clear cache, clear moves
-          setToBare()
-          break;
+      // Clear cache, clear moves
+      setToBare()
+      break; }
   
-        case ClickAction.showMoves:
-          // Fetch moves
-          var data = await fetchPossibleMoves(position)
+      case ClickAction.showMoves:
+      // Fetch moves
+      { const data = await fetchPossibleMoves(position)
           
-          // Set Moves
-          setMoves(data["moves"] || [])
-          setCaptures(data["captures"] || [])
-          setPromotionNextMove(data["triggerPromotion"])
+        // Set Moves
+        setMoves(data["moves"] || [])
+        setCaptures(data["captures"] || [])
+        setPromotionNextMove(data["triggerPromotion"])
   
-          // Show Moves
-          setSelectedPiece(position)
-          break;
+        // Show Moves
+        setSelectedPiece(position)
+        break; }
       }
       
       setWaiting(false)
@@ -316,43 +324,43 @@ export function ChessBoard() {
         return
       }
   
-      var row = Math.floor(idx / 8)
-      var col = idx % 8
+      const row = Math.floor(idx / 8)
+      const col = idx % 8
       return (
-        <div className={`${colourToString.get(colour)}-${variantToString.get(variant)}`} style={{transform: `translate(${col * 50}px, ${row * 50}px)`}}/>
+        <div key={`Piece_${idx}`} className={`${colourToString.get(colour)}-${variantToString.get(variant)}`} style={{transform: `translate(${col * 50}px, ${row * 50}px)`}}/>
       )})
   
-    const MovesComponent = (moves).map(move => {
-      var row = Math.floor(move / 8)
-      var col = move % 8
+    const MovesComponent = (moves).map((move, idx) => {
+      const row = Math.floor(move / 8)
+      const col = move % 8
       return (
-      <div className='potential-move' style={{transform: `translate(${col * 50}px, ${row * 50}px)`}}/>
-    )})
+        <div key={`Move_${idx}`} className='potential-move' style={{transform: `translate(${col * 50}px, ${row * 50}px)`}}/>
+      )})
   
-    const CapturesComponent = captures.map(move => {
-      var row = Math.floor(move / 8)
-      var col = move % 8
+    const CapturesComponent = captures.map((move, idx) => {
+      const row = Math.floor(move / 8)
+      const col = move % 8
       return (
-      <div className='potential-capture' style={{transform: `translate(${col * 50}px, ${row * 50}px)`}}/>
-    )})
+        <div key={`Capture_${idx}`} className='potential-capture' style={{transform: `translate(${col * 50}px, ${row * 50}px)`}}/>
+      )})
   
-    const LastMoveComponent = game?.matchData.activeState.lastMove.map(move => {
-      var row = Math.floor(move / 8)
-      var col = move % 8
+    const LastMoveComponent = game?.matchData.activeState.lastMove.map((move, idx) => {
+      const row = Math.floor(move / 8)
+      const col = move % 8
       return (
-      <div className='last-move' style={{transform: `translate(${col * 50}px, ${row * 50}px)`}}/>
-    )})
+        <div key={`LastMove_${idx}`} className='last-move' style={{transform: `translate(${col * 50}px, ${row * 50}px)`}}/>
+      )})
   
     const PromotionComponent = ({ promotionSquare }: { promotionSquare: number }) => {
       if (!promotionActive) {
         return <></>
       }
   
-      var col = promotionSquare % 8
+      const col = promotionSquare % 8
   
-      var promotionColour = colourToString.get(PieceColour.Black)
-      var promotionDirection = -1
-      var verticalOffset = 350
+      let promotionColour = colourToString.get(PieceColour.Black)
+      let promotionDirection = -1
+      let verticalOffset = 350
   
       if (promotionSquare <= 7) {
         promotionColour = colourToString.get(PieceColour.White)
@@ -362,10 +370,10 @@ export function ChessBoard() {
   
       return (
         <>
-        <div className={`${promotionColour}-queen promotion`} style={{transform: `translate(${col * 50}px, ${verticalOffset}px)`}}/>
-        <div className={`${promotionColour}-knight promotion`} style={{transform: `translate(${col * 50}px, ${verticalOffset + promotionDirection * 50}px)`}}/>
-        <div className={`${promotionColour}-rook promotion`} style={{transform: `translate(${col * 50}px, ${verticalOffset + promotionDirection * 50 * 2}px)`}}/>
-        <div className={`${promotionColour}-bishop promotion`} style={{transform: `translate(${col * 50}px, ${verticalOffset + promotionDirection * 50 * 3}px)`}}/>
+          <div className={`${promotionColour}-queen promotion`} style={{transform: `translate(${col * 50}px, ${verticalOffset}px)`}}/>
+          <div className={`${promotionColour}-knight promotion`} style={{transform: `translate(${col * 50}px, ${verticalOffset + promotionDirection * 50}px)`}}/>
+          <div className={`${promotionColour}-rook promotion`} style={{transform: `translate(${col * 50}px, ${verticalOffset + promotionDirection * 50 * 2}px)`}}/>
+          <div className={`${promotionColour}-bishop promotion`} style={{transform: `translate(${col * 50}px, ${verticalOffset + promotionDirection * 50 * 3}px)`}}/>
         </>
       )
     }
@@ -375,8 +383,8 @@ export function ChessBoard() {
         return <></>
       }
   
-      var gameOverStatusCodes = ["Ongoing", "Stalemate", "Checkmate", "Threefold Repetition", "Insufficient Material"]
-      var gameOverText = gameOverStatusCodes[game?.matchData.gameOverStatus || 0]
+      const gameOverStatusCodes = ["Ongoing", "Stalemate", "Checkmate", "Threefold Repetition", "Insufficient Material"]
+      const gameOverText = gameOverStatusCodes[game?.matchData.gameOverStatus || 0]
   
       return <div style={{transform: `translate(${0}px, ${180}px)`, color: "black"}}>{gameOverText}</div>
     }
@@ -394,7 +402,7 @@ export function ChessBoard() {
         </div>
       </div>
     )
-  }
+}
 
 interface boardInfo {
     board: [PieceColour | null, PieceVariant | null][],
@@ -426,262 +434,262 @@ interface gameContext {
 const GameContext = createContext<gameContext | null>(null)
 
 function GameWrapper({ children, matchID }: { children: ReactElement, matchID: string}) {
-    const [matchData, setMatchData] = useState<matchData>(
-      {
-        activeState: {
-            board: parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")["board"],
-            lastMove: [0, 0],
-            FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-        },
-        stateHistory: [{
-            FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-            lastMove: [0, 0],
-            algebraicNotation: "",
-        }],
-        activeColour: PieceColour.White,
-        activeMove: 0,
-        gameOverStatus: 0,
-      })
-    const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
-    const [playerColour, setPlayerColour] = useState(PieceColour.Spectator)
+  const [matchData, setMatchData] = useState<matchData>(
+    {
+      activeState: {
+        board: parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")["board"],
+        lastMove: [0, 0],
+        FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      },
+      stateHistory: [{
+        FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        lastMove: [0, 0],
+        algebraicNotation: "",
+      }],
+      activeColour: PieceColour.White,
+      activeMove: 0,
+      gameOverStatus: 0,
+    })
+  const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
+  const [playerColour, setPlayerColour] = useState(PieceColour.Spectator)
   
-    useEffect(() => {
-      // Connect to websocket for matchroom
-      console.log("Connecting to ws")
-      var ws = new WebSocket(import.meta.env.VITE_API_MATCHROOM_URL + matchID + '/ws')
-      setWebSocket(ws)
-      return () => {
-        // Disconnect
-        ws?.close()
-      }
-    }, [])
-
-    useEffect(() => {
-        console.log("GAMEWRAPPER:")
-        console.log(matchData)
-    }, [matchData])
-
-    if (webSocket) {
-        webSocket.onmessage = (event) => readMessage(event.data)
+  useEffect(() => {
+    // Connect to websocket for matchroom
+    console.log("Connecting to ws")
+    const ws = new WebSocket(import.meta.env.VITE_API_MATCHROOM_URL + matchID + '/ws')
+    setWebSocket(ws)
+    return () => {
+      // Disconnect
+      ws?.close()
     }
-  
-    function readMessage(message: any) {
-      console.log("FROM WEBSOCKET")
-      console.log(message)
-  
-      for (let msg of message.split("\n")) {
-        var parsedMsg = JSON.parse(msg)[0]
-  
-        if (parsedMsg.hasOwnProperty("playerCode")) {
-          var playerCode = parsedMsg["playerCode"]
-  
-          if (playerCode == 0) {
-            setPlayerColour(PieceColour.White)
-          } else if (playerCode == 1) {
-            setPlayerColour(PieceColour.Black)
-          }
-  
-        } else if (parsedMsg.hasOwnProperty("pastMoves")) {
-  
-          console.log("Setting")
-          var newHistory = parsedMsg["pastMoves"]
-          var activeColour = parseGameStateFromFEN(parsedMsg["pastMoves"].at(-1)["FEN"])["activeColour"]
-          var gameOverStatus = parsedMsg["gameOverStatus"]
-          var activeState = {
-            ...matchData.activeState
-          }
-          var activeMove = matchData.activeMove
+  }, [])
 
-          console.log(matchData)
-          if (matchData.activeState.FEN == matchData.stateHistory.at(-1)?.FEN) {
-            activeState = {
-                board: parseGameStateFromFEN(newHistory.at(-1)["FEN"]).board,
-                lastMove: newHistory.at(-1)["lastMove"],
-                FEN: parsedMsg["pastMoves"].at(-1)["FEN"],
-            }
-            console.log("Increment activeMove")
-            activeMove = newHistory.length - 1
-          }
-  
-          var newMatchData: matchData = {
-            activeState: activeState,
-            stateHistory: newHistory,
-            activeColour: activeColour,
-            gameOverStatus: gameOverStatus,
-            activeMove: activeMove,
-          }
+  useEffect(() => {
+    console.log("GAMEWRAPPER:")
+    console.log(matchData)
+  }, [matchData])
 
-          console.log("New Match Data: ", newMatchData)
-
-          setMatchData(newMatchData)
-  
-        }
-      }
-    }
-    
-    return (
-      <GameContext.Provider value={{matchData, setMatchData, webSocket, playerColour}}>
-        {children}
-      </GameContext.Provider>
-    )
+  if (webSocket) {
+    webSocket.onmessage = (event) => readMessage(event.data)
   }
   
-  function GameInfoTile() {
+  function readMessage(message: unknown) {
+    console.log("FROM WEBSOCKET")
+    console.log(message)
   
-    const game = useContext(GameContext)
-    if (!game) {
-      throw new Error('GameInfoTile must be used within a GameContext Provider');
-    }
+    for (const msg of message.split("\n")) {
+      const parsedMsg = JSON.parse(msg)[0]
+  
+      if (Object.prototype.hasOwnProperty.call(parsedMsg, "playerCode")) {
+        const playerCode = parsedMsg["playerCode"]
+  
+        if (playerCode == 0) {
+          setPlayerColour(PieceColour.White)
+        } else if (playerCode == 1) {
+          setPlayerColour(PieceColour.Black)
+        }
+  
+      } else if (Object.prototype.hasOwnProperty.call(parsedMsg, "pastMoves")) {
+  
+        console.log("Setting")
+        const newHistory = parsedMsg["pastMoves"]
+        const activeColour = parseGameStateFromFEN(parsedMsg["pastMoves"].at(-1)["FEN"])["activeColour"]
+        const gameOverStatus = parsedMsg["gameOverStatus"]
+        let activeState = {
+          ...matchData.activeState
+        }
+        let activeMove = matchData.activeMove
 
-    function updateActiveState(stateHistoryIndex: number) {
-        console.log(stateHistoryIndex)
-        if (!game) {
-            return
-        }
-        if (stateHistoryIndex == game.matchData.activeMove) {
-            return
-        }
-        if (stateHistoryIndex < 0 || game.matchData.stateHistory.length - 1 < stateHistoryIndex) {
-            return
-        }
-        var activeMoveNumber = stateHistoryIndex
-        var matchData = {
-            ...game.matchData
-        }
-        matchData.activeMove = activeMoveNumber
-        matchData.activeState = {
-            board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
-            lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
-            FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
-        }
-        console.log("MOVEHISTORY")
         console.log(matchData)
-        game.setMatchData(matchData)
-      }
+        if (matchData.activeState.FEN == matchData.stateHistory.at(-1)?.FEN) {
+          activeState = {
+            board: parseGameStateFromFEN(newHistory.at(-1)["FEN"]).board,
+            lastMove: newHistory.at(-1)["lastMove"],
+            FEN: parsedMsg["pastMoves"].at(-1)["FEN"],
+          }
+          console.log("Increment activeMove")
+          activeMove = newHistory.length - 1
+        }
   
-    function PlayerInfo() {
-      return (
-        <div className='playerInfo'>
-          <div className='playerPingStatus'>O</div>
-          <div className='playerName'>Player</div>
-        </div>
-      )
-    }
-  
-    function MoveHistoryControls() {
-        if (!game) {
-            return
+        const newMatchData: matchData = {
+          activeState: activeState,
+          stateHistory: newHistory,
+          activeColour: activeColour,
+          gameOverStatus: gameOverStatus,
+          activeMove: activeMove,
         }
 
-        var latestMoveButtonClassName = "moveHistoryControlsButton"
-        if (game.matchData.activeMove != game.matchData.stateHistory.length - 1) {
-            latestMoveButtonClassName += " newMoveNotification"
-        }
+        console.log("New Match Data: ", newMatchData)
 
-      return (
-        <div className='moveHistoryControlsContainer'>
-          <div className='moveHistoryControlsButton'>
-            <Microscope size={12}/>
-          </ div>  
-          <div onClick={() => updateActiveState(0)} className='moveHistoryControlsButton'>
-            <ChevronFirst size={12}/>
-          </ div>
-          <div onClick={() => updateActiveState(game?.matchData.activeMove - 1)} className='moveHistoryControlsButton'>
-            <ChevronLeft size={12}/>
-          </ div>          
-          <div className='moveHistoryControlsButton'>
-            <ChevronRight onClick={() => updateActiveState(game?.matchData.activeMove + 1)} size={12}/>
-          </ div>          
-          <div onClick={() => updateActiveState(game?.matchData.stateHistory.length - 1)} className={latestMoveButtonClassName}>
-            <ChevronLast size={12}/>
-          </ div>          
-          <div className='moveHistoryControlsButton'>
-            <AlignJustify size={12}/>
-          </ div>
-        </div>
-      )
-    }
+        setMatchData(newMatchData)
   
-    function GameControls() {
-      return (
-        <div className='gameControlsContainer'>
-          <div className='spacer' />
-          <div className='gameControlsButton'>
-            <CornerUpLeft size={12} color='#000000'/>
-          </div>
-          <div className='gameControlsButton'>
-            <Equal size={12} color='#000000'/>
-          </div>
-          <div className='gameControlsButton'>
-            <Flag size={12} color='#000000'/>
-          </div>
-          <div className='spacer' />
-        </div>
-      )
-    }
-  
-    function Moves({ boardHistory } : { boardHistory: boardHistory[]}) {
-      const gameCtx = useContext(GameContext)
-      if (!gameCtx) {
-        throw new Error('ChessBoard must be used within a GameContext Provider');
       }
-
-      var tableData: boardHistory[][] = []
-      for (var i = 1; i < boardHistory.length; i+=2) {
-        var rowData: boardHistory[] = []
-        rowData.push(boardHistory[i])
-        if (i+1 < boardHistory.length) {
-            rowData.push(boardHistory[i+1])
-        }
-        tableData.push(rowData)
-      }
-
-      //@TODO
-      // Make some setBoardState instead for move history to use
-  
-  
-      return (
-        <div className='movesContainer'>
-          <table>
-            <tbody>
-              {tableData.map((data, idx) => {
-                return (
-                  <tr className='movesRow'>
-                    <td>{Math.floor(idx)}</td>
-                    <td 
-                    onClick={() => updateActiveState(idx*2 + 1)}
-                    className={gameCtx.matchData.activeMove == idx*2 + 1 ? "highlight" : ""}
-                    >
-                        {data[0]["algebraicNotation"]}
-                    </td>
-                    {
-                    data.length > 1 ? 
-                    <td 
-                    onClick={() => updateActiveState(idx*2 + 2)}
-                    className={gameCtx.matchData.activeMove == idx*2 + 2 ? "highlight" : ""}
-                    >
-                        {data[1]["algebraicNotation"]}
-                    </td> 
-                    : 
-                    <></>}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )
-  
     }
+  }
+    
+  return (
+    <GameContext.Provider value={{matchData, setMatchData, webSocket, playerColour}}>
+      {children}
+    </GameContext.Provider>
+  )
+}
   
+function GameInfoTile() {
+  
+  const game = useContext(GameContext)
+  if (!game) {
+    throw new Error('GameInfoTile must be used within a GameContext Provider');
+  }
+
+  function updateActiveState(stateHistoryIndex: number) {
+    console.log(stateHistoryIndex)
+    if (!game) {
+      return
+    }
+    if (stateHistoryIndex == game.matchData.activeMove) {
+      return
+    }
+    if (stateHistoryIndex < 0 || game.matchData.stateHistory.length - 1 < stateHistoryIndex) {
+      return
+    }
+    const activeMoveNumber = stateHistoryIndex
+    const matchData = {
+      ...game.matchData
+    }
+    matchData.activeMove = activeMoveNumber
+    matchData.activeState = {
+      board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
+      lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
+      FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
+    }
+    console.log("MOVEHISTORY")
+    console.log(matchData)
+    game.setMatchData(matchData)
+  }
+  
+  function PlayerInfo() {
     return (
-      <div className='gameInfo'>
-        <PlayerInfo />
-        <MoveHistoryControls />
-        <Moves boardHistory={game.matchData.stateHistory}/>
-        <GameControls />
-        <PlayerInfo />
+      <div className='playerInfo'>
+        <div className='playerPingStatus'>O</div>
+        <div className='playerName'>Player</div>
       </div>
     )
   }
+  
+  function MoveHistoryControls() {
+    if (!game) {
+      return
+    }
+
+    let latestMoveButtonClassName = "moveHistoryControlsButton"
+    if (game.matchData.activeMove != game.matchData.stateHistory.length - 1) {
+      latestMoveButtonClassName += " newMoveNotification"
+    }
+
+    return (
+      <div className='moveHistoryControlsContainer'>
+        <div className='moveHistoryControlsButton'>
+          <Microscope size={12}/>
+        </ div>  
+        <div onClick={() => updateActiveState(0)} className='moveHistoryControlsButton'>
+          <ChevronFirst size={12}/>
+        </ div>
+        <div onClick={() => updateActiveState(game?.matchData.activeMove - 1)} className='moveHistoryControlsButton'>
+          <ChevronLeft size={12}/>
+        </ div>          
+        <div className='moveHistoryControlsButton'>
+          <ChevronRight onClick={() => updateActiveState(game?.matchData.activeMove + 1)} size={12}/>
+        </ div>          
+        <div onClick={() => updateActiveState(game?.matchData.stateHistory.length - 1)} className={latestMoveButtonClassName}>
+          <ChevronLast size={12}/>
+        </ div>          
+        <div className='moveHistoryControlsButton'>
+          <AlignJustify size={12}/>
+        </ div>
+      </div>
+    )
+  }
+  
+  function GameControls() {
+    return (
+      <div className='gameControlsContainer'>
+        <div className='spacer' />
+        <div className='gameControlsButton'>
+          <CornerUpLeft size={12} color='#000000'/>
+        </div>
+        <div className='gameControlsButton'>
+          <Equal size={12} color='#000000'/>
+        </div>
+        <div className='gameControlsButton'>
+          <Flag size={12} color='#000000'/>
+        </div>
+        <div className='spacer' />
+      </div>
+    )
+  }
+  
+  function Moves({ boardHistory } : { boardHistory: boardHistory[]}) {
+    const gameCtx = useContext(GameContext)
+    if (!gameCtx) {
+      throw new Error('ChessBoard must be used within a GameContext Provider');
+    }
+
+    const tableData: boardHistory[][] = []
+    for (let i = 1; i < boardHistory.length; i+=2) {
+      const rowData: boardHistory[] = []
+      rowData.push(boardHistory[i])
+      if (i+1 < boardHistory.length) {
+        rowData.push(boardHistory[i+1])
+      }
+      tableData.push(rowData)
+    }
+
+    //@TODO
+    // Make some setBoardState instead for move history to use
+  
+  
+    return (
+      <div className='movesContainer'>
+        <table>
+          <tbody>
+            {tableData.map((data, idx) => {
+              return (
+                <tr key={`Row_${idx}`} className='movesRow'>
+                  <td>{Math.floor(idx)}</td>
+                  <td 
+                    onClick={() => updateActiveState(idx*2 + 1)}
+                    className={gameCtx.matchData.activeMove == idx*2 + 1 ? "highlight" : ""}
+                  >
+                    {data[0]["algebraicNotation"]}
+                  </td>
+                  {
+                    data.length > 1 ? 
+                      <td 
+                        onClick={() => updateActiveState(idx*2 + 2)}
+                        className={gameCtx.matchData.activeMove == idx*2 + 2 ? "highlight" : ""}
+                      >
+                        {data[1]["algebraicNotation"]}
+                      </td> 
+                      : 
+                      <></>}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+  
+  }
+  
+  return (
+    <div className='gameInfo'>
+      <PlayerInfo />
+      <MoveHistoryControls />
+      <Moves boardHistory={game.matchData.stateHistory}/>
+      <GameControls />
+      <PlayerInfo />
+    </div>
+  )
+}
 
