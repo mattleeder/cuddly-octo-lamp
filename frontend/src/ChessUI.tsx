@@ -398,11 +398,12 @@ export function ChessBoard() {
 
 interface boardInfo {
     board: [PieceColour | null, PieceVariant | null][],
-    lastMove: [number, number]
+    lastMove: [number, number],
+    FEN: string,
 }
 
 interface boardHistory {
-    fen: string,
+    FEN: string,
     lastMove: [number, number]
     algebraicNotation: string
 }
@@ -428,11 +429,12 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
     const [matchData, setMatchData] = useState<matchData>(
       {
         activeState: {
-            ...parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+            board: parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")["board"],
             lastMove: [0, 0],
+            FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
         },
         stateHistory: [{
-            fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
             lastMove: [0, 0],
             algebraicNotation: "",
         }],
@@ -445,26 +447,30 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
   
     useEffect(() => {
       // Connect to websocket for matchroom
+      console.log("Connecting to ws")
       var ws = new WebSocket(import.meta.env.VITE_API_MATCHROOM_URL + matchID + '/ws')
-      ws.onmessage = (event) => readMessage(event.data)
       setWebSocket(ws)
       return () => {
         // Disconnect
         ws?.close()
       }
     }, [])
+
+    useEffect(() => {
+        console.log("GAMEWRAPPER:")
+        console.log(matchData)
+    }, [matchData])
+
+    if (webSocket) {
+        webSocket.onmessage = (event) => readMessage(event.data)
+    }
   
     function readMessage(message: any) {
       console.log("FROM WEBSOCKET")
       console.log(message)
-      console.log("TESTTEST")
   
       for (let msg of message.split("\n")) {
         var parsedMsg = JSON.parse(msg)[0]
-        console.log("PARSEDMSG")
-        console.log(parsedMsg)
-        console.log(parsedMsg.hasOwnProperty("playerCode"))
-        console.log(parsedMsg.hasOwnProperty("pastMoves"))
   
         if (parsedMsg.hasOwnProperty("playerCode")) {
           var playerCode = parsedMsg["playerCode"]
@@ -481,15 +487,20 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
           var newHistory = parsedMsg["pastMoves"]
           var activeColour = parseGameStateFromFEN(parsedMsg["pastMoves"].at(-1)["FEN"])["activeColour"]
           var gameOverStatus = parsedMsg["gameOverStatus"]
-          var activeState = matchData.activeState
+          var activeState = {
+            ...matchData.activeState
+          }
           var activeMove = matchData.activeMove
 
-          if (activeMove == matchData.stateHistory.length - 1) {
+          console.log(matchData)
+          if (matchData.activeState.FEN == matchData.stateHistory.at(-1)?.FEN) {
             activeState = {
                 board: parseGameStateFromFEN(newHistory.at(-1)["FEN"]).board,
-                lastMove: newHistory.at(-1)["lastMove"],   
+                lastMove: newHistory.at(-1)["lastMove"],
+                FEN: parsedMsg["pastMoves"].at(-1)["FEN"],
             }
-            activeMove += 1
+            console.log("Increment activeMove")
+            activeMove = newHistory.length - 1
           }
   
           var newMatchData: matchData = {
@@ -501,7 +512,7 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
           }
 
           console.log("New Match Data: ", newMatchData)
-  
+
           setMatchData(newMatchData)
   
         }
@@ -574,26 +585,31 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
       )
     }
   
-    interface moveHistoryRowData {
-      rowNumber: string,
-      leftMove: string,
-      leftFEN: string,
-      rightMove: string | null,
-      rightFEN: string | null
-    }
-  
     function Moves({ boardHistory } : { boardHistory: boardHistory[]}) {
       const gameCtx = useContext(GameContext)
       if (!gameCtx) {
         throw new Error('ChessBoard must be used within a GameContext Provider');
       }
 
-
-      const [activeMoveNumber, setActiveMoveNumber] = useState(boardHistory.length - 1)
-
-      useEffect(() => {
-
-      }, [activeMoveNumber])
+      function updateActiveState(stateHistoryIndex: number) {
+        console.log(stateHistoryIndex)
+        if (stateHistoryIndex == gameCtx?.matchData.activeMove) {
+            return
+        }
+        var activeMoveNumber = stateHistoryIndex
+        var matchData = {
+            ...gameCtx.matchData
+        }
+        matchData.activeMove = activeMoveNumber
+        matchData.activeState = {
+            board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
+            lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
+            FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
+        }
+        console.log("MOVEHISTORY")
+        console.log(matchData)
+        gameCtx.setMatchData(matchData)
+      }
 
       var tableData: boardHistory[][] = []
       for (var i = 1; i < boardHistory.length; i+=2) {
@@ -616,18 +632,18 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
               {tableData.map((data, idx) => {
                 return (
                   <tr className='movesRow'>
-                    <td>{Math.floor(idx / 2)}</td>
+                    <td>{Math.floor(idx)}</td>
                     <td 
-                    onClick={() => setActiveMoveNumber(idx*2 + 1)}
-                    className={activeMoveNumber == idx*2 + 1 ? "highlight" : ""}
+                    onClick={() => updateActiveState(idx*2 + 1)}
+                    className={gameCtx.matchData.activeMove == idx*2 + 1 ? "highlight" : ""}
                     >
                         {data[0]["algebraicNotation"]}
                     </td>
                     {
                     data.length > 1 ? 
                     <td 
-                    onClick={() => setActiveMoveNumber(idx*2 + 2)}
-                    className={activeMoveNumber == idx*2 + 2 ? "highlight" : ""}
+                    onClick={() => updateActiveState(idx*2 + 2)}
+                    className={gameCtx.matchData.activeMove == idx*2 + 2 ? "highlight" : ""}
                     >
                         {data[1]["algebraicNotation"]}
                     </td> 
