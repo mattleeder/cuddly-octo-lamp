@@ -209,7 +209,11 @@ export function ChessBoard() {
       }
   
       catch (error: unknown) {
-        console.error(error.message)
+        if (error instanceof Error) {
+            console.error(error.message)
+        } else {
+            console.log(error)
+        }
       }
   
       return {}
@@ -476,6 +480,10 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
   function readMessage(message: unknown) {
     console.log("FROM WEBSOCKET")
     console.log(message)
+
+    if (typeof message != "string") {
+        return
+    }
   
     for (const msg of message.split("\n")) {
       const parsedMsg = JSON.parse(msg)[0]
