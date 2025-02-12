@@ -532,6 +532,32 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
     if (!game) {
       throw new Error('GameInfoTile must be used within a GameContext Provider');
     }
+
+    function updateActiveState(stateHistoryIndex: number) {
+        console.log(stateHistoryIndex)
+        if (!game) {
+            return
+        }
+        if (stateHistoryIndex == game.matchData.activeMove) {
+            return
+        }
+        if (stateHistoryIndex < 0 || game.matchData.stateHistory.length - 1 < stateHistoryIndex) {
+            return
+        }
+        var activeMoveNumber = stateHistoryIndex
+        var matchData = {
+            ...game.matchData
+        }
+        matchData.activeMove = activeMoveNumber
+        matchData.activeState = {
+            board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
+            lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
+            FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
+        }
+        console.log("MOVEHISTORY")
+        console.log(matchData)
+        game.setMatchData(matchData)
+      }
   
     function PlayerInfo() {
       return (
@@ -543,21 +569,30 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
     }
   
     function MoveHistoryControls() {
+        if (!game) {
+            return
+        }
+
+        var latestMoveButtonClassName = "moveHistoryControlsButton"
+        if (game.matchData.activeMove != game.matchData.stateHistory.length - 1) {
+            latestMoveButtonClassName += " newMoveNotification"
+        }
+
       return (
         <div className='moveHistoryControlsContainer'>
           <div className='moveHistoryControlsButton'>
             <Microscope size={12}/>
           </ div>  
-          <div className='moveHistoryControlsButton'>
+          <div onClick={() => updateActiveState(0)} className='moveHistoryControlsButton'>
             <ChevronFirst size={12}/>
           </ div>
-          <div className='moveHistoryControlsButton'>
+          <div onClick={() => updateActiveState(game?.matchData.activeMove - 1)} className='moveHistoryControlsButton'>
             <ChevronLeft size={12}/>
           </ div>          
           <div className='moveHistoryControlsButton'>
-            <ChevronRight size={12}/>
+            <ChevronRight onClick={() => updateActiveState(game?.matchData.activeMove + 1)} size={12}/>
           </ div>          
-          <div className='moveHistoryControlsButton'>
+          <div onClick={() => updateActiveState(game?.matchData.stateHistory.length - 1)} className={latestMoveButtonClassName}>
             <ChevronLast size={12}/>
           </ div>          
           <div className='moveHistoryControlsButton'>
@@ -589,26 +624,6 @@ function GameWrapper({ children, matchID }: { children: ReactElement, matchID: s
       const gameCtx = useContext(GameContext)
       if (!gameCtx) {
         throw new Error('ChessBoard must be used within a GameContext Provider');
-      }
-
-      function updateActiveState(stateHistoryIndex: number) {
-        console.log(stateHistoryIndex)
-        if (stateHistoryIndex == gameCtx?.matchData.activeMove) {
-            return
-        }
-        var activeMoveNumber = stateHistoryIndex
-        var matchData = {
-            ...gameCtx.matchData
-        }
-        matchData.activeMove = activeMoveNumber
-        matchData.activeState = {
-            board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
-            lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
-            FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
-        }
-        console.log("MOVEHISTORY")
-        console.log(matchData)
-        gameCtx.setMatchData(matchData)
       }
 
       var tableData: boardHistory[][] = []

@@ -107,6 +107,16 @@
   cursor: pointer;
 }
 
+@keyframes flash {
+  0% { background-color: transparent; }
+  50% { background-color: green; }
+  100% { background-color: 1; }
+}
+
+.moveHistoryControlsButton.newMoveNotification {
+  animation: flash 1s infinite;
+}
+
 .movesContainer {
   height: 50%;
   color: black;
