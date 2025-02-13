@@ -1,5 +1,5 @@
 import { Microscope, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, AlignJustify, CornerUpLeft, Flag, Handshake } from "lucide-react"
-import { useState, useEffect, useRef, useContext, createContext, ReactElement } from "react"
+import { useState, useEffect, useRef, useContext, createContext, ReactNode } from "react"
 import React from 'react';
 import { useParams, useNavigate } from "react-router-dom"
 import { PieceColour, PieceVariant, parseGameStateFromFEN } from "./ChessLogic"
@@ -186,6 +186,11 @@ export function ChessBoard() {
     }
   }, [])
 
+  // Clear board when changing active move
+  useEffect(() => {
+    setToBare()
+  }, [game.matchData.activeMove])
+
   function wsPostMove(position: number, piece: number, promotion: string) {
     game?.webSocket?.send(JSON.stringify({
       "piece": piece,
@@ -263,7 +268,11 @@ export function ChessBoard() {
     console.log(`Position : ${position}`)
     console.log(`Clicked On: ${game?.matchData.activeState.board[position][0]}`)
     let clickAction = ClickAction.clear
-    if (promotionActive && [0, 8, 16, 24].includes(Math.abs(position - promotionSquare))) {
+    if (game?.matchData.activeMove != (game as gameContext)?.matchData.stateHistory.length - 1) {
+      console.log("Clicking disable in past moves")
+      setWaiting(false)
+      return
+    } else if (promotionActive && [0, 8, 16, 24].includes(Math.abs(position - promotionSquare))) {
       clickAction = ClickAction.choosePromotion
     } else if ([...moves, ...captures].includes(position)) {
       clickAction = ClickAction.makeMove
@@ -453,7 +462,7 @@ interface gameContext {
 
 const GameContext = createContext<gameContext | null>(null)
 
-function GameWrapper({ children, matchID }: { children: ReactElement, matchID: string }) {
+function GameWrapper({ children, matchID }: { children: ReactNode, matchID: string }) {
   const [matchData, setMatchData] = useState<matchData>(
     {
       activeState: {
@@ -660,11 +669,14 @@ function GameInfoTile() {
     )
   }
 
-  function Moves({ boardHistory }: { boardHistory: boardHistory[] }) {
+  function Moves() {
+
+    
     const gameCtx = useContext(GameContext)
     if (!gameCtx) {
       throw new Error('ChessBoard must be used within a GameContext Provider');
     }
+    const boardHistory = gameCtx.matchData.stateHistory
     const scrollPosRef = useRef(0)
     const tableRef = useRef<HTMLDivElement | null>(null)
 
@@ -674,6 +686,7 @@ function GameInfoTile() {
         console.log('Moves Component unmounted');
       };
     }, []);
+    
 
 
     function handleScroll() {
@@ -750,7 +763,7 @@ function GameInfoTile() {
     <div className='gameInfo'>
       <PlayerInfo />
       <MoveHistoryControls />
-      <Moves boardHistory={game.matchData.stateHistory} />
+      <Moves />
       <GameControls />
       <PlayerInfo />
     </div>
