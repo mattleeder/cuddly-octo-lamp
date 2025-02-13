@@ -622,6 +622,13 @@ function GameInfoTile() {
       return
     }
 
+    useEffect(() => {
+      console.log('Move History Controls Component mounted');
+      return () => {
+        console.log('Move History Controls unmounted');
+      };
+    }, []);
+
     let latestMoveButtonClassName = "moveHistoryControlsButton"
     if (game.matchData.activeMove != game.matchData.stateHistory.length - 1) {
       latestMoveButtonClassName += " newMoveNotification"
@@ -651,114 +658,6 @@ function GameInfoTile() {
     )
   }
 
-  function GameControls() {
-    return (
-      <div className='gameControlsContainer'>
-        <div className='spacer' />
-        <div className='gameControlsButton'>
-          <CornerUpLeft size={12} color='#000000' />
-        </div>
-        <div className='gameControlsButton'>
-          <Handshake size={12} color='#000000' />
-        </div>
-        <div className='gameControlsButton'>
-          <Flag size={12} color='#000000' />
-        </div>
-        <div className='spacer' />
-      </div>
-    )
-  }
-
-  function Moves() {
-
-    
-    const gameCtx = useContext(GameContext)
-    if (!gameCtx) {
-      throw new Error('ChessBoard must be used within a GameContext Provider');
-    }
-    const boardHistory = gameCtx.matchData.stateHistory
-    const scrollPosRef = useRef(0)
-    const tableRef = useRef<HTMLDivElement | null>(null)
-
-    useEffect(() => {
-      console.log('Moves Component mounted');
-      return () => {
-        console.log('Moves Component unmounted');
-      };
-    }, []);
-    
-
-
-    function handleScroll() {
-      console.log("Handling scroll")
-      if (tableRef.current) {
-        console.log(`Setting scrollPos to ${tableRef.current.scrollTop}`)
-        if (scrollPosRef.current != null) {
-          scrollPosRef.current = tableRef.current.scrollTop
-        }
-      }
-    }
-
-    useEffect(() => {
-      console.log(`scrollPosRef: ${scrollPosRef}`)
-      console.log(scrollPosRef)
-      if (scrollPosRef.current != null) {
-        console.log(`scrollPosRef: ${scrollPosRef.current}`)
-      }
-      if (tableRef.current) {
-        console.log("Scrolling")
-      }
-    }, [boardHistory])
-
-    const tableData: boardHistory[][] = []
-    for (let i = 1; i < boardHistory.length; i += 2) {
-      const rowData: boardHistory[] = []
-      rowData.push(boardHistory[i])
-      if (i + 1 < boardHistory.length) {
-        rowData.push(boardHistory[i + 1])
-      }
-      tableData.push(rowData)
-    }
-
-    //@TODO
-    // Make some setBoardState instead for move history to use
-
-
-    return (
-      <div className='movesContainer' ref={tableRef} onScroll={handleScroll}>
-        <table>
-          <tbody>
-            {tableData.map((data, idx) => {
-              return (
-                <tr key={idx} className='movesRow'>
-                  <td>{Math.floor(idx) + 1}</td>
-                  <td
-                    onClick={() => updateActiveState(idx * 2 + 1)}
-                    className={gameCtx.matchData.activeMove == idx * 2 + 1 ? "highlight" : ""}
-                  >
-                    {data[0]["algebraicNotation"]}
-                  </td>
-                  {
-                    data.length > 1 ?
-                      <td
-                        onClick={() => updateActiveState(idx * 2 + 2)}
-                        className={gameCtx.matchData.activeMove == idx * 2 + 2 ? "highlight" : ""}
-                      >
-                        {data[1]["algebraicNotation"]}
-                      </td>
-                      :
-                      <></>
-                  }
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    )
-
-  }
-
   return (
     <div className='gameInfo'>
       <PlayerInfo />
@@ -768,4 +667,142 @@ function GameInfoTile() {
       <PlayerInfo />
     </div>
   )
+}
+
+function GameControls() {
+  useEffect(() => {
+    console.log('Game Controls Component mounted');
+    return () => {
+      console.log('Game Controls unmounted');
+    };
+  }, []);
+  return (
+    <div className='gameControlsContainer'>
+      <div className='spacer' />
+      <div className='gameControlsButton'>
+        <CornerUpLeft size={12} color='#000000' />
+      </div>
+      <div className='gameControlsButton'>
+        <Handshake size={12} color='#000000' />
+      </div>
+      <div className='gameControlsButton'>
+        <Flag size={12} color='#000000' />
+      </div>
+      <div className='spacer' />
+    </div>
+  )
+}
+
+function Moves() {
+  const game = useContext(GameContext)
+  if (!game) {
+    throw new Error('Move History must be used within a GameContext Provider');
+  }
+
+  const boardHistory = game.matchData.stateHistory
+  const scrollPosRef = useRef(0)
+  const tableRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    console.log('Moves Component mounted');
+    return () => {
+      console.log('Moves Component unmounted');
+    };
+  }, []);
+  
+  function updateActiveState(stateHistoryIndex: number) {
+    console.log("updateActiveState Called")
+    console.log(stateHistoryIndex)
+    if (!game) {
+      return
+    }
+    if (stateHistoryIndex == game.matchData.activeMove) {
+      return
+    }
+    if (stateHistoryIndex < 0 || game.matchData.stateHistory.length - 1 < stateHistoryIndex) {
+      return
+    }
+    const activeMoveNumber = stateHistoryIndex
+    const matchData = {
+      ...game.matchData
+    }
+    matchData.activeMove = activeMoveNumber
+    matchData.activeState = {
+      board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
+      lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
+      FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
+    }
+    console.log("MOVEHISTORY")
+    console.log(matchData)
+    game.setMatchData(matchData)
+  }
+
+  function handleScroll() {
+    console.log("Handling scroll")
+    if (tableRef.current) {
+      console.log(`Setting scrollPos to ${tableRef.current.scrollTop}`)
+      if (scrollPosRef.current != null) {
+        scrollPosRef.current = tableRef.current.scrollTop
+      }
+    }
+  }
+
+  useEffect(() => {
+    console.log(`scrollPosRef: ${scrollPosRef}`)
+    console.log(scrollPosRef)
+    if (scrollPosRef.current != null) {
+      console.log(`scrollPosRef: ${scrollPosRef.current}`)
+    }
+    if (tableRef.current) {
+      console.log("Scrolling")
+    }
+  }, [boardHistory])
+
+  const tableData: boardHistory[][] = []
+  for (let i = 1; i < boardHistory.length; i += 2) {
+    const rowData: boardHistory[] = []
+    rowData.push(boardHistory[i])
+    if (i + 1 < boardHistory.length) {
+      rowData.push(boardHistory[i + 1])
+    }
+    tableData.push(rowData)
+  }
+
+  //@TODO
+  // Make some setBoardState instead for move history to use
+
+
+  return (
+    <div className='movesContainer' ref={tableRef} onScroll={handleScroll}>
+      <table>
+        <tbody>
+          {tableData.map((data, idx) => {
+            return (
+              <tr key={idx} className='movesRow'>
+                <td>{Math.floor(idx) + 1}</td>
+                <td
+                  onClick={() => updateActiveState(idx * 2 + 1)}
+                  className={game.matchData.activeMove == idx * 2 + 1 ? "highlight" : ""}
+                >
+                  {data[0]["algebraicNotation"]}
+                </td>
+                {
+                  data.length > 1 ?
+                    <td
+                      onClick={() => updateActiveState(idx * 2 + 2)}
+                      className={game.matchData.activeMove == idx * 2 + 2 ? "highlight" : ""}
+                    >
+                      {data[1]["algebraicNotation"]}
+                    </td>
+                    :
+                    <></>
+                }
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+
 }
