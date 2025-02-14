@@ -839,10 +839,18 @@ function CountdownTimer({ countdownTimerMilliseconds, paused, className } : { co
 }
 
 function formatDuration(durationInMilliseconds: number): string {
+  if (durationInMilliseconds <= 0) {
+    return "00:00:00.0"
+  }
   const time = new Date(durationInMilliseconds);
-  const hours = time.getUTCHours();
+  // const hours = time.getUTCHours();
   const minutes = time.getUTCMinutes();
   const seconds = time.getUTCSeconds();
   const milliseconds = time.getUTCMilliseconds();
-  return hours + ":" + minutes + ":" + seconds + ":" + milliseconds;
+
+  let result = String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0")
+  if (durationInMilliseconds < 10_000) {
+    result += "." + milliseconds.toPrecision(1)[0]
+  }
+  return result;
 }
