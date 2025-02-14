@@ -60,9 +60,11 @@ func (hubManager *MatchRoomHubManager) registerClientToMatchRoomHub(conn *websoc
 }
 
 type MatchStateHistory struct {
-	FEN               string `json:"FEN"`
-	LastMove          [2]int `json:"lastMove"`
-	AlgebraicNotation string `json:"algebraicNotation"`
+	FEN                                  string `json:"FEN"`
+	LastMove                             [2]int `json:"lastMove"`
+	AlgebraicNotation                    string `json:"algebraicNotation"`
+	WhitePlayerTimeRemainingMilliseconds int64  `json:"whitePlayerTimeRemainingMilliseconds"`
+	BlackPlayerTimeRemainingMilliseconds int64  `json:"blackPlayerTimeRemainingMilliseconds"`
 }
 
 var matchRoomHubManager = newMatchRoomHubManager()
@@ -87,6 +89,14 @@ type MatchRoomHub struct {
 
 	blackPlayerID int64
 
+	whitePlayerTimeRemaining time.Duration
+
+	blackPlayerTimeRemaining time.Duration
+
+	hasWhitePlayerMadeFirstMove bool
+
+	hasBlackPlayerMadeFirstMove bool
+
 	turn byte // byte(0) is white, byte(1) is black
 
 	currentGameState []byte
@@ -94,6 +104,10 @@ type MatchRoomHub struct {
 	current_fen string
 
 	moveHistory []MatchStateHistory
+
+	timeOfLastMove time.Time
+
+	flagTimer <-chan time.Time
 }
 
 func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
@@ -117,9 +131,11 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 
 	currentGameState := [1]postChessMoveReply{{
 		MatchStateHistory: []MatchStateHistory{{
-			FEN:               matchState.CurrentFEN,
-			LastMove:          [2]int{last_move_move, last_move_piece},
-			AlgebraicNotation: intToAlgebraicNotation(last_move_move),
+			FEN:                                  matchState.CurrentFEN,
+			LastMove:                             [2]int{last_move_move, last_move_piece},
+			AlgebraicNotation:                    intToAlgebraicNotation(last_move_move),
+			WhitePlayerTimeRemainingMilliseconds: time.Duration(3 * time.Minute).Milliseconds(),
+			BlackPlayerTimeRemainingMilliseconds: time.Duration(3 * time.Minute).Milliseconds(),
 		}},
 		GameOverStatus: Ongoing,
 	}}
@@ -137,17 +153,22 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 	}
 
 	return &MatchRoomHub{
-		matchID:          matchID,
-		broadcast:        make(chan []byte),
-		register:         make(chan *MatchRoomHubClient),
-		unregister:       make(chan *MatchRoomHubClient),
-		clients:          make(map[*MatchRoomHubClient]bool),
-		whitePlayerID:    matchState.WhitePlayerID,
-		blackPlayerID:    matchState.BlackPlayerID,
-		turn:             turn,
-		currentGameState: jsonStr,
-		current_fen:      matchState.CurrentFEN,
-		moveHistory:      currentGameState[0].MatchStateHistory,
+		matchID:                     matchID,
+		broadcast:                   make(chan []byte),
+		register:                    make(chan *MatchRoomHubClient),
+		unregister:                  make(chan *MatchRoomHubClient),
+		clients:                     make(map[*MatchRoomHubClient]bool),
+		whitePlayerID:               matchState.WhitePlayerID,
+		blackPlayerID:               matchState.BlackPlayerID,
+		whitePlayerTimeRemaining:    time.Duration(3 * time.Minute),
+		blackPlayerTimeRemaining:    time.Duration(3 * time.Minute),
+		hasWhitePlayerMadeFirstMove: false,
+		hasBlackPlayerMadeFirstMove: false,
+		turn:                        turn,
+		currentGameState:            jsonStr,
+		current_fen:                 matchState.CurrentFEN,
+		moveHistory:                 currentGameState[0].MatchStateHistory,
+		timeOfLastMove:              time.Now(),
 	}, nil
 }
 
@@ -171,6 +192,36 @@ func (hub *MatchRoomHub) run() {
 				delete(hub.clients, client)
 				close(client.send)
 			}
+		case <-hub.flagTimer:
+			var gameState []postChessMoveReply
+			err := json.Unmarshal(hub.currentGameState, &gameState)
+			if err != nil {
+				app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
+				continue
+			}
+
+			if hub.turn == byte(0) {
+				gameState[0].GameOverStatus = WhiteFlagged
+			} else {
+				gameState[0].GameOverStatus = BlackFlagged
+			}
+
+			jsonStr, err := json.Marshal(gameState)
+			if err != nil {
+				app.errorLog.Printf("Error marshalling JSON: %v\n", err)
+				continue
+			}
+
+			hub.currentGameState = jsonStr
+
+			for client := range hub.clients {
+				select {
+				case client.send <- jsonStr:
+				default:
+					close(client.send)
+					delete(hub.clients, client)
+				}
+			}
 		case message := <-hub.broadcast:
 			app.infoLog.Println("WS Message")
 			app.infoLog.Println(message)
@@ -192,14 +243,33 @@ func (hub *MatchRoomHub) run() {
 				continue
 			}
 
+			if message[0] == byte(0) {
+				if hub.hasWhitePlayerMadeFirstMove {
+					hub.whitePlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
+					hub.whitePlayerTimeRemaining += time.Duration(2 * time.Second)
+
+				} else {
+					hub.hasWhitePlayerMadeFirstMove = true
+				}
+			} else {
+				if hub.hasBlackPlayerMadeFirstMove {
+					hub.blackPlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
+					hub.blackPlayerTimeRemaining += time.Duration(2 * time.Second)
+				} else {
+					hub.hasBlackPlayerMadeFirstMove = true
+				}
+			}
+
 			newFEN, gameOverStatus, algebraicNotation := getFENAfterMove(hub.current_fen, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
 			// Need to put move into db
 			data := []postChessMoveReply{
 				{
 					MatchStateHistory: append(hub.moveHistory, MatchStateHistory{
-						FEN:               newFEN,
-						LastMove:          [2]int{chessMove.Piece, chessMove.Move},
-						AlgebraicNotation: algebraicNotation,
+						FEN:                                  newFEN,
+						LastMove:                             [2]int{chessMove.Piece, chessMove.Move},
+						AlgebraicNotation:                    algebraicNotation,
+						WhitePlayerTimeRemainingMilliseconds: hub.whitePlayerTimeRemaining.Milliseconds(),
+						BlackPlayerTimeRemainingMilliseconds: hub.blackPlayerTimeRemaining.Milliseconds(),
 					}),
 					GameOverStatus: gameOverStatus,
 				},
@@ -214,11 +284,21 @@ func (hub *MatchRoomHub) run() {
 			hub.current_fen = newFEN
 			hub.currentGameState = jsonStr
 			hub.moveHistory = append(hub.moveHistory, MatchStateHistory{
-				FEN:               newFEN,
-				LastMove:          [2]int{chessMove.Piece, chessMove.Move},
-				AlgebraicNotation: intToAlgebraicNotation(chessMove.Move),
+				FEN:                                  newFEN,
+				LastMove:                             [2]int{chessMove.Piece, chessMove.Move},
+				AlgebraicNotation:                    intToAlgebraicNotation(chessMove.Move),
+				WhitePlayerTimeRemainingMilliseconds: hub.whitePlayerTimeRemaining.Milliseconds(),
+				BlackPlayerTimeRemainingMilliseconds: hub.blackPlayerTimeRemaining.Milliseconds(),
 			})
 			go app.liveMatches.UpdateFENForLiveMatch(hub.matchID, newFEN, chessMove.Piece, chessMove.Move)
+
+			hub.timeOfLastMove = time.Now()
+
+			if message[0] == byte(0) && hub.hasBlackPlayerMadeFirstMove {
+				hub.flagTimer = time.After(hub.blackPlayerTimeRemaining)
+			} else if message[0] == byte(1) && hub.hasWhitePlayerMadeFirstMove {
+				hub.flagTimer = time.After(hub.whitePlayerTimeRemaining)
+			}
 
 			for client := range hub.clients {
 				select {

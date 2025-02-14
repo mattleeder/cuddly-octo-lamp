@@ -52,7 +52,31 @@
 .gameInfo {
 	width: 100px;
   height: 125px;
-  transform: translateY(138px);
+  transform: translateY(238px) translateX(250px);
+  float: right;
+	margin: 0 auto;
+  margin-left: 10px;
+  background-color: grey;
+  box-shadow: 2px 2px #131313;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.playerTimeWhite {
+	width: 100px;
+  height: 20px;
+  transform: translateY(383px) translateX(360px);
+  float: right;
+	margin: 0 auto;
+  margin-left: 10px;
+  background-color: grey;
+  box-shadow: 2px 2px #131313;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.playerTimeBlack {
+	width: 100px;
+  height: 20px;
+  transform: translateY(200px) translateX(140px);
   float: right;
 	margin: 0 auto;
   margin-left: 10px;

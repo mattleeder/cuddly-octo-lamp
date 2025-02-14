@@ -418,7 +418,7 @@ export function ChessBoard() {
       return <></>
     }
 
-    const gameOverStatusCodes = ["Ongoing", "Stalemate", "Checkmate", "Threefold Repetition", "Insufficient Material"]
+    const gameOverStatusCodes = ["Ongoing", "Stalemate", "Checkmate", "Threefold Repetition", "Insufficient Material", "White Flagged", "Black Flagged"]
     const gameOverText = gameOverStatusCodes[game?.matchData.gameOverStatus || 0]
 
     return <div style={{ transform: `translate(${0}px, ${180}px)`, color: "black" }}>{gameOverText}</div>
@@ -440,12 +440,16 @@ interface boardInfo {
   board: [PieceColour | null, PieceVariant | null][],
   lastMove: [number, number],
   FEN: string,
+  whitePlayerTimeRemainingMilliseconds: number
+  blackPlayerTimeRemainingMilliseconds: number
 }
 
 interface boardHistory {
   FEN: string,
   lastMove: [number, number]
   algebraicNotation: string
+  whitePlayerTimeRemainingMilliseconds: number
+  blackPlayerTimeRemainingMilliseconds: number
 }
 
 interface matchData {
@@ -472,11 +476,15 @@ function GameWrapper({ children, matchID }: { children: ReactNode, matchID: stri
         board: parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")["board"],
         lastMove: [0, 0],
         FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        whitePlayerTimeRemainingMilliseconds: 3 * 60 * 1000,
+        blackPlayerTimeRemainingMilliseconds: 3 * 60 * 1000,
       },
       stateHistory: [{
         FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
         lastMove: [0, 0],
         algebraicNotation: "",
+        whitePlayerTimeRemainingMilliseconds: 3 * 60 * 1000,
+        blackPlayerTimeRemainingMilliseconds: 3 * 60 * 1000,
       }],
       activeColour: PieceColour.White,
       activeMove: 0,
@@ -532,13 +540,16 @@ function GameWrapper({ children, matchID }: { children: ReactNode, matchID: stri
         const activeColour = parseGameStateFromFEN(parsedMsg["pastMoves"].at(-1)["FEN"])["activeColour"]
         const gameOverStatus = parsedMsg["gameOverStatus"]
         let activeState = {
-          ...matchData.activeState
+          ...matchData.activeState,
+          whitePlayerTimeRemainingMilliseconds:  newHistory.at(-1)["whitePlayerTimeRemainingMilliseconds"],
+          blackPlayerTimeRemainingMilliseconds:  newHistory.at(-1)["blackPlayerTimeRemainingMilliseconds"],
         }
         let activeMove = matchData.activeMove
 
         console.log(matchData)
         if (matchData.activeState.FEN == matchData.stateHistory.at(-1)?.FEN) {
           activeState = {
+            ...activeState,
             board: parseGameStateFromFEN(newHistory.at(-1)["FEN"]).board,
             lastMove: newHistory.at(-1)["lastMove"],
             FEN: parsedMsg["pastMoves"].at(-1)["FEN"],
@@ -593,13 +604,33 @@ function GameInfoTile() {
     )
   }
 
+  function isBlackClockPaused() {
+    if (!game) {
+      return true
+    }
+    console.log(game.matchData.activeColour)
+    console.log(game.matchData.stateHistory.length)
+    return game.matchData.activeColour != PieceColour.Black || game.matchData.stateHistory.length <= 2
+  }
+
+  function isWhiteClockPaused() {
+    if (!game) {
+      return true
+    }
+    return game.matchData.activeColour != PieceColour.White || game.matchData.stateHistory.length <= 2
+  }
+
   return (
-    <div className='gameInfo'>
-      <PlayerInfo />
-      <MoveHistoryControls />
-      <Moves />
-      <GameControls />
-      <PlayerInfo />
+    <div>
+      <CountdownTimer className="playerTimeBlack" paused={isBlackClockPaused()} countdownTimerMilliseconds={game.matchData.activeState.blackPlayerTimeRemainingMilliseconds}/>
+      <div className='gameInfo'>
+        <PlayerInfo />
+        <MoveHistoryControls />
+        <Moves />
+        <GameControls />
+        <PlayerInfo />
+      </div>
+      <CountdownTimer className="playerTimeWhite" paused={isWhiteClockPaused()} countdownTimerMilliseconds={game.matchData.activeState.whitePlayerTimeRemainingMilliseconds}/>
     </div>
   )
 }
@@ -765,8 +796,53 @@ function updateActiveState(stateHistoryIndex: number, game: gameContext) {
     board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
     lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
     FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
+    whitePlayerTimeRemainingMilliseconds: matchData.activeState.whitePlayerTimeRemainingMilliseconds,
+    blackPlayerTimeRemainingMilliseconds: matchData.activeState.blackPlayerTimeRemainingMilliseconds,
   }
   console.log("MOVEHISTORY")
   console.log(matchData)
   game.setMatchData(matchData)
+}
+
+function CountdownTimer({ countdownTimerMilliseconds, paused, className } : { countdownTimerMilliseconds: number, paused: boolean, className: string }) {
+  // On mount, record the time using Date.now(), use a prop to get the count
+  // Create a state to hold the remaining time
+  // Create a function in a use effect on mount that sets the remaining time by taking
+  // the elapsed time from the initial count
+  //
+  const [remainingTime, setRemainingTime] = useState(countdownTimerMilliseconds)
+
+  // May need to be called when countdownTimerMilliseconds changes
+  useEffect(() => {
+    const start = Date.now()
+    const updateTimer = () => {
+      const delta = Date.now() - start
+      setRemainingTime(countdownTimerMilliseconds - delta)
+    }
+
+    if (paused) {
+      return
+    }
+
+    const intervalID = setInterval(updateTimer, 1000)
+
+    return () => {
+      clearInterval(intervalID)      
+    }
+  }, [paused])
+
+  return (
+    <div className={className}>
+      {formatDuration(remainingTime)}
+    </div>
+  )
+}
+
+function formatDuration(durationInMilliseconds: number): string {
+  const time = new Date(durationInMilliseconds);
+  const hours = time.getUTCHours();
+  const minutes = time.getUTCMinutes();
+  const seconds = time.getUTCSeconds();
+  const milliseconds = time.getUTCMilliseconds();
+  return hours + ":" + minutes + ":" + seconds + ":" + milliseconds;
 }

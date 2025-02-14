@@ -89,6 +89,8 @@ const (
 	Checkmate
 	ThreefoldRepetition
 	InsufficientMaterial
+	WhiteFlagged
+	BlackFlagged
 )
 
 type pieceType struct {
