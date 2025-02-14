@@ -376,6 +376,9 @@ export function ChessBoard() {
   })
 
   const LastMoveComponent = game?.matchData.activeState.lastMove.map((move, idx) => {
+    if (game.matchData.activeMove == 0) {
+      return <React.Fragment key={0} />
+    }
     const row = Math.floor(move / 8)
     const col = move % 8
     return (
@@ -632,8 +635,8 @@ function Moves() {
   }
 
   const boardHistory = game.matchData.stateHistory
-  const scrollPosRef = useRef(0)
   const tableRef = useRef<HTMLDivElement | null>(null)
+  const activeRef = useRef<HTMLTableCellElement | null>(null)
 
   useEffect(() => {
     console.log('Moves Component mounted');
@@ -641,54 +644,14 @@ function Moves() {
       console.log('Moves Component unmounted');
     };
   }, []);
-  
-  function updateActiveState(stateHistoryIndex: number) {
-    console.log("updateActiveState Called")
-    console.log(stateHistoryIndex)
-    if (!game) {
-      return
-    }
-    if (stateHistoryIndex == game.matchData.activeMove) {
-      return
-    }
-    if (stateHistoryIndex < 0 || game.matchData.stateHistory.length - 1 < stateHistoryIndex) {
-      return
-    }
-    const activeMoveNumber = stateHistoryIndex
-    const matchData = {
-      ...game.matchData
-    }
-    matchData.activeMove = activeMoveNumber
-    matchData.activeState = {
-      board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
-      lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
-      FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
-    }
-    console.log("MOVEHISTORY")
-    console.log(matchData)
-    game.setMatchData(matchData)
-  }
-
-  function handleScroll() {
-    console.log("Handling scroll")
-    if (tableRef.current) {
-      console.log(`Setting scrollPos to ${tableRef.current.scrollTop}`)
-      if (scrollPosRef.current != null) {
-        scrollPosRef.current = tableRef.current.scrollTop
-      }
-    }
-  }
 
   useEffect(() => {
-    console.log(`scrollPosRef: ${scrollPosRef}`)
-    console.log(scrollPosRef)
-    if (scrollPosRef.current != null) {
-      console.log(`scrollPosRef: ${scrollPosRef.current}`)
+    console.log("Active Move Changed")
+    console.log(activeRef.current)
+    if (activeRef.current) {
+      activeRef.current.scrollIntoView({ behavior: "auto", block: "nearest" })
     }
-    if (tableRef.current) {
-      console.log("Scrolling")
-    }
-  }, [boardHistory])
+  }, [game.matchData.activeMove])
 
   const tableData: boardHistory[][] = []
   for (let i = 1; i < boardHistory.length; i += 2) {
@@ -700,12 +663,9 @@ function Moves() {
     tableData.push(rowData)
   }
 
-  //@TODO
-  // Make some setBoardState instead for move history to use
-
 
   return (
-    <div className='movesContainer' ref={tableRef} onScroll={handleScroll}>
+    <div className='movesContainer' ref={tableRef}>
       <table>
         <tbody>
           {tableData.map((data, idx) => {
@@ -713,16 +673,18 @@ function Moves() {
               <tr key={idx} className='movesRow'>
                 <td>{Math.floor(idx) + 1}</td>
                 <td
-                  onClick={() => updateActiveState(idx * 2 + 1)}
+                  onClick={() => updateActiveState(idx * 2 + 1, game)}
                   className={game.matchData.activeMove == idx * 2 + 1 ? "highlight" : ""}
+                  ref={(game.matchData.activeMove == idx * 2 + 1) || (game.matchData.activeMove == 0 && idx == 1) ? activeRef : null}
                 >
                   {data[0]["algebraicNotation"]}
                 </td>
                 {
                   data.length > 1 ?
                     <td
-                      onClick={() => updateActiveState(idx * 2 + 2)}
+                      onClick={() => updateActiveState(idx * 2 + 2, game)}
                       className={game.matchData.activeMove == idx * 2 + 2 ? "highlight" : ""}
+                      ref={game.matchData.activeMove == idx * 2 + 2 ? activeRef : null}
                     >
                       {data[1]["algebraicNotation"]}
                     </td>
@@ -758,48 +720,21 @@ function MoveHistoryControls() {
     latestMoveButtonClassName += " newMoveNotification"
   }
 
-  function updateActiveState(stateHistoryIndex: number) {
-    console.log("updateActiveState Called")
-    console.log(stateHistoryIndex)
-    if (!game) {
-      return
-    }
-    if (stateHistoryIndex == game.matchData.activeMove) {
-      return
-    }
-    if (stateHistoryIndex < 0 || game.matchData.stateHistory.length - 1 < stateHistoryIndex) {
-      return
-    }
-    const activeMoveNumber = stateHistoryIndex
-    const matchData = {
-      ...game.matchData
-    }
-    matchData.activeMove = activeMoveNumber
-    matchData.activeState = {
-      board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
-      lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
-      FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
-    }
-    console.log("MOVEHISTORY")
-    console.log(matchData)
-    game.setMatchData(matchData)
-  }
-
   return (
     <div className='moveHistoryControlsContainer'>
       <div className='moveHistoryControlsButton'>
         <Microscope size={12} />
       </ div>
-      <div onClick={() => updateActiveState(0)} className='moveHistoryControlsButton'>
+      <div onClick={() => updateActiveState(0, game)} className='moveHistoryControlsButton'>
         <ChevronFirst size={12} />
       </ div>
-      <div onClick={() => updateActiveState(game?.matchData.activeMove - 1)} className='moveHistoryControlsButton'>
+      <div onClick={() => updateActiveState(game?.matchData.activeMove - 1, game)} className='moveHistoryControlsButton'>
         <ChevronLeft size={12} />
       </ div>
       <div className='moveHistoryControlsButton'>
-        <ChevronRight onClick={() => updateActiveState(game?.matchData.activeMove + 1)} size={12} />
+        <ChevronRight onClick={() => updateActiveState(game?.matchData.activeMove + 1, game)} size={12} />
       </ div>
-      <div onClick={() => updateActiveState(game?.matchData.stateHistory.length - 1)} className={latestMoveButtonClassName}>
+      <div onClick={() => updateActiveState(game?.matchData.stateHistory.length - 1, game)} className={latestMoveButtonClassName}>
         <ChevronLast size={12} />
       </ div>
       <div className='moveHistoryControlsButton'>
@@ -807,4 +742,31 @@ function MoveHistoryControls() {
       </ div>
     </div>
   )
+}
+
+function updateActiveState(stateHistoryIndex: number, game: gameContext) {
+  console.log("updateActiveState Called")
+  console.log(stateHistoryIndex)
+  if (!game) {
+    throw new Error("updateActiveState must be called within a GameContext")
+  }
+  if (stateHistoryIndex == game.matchData.activeMove) {
+    return
+  }
+  if (stateHistoryIndex < 0 || game.matchData.stateHistory.length - 1 < stateHistoryIndex) {
+    return
+  }
+  const activeMoveNumber = stateHistoryIndex
+  const matchData = {
+    ...game.matchData
+  }
+  matchData.activeMove = activeMoveNumber
+  matchData.activeState = {
+    board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
+    lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
+    FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
+  }
+  console.log("MOVEHISTORY")
+  console.log(matchData)
+  game.setMatchData(matchData)
 }

@@ -978,7 +978,7 @@ func boardFromFEN(fen string) gameState {
 
 		case 3:
 			// Parse Enpassant
-			if char == '/' {
+			if char == '-' {
 				continue
 			}
 
