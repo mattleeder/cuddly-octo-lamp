@@ -9,7 +9,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -95,14 +94,6 @@ type MatchRoomHub struct {
 	current_fen string
 
 	moveHistory []MatchStateHistory
-}
-
-func intToAlgebraicNotation(position int) string {
-	var columns = []string{"a", "b", "c", "d", "e", "f", "g", "h"}
-	row := 8 - position/8
-	col := position % 8
-
-	return fmt.Sprintf("%s%v", columns[col], row)
 }
 
 func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
@@ -201,14 +192,14 @@ func (hub *MatchRoomHub) run() {
 				continue
 			}
 
-			newFEN, gameOverStatus := getFENAfterMove(hub.current_fen, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
+			newFEN, gameOverStatus, algebraicNotation := getFENAfterMove(hub.current_fen, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
 			// Need to put move into db
 			data := []postChessMoveReply{
 				{
 					MatchStateHistory: append(hub.moveHistory, MatchStateHistory{
 						FEN:               newFEN,
 						LastMove:          [2]int{chessMove.Piece, chessMove.Move},
-						AlgebraicNotation: intToAlgebraicNotation(chessMove.Move),
+						AlgebraicNotation: algebraicNotation,
 					}),
 					GameOverStatus: gameOverStatus,
 				},

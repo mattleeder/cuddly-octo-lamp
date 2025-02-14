@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 	"unicode"
@@ -1087,8 +1088,80 @@ func gameHasSufficientMaterial(currentGameState gameState) bool {
 	return true
 }
 
-func getFENAfterMove(currentFEN string, piece int, move int, promotionString string) (string, gameOverStatusCode) {
+func intToAlgebraicNotation(position int) string {
+	var columns = []string{"a", "b", "c", "d", "e", "f", "g", "h"}
+	row := 8 - position/8
+	col := position % 8
+
+	return fmt.Sprintf("%s%v", columns[col], row)
+}
+
+func getFENAfterMove(currentFEN string, piece int, move int, promotionString string) (string, gameOverStatusCode, string) {
 	var currentGameState = boardFromFEN(currentFEN)
+
+	// Algebraic Notation
+	// Add the piece type, if pawn add nothing but store the file
+	// Are there any other pieces of the same type and colour that can move to this square?
+	// If so add file and/or rank to distinguish
+	// If capture add an "x", prepend pawn file if it is stored
+	// Add the move
+	// If promotion add an equals and then promotion
+
+	var variantToString = make(map[pieceVariant]string)
+	variantToString[Knight] = "n"
+	variantToString[Bishop] = "b"
+	variantToString[Rook] = "r"
+	variantToString[Queen] = "q"
+
+	var algebraicNotation = ""
+	var pawnFile = ""
+	var oldPositionAlgebraic = intToAlgebraicNotation(piece)
+	if currentGameState.board[piece].piece.variant == Pawn {
+		pawnFile = string(oldPositionAlgebraic[0])
+	} else {
+		algebraicNotation += variantToString[currentGameState.board[piece].piece.variant]
+	}
+	// Can other piece get there?
+	var currentPieceColour = currentGameState.board[piece].piece.colour
+	var currentPieceVariant = currentGameState.board[piece].piece.variant
+	var rankDistinguishNeeded = false
+	var fileDistinguishNeeded = false
+
+	for i := 0; i < 64; i++ {
+		if i == piece {
+			continue
+		}
+		if currentGameState.board[i].piece == nil || currentGameState.board[i].piece.colour != currentPieceColour || currentGameState.board[i].piece.variant != currentPieceVariant {
+			continue
+		}
+
+		moves, captures, _, _ := getMovesandCapturesForPiece(i, currentGameState)
+
+		if slices.Contains(append(moves, captures...), move) {
+			// Check if same file
+			if (i-piece)%8 == 0 {
+				rankDistinguishNeeded = true
+			} else {
+				fileDistinguishNeeded = true
+			}
+		}
+	}
+
+	if fileDistinguishNeeded {
+		algebraicNotation += string(oldPositionAlgebraic[0])
+	}
+
+	if rankDistinguishNeeded {
+		algebraicNotation += string(oldPositionAlgebraic[1])
+	}
+
+	// Capture? Check for piece present or pawn horizontal (to get enpassant)
+	if currentGameState.board[move].piece != nil || (pawnFile != "" && (move-piece)%8 != 0) {
+		algebraicNotation = pawnFile + algebraicNotation + "x"
+	}
+	algebraicNotation += intToAlgebraicNotation(move)
+	// Promotion added later
+
 	currentGameState.board[move].piece = currentGameState.board[piece].piece
 	currentGameState.board[piece].piece = nil
 
@@ -1110,9 +1183,16 @@ func getFENAfterMove(currentFEN string, piece int, move int, promotionString str
 		if move <= 7 {
 			promotionColour = White
 		}
-		var promotionVariant = runeToVariant[promotionString]
+		promotionVariant, ok := runeToVariant[promotionString]
+		// @TODO
+		// Handle error properly
+		if !ok {
+			app.errorLog.Println("Could not understand promotion string")
+		}
 
 		newGameState.board[move].piece = createPiece(move, promotionColour, promotionVariant)
+
+		algebraicNotation += "=" + promotionString
 	}
 
 	// Check for king move
@@ -1122,9 +1202,11 @@ func getFENAfterMove(currentFEN string, piece int, move int, promotionString str
 			if newGameState.board[move+1].piece != nil && newGameState.board[move+1].piece.variant == Rook {
 				newGameState.board[move-1].piece = newGameState.board[move+1].piece
 				newGameState.board[move+1].piece = nil
+				algebraicNotation = "O-O"
 			} else if newGameState.board[move-2].piece != nil && newGameState.board[move-2].piece.variant == Rook {
 				newGameState.board[move+1].piece = newGameState.board[move-2].piece
 				newGameState.board[move-2].piece = nil
+				algebraicNotation = "O-O-O"
 			}
 		}
 		if newGameState.turn == White {
@@ -1186,7 +1268,7 @@ func getFENAfterMove(currentFEN string, piece int, move int, promotionString str
 	sufficientMaterial := gameHasSufficientMaterial(currentGameState)
 
 	if !sufficientMaterial {
-		return newFEN, InsufficientMaterial
+		return newFEN, InsufficientMaterial, algebraicNotation
 	}
 
 	// Check for checkmate / stalemate
@@ -1212,7 +1294,13 @@ func getFENAfterMove(currentFEN string, piece int, move int, promotionString str
 		}
 	}
 
-	return newFEN, gameOverStatus
+	if gameOverStatus == Checkmate {
+		algebraicNotation += "#"
+	} else if enemyKingInCheck {
+		algebraicNotation += "+"
+	}
+
+	return newFEN, gameOverStatus, algebraicNotation
 }
 
 func gameStateToFEN(newGameState gameState) string {
