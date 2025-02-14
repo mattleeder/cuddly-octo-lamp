@@ -581,79 +581,11 @@ function GameInfoTile() {
     throw new Error('GameInfoTile must be used within a GameContext Provider');
   }
 
-  function updateActiveState(stateHistoryIndex: number) {
-    console.log("updateActiveState Called")
-    console.log(stateHistoryIndex)
-    if (!game) {
-      return
-    }
-    if (stateHistoryIndex == game.matchData.activeMove) {
-      return
-    }
-    if (stateHistoryIndex < 0 || game.matchData.stateHistory.length - 1 < stateHistoryIndex) {
-      return
-    }
-    const activeMoveNumber = stateHistoryIndex
-    const matchData = {
-      ...game.matchData
-    }
-    matchData.activeMove = activeMoveNumber
-    matchData.activeState = {
-      board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
-      lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
-      FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
-    }
-    console.log("MOVEHISTORY")
-    console.log(matchData)
-    game.setMatchData(matchData)
-  }
-
   function PlayerInfo() {
     return (
       <div className='playerInfo'>
         <div className='playerPingStatus'>O</div>
         <div className='playerName'>Player</div>
-      </div>
-    )
-  }
-
-  function MoveHistoryControls() {
-    if (!game) {
-      return
-    }
-
-    useEffect(() => {
-      console.log('Move History Controls Component mounted');
-      return () => {
-        console.log('Move History Controls unmounted');
-      };
-    }, []);
-
-    let latestMoveButtonClassName = "moveHistoryControlsButton"
-    if (game.matchData.activeMove != game.matchData.stateHistory.length - 1) {
-      latestMoveButtonClassName += " newMoveNotification"
-    }
-
-    return (
-      <div className='moveHistoryControlsContainer'>
-        <div className='moveHistoryControlsButton'>
-          <Microscope size={12} />
-        </ div>
-        <div onClick={() => updateActiveState(0)} className='moveHistoryControlsButton'>
-          <ChevronFirst size={12} />
-        </ div>
-        <div onClick={() => updateActiveState(game?.matchData.activeMove - 1)} className='moveHistoryControlsButton'>
-          <ChevronLeft size={12} />
-        </ div>
-        <div className='moveHistoryControlsButton'>
-          <ChevronRight onClick={() => updateActiveState(game?.matchData.activeMove + 1)} size={12} />
-        </ div>
-        <div onClick={() => updateActiveState(game?.matchData.stateHistory.length - 1)} className={latestMoveButtonClassName}>
-          <ChevronLast size={12} />
-        </ div>
-        <div className='moveHistoryControlsButton'>
-          <AlignJustify size={12} />
-        </ div>
       </div>
     )
   }
@@ -805,4 +737,74 @@ function Moves() {
     </div>
   )
 
+}
+
+function MoveHistoryControls() {
+  useEffect(() => {
+    console.log('Move History Controls Component mounted');
+    return () => {
+      console.log('Move History Controls unmounted');
+    };
+  }, []);
+
+  const game = useContext(GameContext)
+
+  if (!game) {
+    return
+  }
+
+  let latestMoveButtonClassName = "moveHistoryControlsButton"
+  if (game.matchData.activeMove != game.matchData.stateHistory.length - 1) {
+    latestMoveButtonClassName += " newMoveNotification"
+  }
+
+  function updateActiveState(stateHistoryIndex: number) {
+    console.log("updateActiveState Called")
+    console.log(stateHistoryIndex)
+    if (!game) {
+      return
+    }
+    if (stateHistoryIndex == game.matchData.activeMove) {
+      return
+    }
+    if (stateHistoryIndex < 0 || game.matchData.stateHistory.length - 1 < stateHistoryIndex) {
+      return
+    }
+    const activeMoveNumber = stateHistoryIndex
+    const matchData = {
+      ...game.matchData
+    }
+    matchData.activeMove = activeMoveNumber
+    matchData.activeState = {
+      board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
+      lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
+      FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
+    }
+    console.log("MOVEHISTORY")
+    console.log(matchData)
+    game.setMatchData(matchData)
+  }
+
+  return (
+    <div className='moveHistoryControlsContainer'>
+      <div className='moveHistoryControlsButton'>
+        <Microscope size={12} />
+      </ div>
+      <div onClick={() => updateActiveState(0)} className='moveHistoryControlsButton'>
+        <ChevronFirst size={12} />
+      </ div>
+      <div onClick={() => updateActiveState(game?.matchData.activeMove - 1)} className='moveHistoryControlsButton'>
+        <ChevronLeft size={12} />
+      </ div>
+      <div className='moveHistoryControlsButton'>
+        <ChevronRight onClick={() => updateActiveState(game?.matchData.activeMove + 1)} size={12} />
+      </ div>
+      <div onClick={() => updateActiveState(game?.matchData.stateHistory.length - 1)} className={latestMoveButtonClassName}>
+        <ChevronLast size={12} />
+      </ div>
+      <div className='moveHistoryControlsButton'>
+        <AlignJustify size={12} />
+      </ div>
+    </div>
+  )
 }

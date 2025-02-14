@@ -2,14 +2,19 @@ import globals from "globals";
 import pluginJs from "@eslint/js";
 import tseslint from "typescript-eslint";
 import pluginReact from "eslint-plugin-react";
+import reactCompiler from 'eslint-plugin-react-compiler';
 
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   {files: ["**/*.{js,mjs,cjs,ts,jsx,tsx}"]},
   {languageOptions: { globals: globals.browser }},
-  {"rules": {
-    "indent": ["error", 2]
+  {plugins: {
+    'react-compiler': reactCompiler,
+  },
+  "rules": {
+    "indent": ["error", 2],
+    'react-compiler/react-compiler': 'error',
   }},
   
   pluginJs.configs.recommended,

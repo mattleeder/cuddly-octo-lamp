@@ -12,6 +12,7 @@ import {
 
 function App() {
   console.log(import.meta.env.VITE_API_URL)
+  console.log(`React Version: ${React.version}`)
 
   return (
     <Router>
