@@ -310,6 +310,30 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	return nil
 }
 
+func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection() (jsonStr []byte, err error) {
+	var gameState []postChessMoveReply
+	err = json.Unmarshal(hub.currentGameState, &gameState)
+	if err != nil {
+		app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
+		return []byte{}, err
+	}
+
+	// Correct times
+	if hub.turn == byte(0) && hub.hasWhitePlayerMadeFirstMove {
+		gameState[0].MatchStateHistory[len(gameState[0].MatchStateHistory)-1].WhitePlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
+	} else if hub.turn == byte(1) && hub.hasBlackPlayerMadeFirstMove {
+		gameState[0].MatchStateHistory[len(gameState[0].MatchStateHistory)-1].BlackPlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
+	}
+
+	jsonStr, err = json.Marshal(gameState)
+	if err != nil {
+		app.errorLog.Printf("Error marshalling JSON: %v\n", err)
+		return []byte{}, err
+	}
+
+	return jsonStr, nil
+}
+
 func (hub *MatchRoomHub) run() {
 	defer app.infoLog.Println("Hub stopped")
 	for {
@@ -318,7 +342,12 @@ func (hub *MatchRoomHub) run() {
 		// Clients get currentGameState on register
 		case client := <-hub.register:
 			hub.clients[client] = true
-			client.send <- hub.currentGameState
+			jsonStr, err := hub.getCurrentMatchStateForNewConnection()
+			if err != nil {
+				app.errorLog.Printf("Could not get json for new connection: %v\n", err)
+				continue
+			}
+			client.send <- jsonStr
 
 		case client := <-hub.unregister:
 			if _, ok := hub.clients[client]; ok {
