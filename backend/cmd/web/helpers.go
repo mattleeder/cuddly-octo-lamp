@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"runtime/debug"
+
+	"github.com/gorilla/websocket"
 )
 
 // Errors
@@ -24,6 +26,13 @@ func (app *application) clientError(w http.ResponseWriter, status int) {
 
 func (app *application) notFound(w http.ResponseWriter) {
 	app.clientError(w, http.StatusNotFound)
+}
+
+func (app *application) websocketError(conn *websocket.Conn, err error) {
+	trace := fmt.Sprintf("%s\n%s", err.Error(), debug.Stack())
+	app.errorLog.Output(2, trace)
+	conn.WriteMessage(websocket.CloseMessage, []byte{})
+	conn.Close()
 }
 
 // Cookies

@@ -121,9 +121,9 @@ func swapRemove[T any](arr []T, idx int) []T {
 	return arr[:len(arr)-1]
 }
 
-func createMatch(playerOneID int64, playerTwoID int64) error {
+func createMatch(playerOneID int64, playerTwoID int64, timeFormatInMilliseconds int64, incrementInMilliseconds int64) error {
 	playerOneIsWhite := rand.Intn(2) == 1
-	matchID, err := app.liveMatches.InsertNew(playerOneID, playerTwoID, playerOneIsWhite)
+	matchID, err := app.liveMatches.InsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds)
 	if err != nil {
 		return err
 	}
@@ -218,7 +218,7 @@ func matchPlayers() {
 
 		awaitingRemoval.mu.Unlock()
 		// Match players
-		err := createMatch(playerOne.playerID, playerTwo.playerID)
+		err := createMatch(playerOne.playerID, playerTwo.playerID, 3*60*1000, 2*1000)
 		if err != nil {
 			log.Println(err)
 			continue

@@ -9,6 +9,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -31,19 +33,38 @@ func newMatchRoomHubManager() *MatchRoomHubManager {
 	}
 }
 
-func (hubManager *MatchRoomHubManager) registerClientToMatchRoomHub(conn *websocket.Conn, matchID int64, playerID *int64) (*MatchRoomHubClient, error) {
+func (hubManager *MatchRoomHubManager) getHubFromMatchID(matchID int64) (*MatchRoomHub, error) {
 	val, ok := hubManager.hubs[matchID]
 
 	// If hub not running, run it
 	if !ok {
-		newHub, err := newMatchRoomHub(matchID)
+		var err error
+		val, err = hubManager.registerNewHub(matchID)
 		if err != nil {
 			app.errorLog.Println(err)
 			return nil, err
 		}
-		hubManager.hubs[matchID] = newHub
-		go hubManager.hubs[matchID].run()
-		val = hubManager.hubs[matchID]
+		go val.run()
+	}
+
+	return val, nil
+}
+
+func (hubManager *MatchRoomHubManager) registerNewHub(matchID int64) (*MatchRoomHub, error) {
+	newHub, err := newMatchRoomHub(matchID)
+	if err != nil {
+		app.errorLog.Println(err)
+		return nil, err
+	}
+	hubManager.hubs[matchID] = newHub
+	return hubManager.hubs[matchID], nil
+}
+
+func (hubManager *MatchRoomHubManager) registerClientToMatchRoomHub(conn *websocket.Conn, matchID int64, playerID *int64) (*MatchRoomHubClient, error) {
+	val, err := hubManager.getHubFromMatchID(matchID)
+	if err != nil {
+		app.errorLog.Println(err)
+		return nil, err
 	}
 
 	var playerCode playerCodeEnum = Spectator
@@ -134,8 +155,8 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 			FEN:                                  matchState.CurrentFEN,
 			LastMove:                             [2]int{last_move_move, last_move_piece},
 			AlgebraicNotation:                    intToAlgebraicNotation(last_move_move),
-			WhitePlayerTimeRemainingMilliseconds: time.Duration(3 * time.Minute).Milliseconds(),
-			BlackPlayerTimeRemainingMilliseconds: time.Duration(3 * time.Minute).Milliseconds(),
+			WhitePlayerTimeRemainingMilliseconds: time.Duration(matchState.WhitePlayerTimeRemainingMilliseconds * int64(time.Millisecond)).Milliseconds(),
+			BlackPlayerTimeRemainingMilliseconds: time.Duration(matchState.BlackPlayerTimeRemainingMilliseconds * int64(time.Millisecond)).Milliseconds(),
 		}},
 		GameOverStatus: Ongoing,
 	}}
@@ -178,6 +199,117 @@ type wsChessMove struct {
 	PromotionString string `json:"promotionString"`
 }
 
+func (hub *MatchRoomHub) sendMessageToAllClients(message []byte) {
+	for client := range hub.clients {
+		select {
+		case client.send <- message:
+		default:
+			close(client.send)
+			delete(hub.clients, client)
+		}
+	}
+}
+
+func (hub *MatchRoomHub) updateGameStateAfterFlag() (err error) {
+	var gameState []postChessMoveReply
+	err = json.Unmarshal(hub.currentGameState, &gameState)
+	if err != nil {
+		app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
+		return err
+	}
+
+	if hub.turn == byte(0) {
+		gameState[0].GameOverStatus = WhiteFlagged
+	} else {
+		gameState[0].GameOverStatus = BlackFlagged
+	}
+
+	var jsonStr []byte
+
+	jsonStr, err = json.Marshal(gameState)
+	if err != nil {
+		app.errorLog.Printf("Error marshalling JSON: %v\n", err)
+		return err
+	}
+
+	hub.currentGameState = jsonStr
+
+	return nil
+}
+
+func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
+
+	// Parse Message
+	var chessMove wsChessMove
+	err = json.Unmarshal(message[1:], &chessMove)
+	if err != nil {
+		return errors.New(fmt.Sprintf("Error unmarshalling JSON: %v\n", err))
+	}
+
+	// Validate Move
+	var validMove = IsMoveValid(hub.current_fen, chessMove.Piece, chessMove.Move)
+	if !validMove {
+		return err
+	}
+
+	// Contsruct reply
+	if message[0] == byte(0) {
+		if hub.hasWhitePlayerMadeFirstMove {
+			hub.whitePlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
+			hub.whitePlayerTimeRemaining += time.Duration(2 * time.Second)
+
+		} else {
+			hub.hasWhitePlayerMadeFirstMove = true
+		}
+	} else {
+		if hub.hasBlackPlayerMadeFirstMove {
+			hub.blackPlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
+			hub.blackPlayerTimeRemaining += time.Duration(2 * time.Second)
+		} else {
+			hub.hasBlackPlayerMadeFirstMove = true
+		}
+	}
+
+	newFEN, gameOverStatus, algebraicNotation := getFENAfterMove(hub.current_fen, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
+	// Need to put move into db
+	data := []postChessMoveReply{
+		{
+			MatchStateHistory: append(hub.moveHistory, MatchStateHistory{
+				FEN:                                  newFEN,
+				LastMove:                             [2]int{chessMove.Piece, chessMove.Move},
+				AlgebraicNotation:                    algebraicNotation,
+				WhitePlayerTimeRemainingMilliseconds: hub.whitePlayerTimeRemaining.Milliseconds(),
+				BlackPlayerTimeRemainingMilliseconds: hub.blackPlayerTimeRemaining.Milliseconds(),
+			}),
+			GameOverStatus: gameOverStatus,
+		},
+	}
+
+	var jsonStr []byte
+
+	jsonStr, err = json.Marshal(data)
+	if err != nil {
+		return errors.New(fmt.Sprintf("Error marshalling JSON: %v\n", err))
+	}
+
+	// Update game state
+	hub.current_fen = newFEN
+	hub.currentGameState = jsonStr
+	hub.moveHistory = data[0].MatchStateHistory
+	hub.timeOfLastMove = time.Now()
+
+	if message[0] == byte(0) && hub.hasBlackPlayerMadeFirstMove {
+		hub.flagTimer = time.After(hub.blackPlayerTimeRemaining)
+	} else if message[0] == byte(1) && hub.hasWhitePlayerMadeFirstMove {
+		hub.flagTimer = time.After(hub.whitePlayerTimeRemaining)
+	}
+
+	// Update database
+	go app.liveMatches.UpdateLiveMatch(hub.matchID, newFEN, chessMove.Piece, chessMove.Move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds())
+
+	return nil
+}
+
 func (hub *MatchRoomHub) run() {
 	defer app.infoLog.Println("Hub stopped")
 	for {
@@ -187,127 +319,35 @@ func (hub *MatchRoomHub) run() {
 		case client := <-hub.register:
 			hub.clients[client] = true
 			client.send <- hub.currentGameState
+
 		case client := <-hub.unregister:
 			if _, ok := hub.clients[client]; ok {
 				delete(hub.clients, client)
 				close(client.send)
 			}
+
 		case <-hub.flagTimer:
-			var gameState []postChessMoveReply
-			err := json.Unmarshal(hub.currentGameState, &gameState)
+			err := hub.updateGameStateAfterFlag()
 			if err != nil {
-				app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
+				app.errorLog.Println(err)
 				continue
 			}
 
-			if hub.turn == byte(0) {
-				gameState[0].GameOverStatus = WhiteFlagged
-			} else {
-				gameState[0].GameOverStatus = BlackFlagged
-			}
+			hub.sendMessageToAllClients(hub.currentGameState)
 
-			jsonStr, err := json.Marshal(gameState)
-			if err != nil {
-				app.errorLog.Printf("Error marshalling JSON: %v\n", err)
-				continue
-			}
-
-			hub.currentGameState = jsonStr
-
-			for client := range hub.clients {
-				select {
-				case client.send <- jsonStr:
-				default:
-					close(client.send)
-					delete(hub.clients, client)
-				}
-			}
 		case message := <-hub.broadcast:
-			app.infoLog.Println("WS Message")
-			app.infoLog.Println(message)
-			app.infoLog.Println(hub.turn)
+			app.infoLog.Printf("WS Message: %v\n", message)
 			if message[0] != hub.turn {
 				continue
 			}
 
-			var chessMove wsChessMove
-			// Parse and validate move
-			err := json.Unmarshal(message[1:], &chessMove)
+			err := hub.updateGameStateAfterMove(message)
 			if err != nil {
-				app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
+				app.errorLog.Println(err)
 				continue
 			}
 
-			var validMove = IsMoveValid(hub.current_fen, chessMove.Piece, chessMove.Move)
-			if !validMove {
-				continue
-			}
-
-			if message[0] == byte(0) {
-				if hub.hasWhitePlayerMadeFirstMove {
-					hub.whitePlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
-					hub.whitePlayerTimeRemaining += time.Duration(2 * time.Second)
-
-				} else {
-					hub.hasWhitePlayerMadeFirstMove = true
-				}
-			} else {
-				if hub.hasBlackPlayerMadeFirstMove {
-					hub.blackPlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
-					hub.blackPlayerTimeRemaining += time.Duration(2 * time.Second)
-				} else {
-					hub.hasBlackPlayerMadeFirstMove = true
-				}
-			}
-
-			newFEN, gameOverStatus, algebraicNotation := getFENAfterMove(hub.current_fen, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
-			// Need to put move into db
-			data := []postChessMoveReply{
-				{
-					MatchStateHistory: append(hub.moveHistory, MatchStateHistory{
-						FEN:                                  newFEN,
-						LastMove:                             [2]int{chessMove.Piece, chessMove.Move},
-						AlgebraicNotation:                    algebraicNotation,
-						WhitePlayerTimeRemainingMilliseconds: hub.whitePlayerTimeRemaining.Milliseconds(),
-						BlackPlayerTimeRemainingMilliseconds: hub.blackPlayerTimeRemaining.Milliseconds(),
-					}),
-					GameOverStatus: gameOverStatus,
-				},
-			}
-
-			jsonStr, err := json.Marshal(data)
-			if err != nil {
-				app.errorLog.Printf("Error marshalling JSON: %v\n", err)
-				continue
-			}
-
-			hub.current_fen = newFEN
-			hub.currentGameState = jsonStr
-			hub.moveHistory = append(hub.moveHistory, MatchStateHistory{
-				FEN:                                  newFEN,
-				LastMove:                             [2]int{chessMove.Piece, chessMove.Move},
-				AlgebraicNotation:                    intToAlgebraicNotation(chessMove.Move),
-				WhitePlayerTimeRemainingMilliseconds: hub.whitePlayerTimeRemaining.Milliseconds(),
-				BlackPlayerTimeRemainingMilliseconds: hub.blackPlayerTimeRemaining.Milliseconds(),
-			})
-			go app.liveMatches.UpdateFENForLiveMatch(hub.matchID, newFEN, chessMove.Piece, chessMove.Move)
-
-			hub.timeOfLastMove = time.Now()
-
-			if message[0] == byte(0) && hub.hasBlackPlayerMadeFirstMove {
-				hub.flagTimer = time.After(hub.blackPlayerTimeRemaining)
-			} else if message[0] == byte(1) && hub.hasWhitePlayerMadeFirstMove {
-				hub.flagTimer = time.After(hub.whitePlayerTimeRemaining)
-			}
-
-			for client := range hub.clients {
-				select {
-				case client.send <- jsonStr:
-				default:
-					close(client.send)
-					delete(hub.clients, client)
-				}
-			}
+			hub.sendMessageToAllClients(hub.currentGameState)
 
 			// Change turn
 			if hub.turn == byte(0) {
@@ -354,6 +394,7 @@ type MatchRoomHubClient struct {
 	// The websocket connection
 	conn *websocket.Conn
 
+	// White, black or spectator
 	playerCode playerCodeEnum
 
 	// Buffered channel of outbound messages
@@ -451,7 +492,7 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 
 	matchID, err := strconv.ParseInt(r.PathValue("matchID"), 10, 64)
 	if err != nil {
-		log.Println(err)
+		app.errorLog.Println(err)
 		http.Error(w, "Could not find match", http.StatusInternalServerError)
 		return
 	}
@@ -467,15 +508,15 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		log.Printf("Error occured whilst parsing playerID: %v\n", err)
-		playerIDasInt = nil
+		app.serverError(w, err)
+		return
 	}
 
 	var conn *websocket.Conn
 
 	conn, err = upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		app.serverError(w, err)
 		return
 	}
 
@@ -483,9 +524,7 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 
 	client, err = matchRoomHubManager.registerClientToMatchRoomHub(conn, matchID, playerIDasInt)
 	if err != nil {
-		app.errorLog.Println(err)
-		conn.WriteMessage(websocket.CloseMessage, []byte{})
-		conn.Close()
+		app.websocketError(conn, err)
 		return
 	}
 
@@ -494,9 +533,7 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 	var jsonStr []byte
 	jsonStr, err = json.Marshal(codeMessage)
 	if err != nil {
-		app.errorLog.Println(err)
-		conn.WriteMessage(websocket.CloseMessage, []byte{})
-		conn.Close()
+		app.websocketError(conn, err)
 		return
 	}
 
