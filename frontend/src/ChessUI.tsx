@@ -160,6 +160,10 @@ export function ChessBoard() {
     if (game?.matchData.activeMove != (game as gameContext)?.matchData.stateHistory.length - 1) {
       setWaiting(false)
       return
+    } else if (game.matchData.gameOverStatus != 1) {
+      console.log("Game has finished")
+      setWaiting(false)
+      return
     } else if (promotionActive && [0, 8, 16, 24].includes(Math.abs(position - promotionSquare))) {
       clickAction = ClickAction.choosePromotion
     } else if ([...moves, ...captures].includes(position)) {
