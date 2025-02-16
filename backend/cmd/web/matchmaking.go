@@ -54,33 +54,68 @@ type RemovalMap struct {
 	awaitingRemoval map[int64]bool
 }
 
-// Lock openPol?
-var openPool = OpenPool{openPool: 0} // The pool to add waiting players too, 0 for A, 1 for B
-var waitingToJoinPoolA []*playerMatchmakingData
-var waitingToJoinPoolB []*playerMatchmakingData
-var matchmakingPool []*playerMatchmakingData
-var awaitingRemoval = RemovalMap{awaitingRemoval: make(map[int64]bool)}
-var pendingRemovalRequests []int // Array of playerIDs
+type QueueData struct {
+	openPool                 *OpenPool
+	waitingToJoinPoolA       *[]*playerMatchmakingData
+	waitingToJoinPoolB       *[]*playerMatchmakingData
+	matchmakingPool          *[]*playerMatchmakingData
+	awaitingRemoval          *RemovalMap
+	pendingRemovalRequests   *[]int
+	timeFormatInMilliseconds int64
+	incrementInMilliseconds  int64
+}
+
+var queueMap = make(map[string]*QueueData)
+
+func addNewQueue(timeFormatInMilliseconds int64, incrementInMilliseconds int64) {
+	app.infoLog.Printf("Creating new queue: %v %v\n", timeFormatInMilliseconds, incrementInMilliseconds)
+	var key string = fmt.Sprintf("%v + %v", timeFormatInMilliseconds, incrementInMilliseconds)
+	queueMap[key] = &QueueData{
+		openPool:                 &OpenPool{openPool: 0},
+		waitingToJoinPoolA:       &[]*playerMatchmakingData{},
+		waitingToJoinPoolB:       &[]*playerMatchmakingData{},
+		matchmakingPool:          &[]*playerMatchmakingData{},
+		awaitingRemoval:          &RemovalMap{awaitingRemoval: make(map[int64]bool)},
+		pendingRemovalRequests:   &[]int{},
+		timeFormatInMilliseconds: timeFormatInMilliseconds,
+		incrementInMilliseconds:  incrementInMilliseconds,
+	}
+}
+
+// // Lock openPol?
+// var openPool = OpenPool{openPool: 0} // The pool to add waiting players too, 0 for A, 1 for B
+// var waitingToJoinPoolA []*playerMatchmakingData
+// var waitingToJoinPoolB []*playerMatchmakingData
+// var matchmakingPool []*playerMatchmakingData
+// var awaitingRemoval = RemovalMap{awaitingRemoval: make(map[int64]bool)}
+// var pendingRemovalRequests []int // Array of playerIDs
 
 const defaultMatchmakingThreshold = 400
 
-func addPlayerToWaitingPool(playerID int64) {
-	awaitingRemoval.mu.Lock()
-	_, ok := awaitingRemoval.awaitingRemoval[playerID]
+func addPlayerToWaitingPool(playerID int64, timeFormatInMilliseconds int64, incrementInMilliseconds int64) {
+	var key string = fmt.Sprintf("%v + %v", timeFormatInMilliseconds, incrementInMilliseconds)
+	queue, ok := queueMap[key]
+	if !ok {
+		addNewQueue(timeFormatInMilliseconds, incrementInMilliseconds)
+		queue = queueMap[key]
+	}
+
+	queue.awaitingRemoval.mu.Lock()
+	_, ok = queue.awaitingRemoval.awaitingRemoval[playerID]
 
 	if ok {
 		// Player already in queue, remove leave request if it exists
-		awaitingRemoval.awaitingRemoval[playerID] = false
-		awaitingRemoval.mu.Unlock()
+		queue.awaitingRemoval.awaitingRemoval[playerID] = false
+		queue.awaitingRemoval.mu.Unlock()
 		return
 	}
-	awaitingRemoval.mu.Unlock()
+	queue.awaitingRemoval.mu.Unlock()
 
-	var pools = []*[]*playerMatchmakingData{&waitingToJoinPoolA, &waitingToJoinPoolB}
+	var pools = []*[]*playerMatchmakingData{queue.waitingToJoinPoolA, queue.waitingToJoinPoolB}
 
 	// Should openPool be locked?
-	openPool.mu.Lock()
-	*pools[openPool.openPool] = append(*pools[openPool.openPool],
+	queue.openPool.mu.Lock()
+	*pools[queue.openPool.openPool] = append(*pools[queue.openPool.openPool],
 		&playerMatchmakingData{
 			playerID:             playerID,
 			elo:                  1500,
@@ -88,21 +123,28 @@ func addPlayerToWaitingPool(playerID int64) {
 			isMatched:            false,
 		})
 
-	openPool.mu.Unlock()
+	queue.openPool.mu.Unlock()
 	// Add playerID to awaitingRemoval map for easier check later
-	awaitingRemoval.mu.Lock()
-	awaitingRemoval.awaitingRemoval[playerID] = false
-	awaitingRemoval.mu.Unlock()
+	queue.awaitingRemoval.mu.Lock()
+	queue.awaitingRemoval.awaitingRemoval[playerID] = false
+	queue.awaitingRemoval.mu.Unlock()
 }
 
-func removePlayerFromWaitingPool(playerID int64) {
-	// If value does not exist, then player is not in queue
-	awaitingRemoval.mu.Lock()
-	_, ok := awaitingRemoval.awaitingRemoval[playerID]
-	if ok {
-		awaitingRemoval.awaitingRemoval[playerID] = true
+func removePlayerFromWaitingPool(playerID int64, timeFormatInMilliseconds int64, incrementInMilliseconds int64) {
+	var key string = fmt.Sprintf("%v + %v", timeFormatInMilliseconds, incrementInMilliseconds)
+	queue, ok := queueMap[key]
+	if !ok {
+		app.errorLog.Println("Queue not found")
+		app.errorLog.Println(queue)
+		return
 	}
-	awaitingRemoval.mu.Unlock()
+	// If value does not exist, then player is not in queue
+	queue.awaitingRemoval.mu.Lock()
+	_, ok = queue.awaitingRemoval.awaitingRemoval[playerID]
+	if ok {
+		queue.awaitingRemoval.awaitingRemoval[playerID] = true
+	}
+	queue.awaitingRemoval.mu.Unlock()
 	return
 }
 
@@ -137,13 +179,13 @@ func createMatch(playerOneID int64, playerTwoID int64, timeFormatInMilliseconds 
 		clients.clients[playerOneID] = &Client{id: playerOneID, channel: make(chan string, 1)}
 	}
 
-	clients.clients[playerOneID].channel <- fmt.Sprintf("%v", matchID)
+	clients.clients[playerOneID].channel <- fmt.Sprintf("%v,%v,%v", matchID, timeFormatInMilliseconds, incrementInMilliseconds)
 
 	_, ok = clients.clients[playerTwoID]
 	if !ok {
 		clients.clients[playerTwoID] = &Client{id: playerTwoID, channel: make(chan string, 1)}
 	}
-	clients.clients[playerTwoID].channel <- fmt.Sprintf("%v", matchID)
+	clients.clients[playerTwoID].channel <- fmt.Sprintf("%v,%v,%v", matchID, timeFormatInMilliseconds, incrementInMilliseconds)
 
 	close(clients.clients[playerOneID].channel)
 	close(clients.clients[playerTwoID].channel)
@@ -160,87 +202,92 @@ func matchPlayers() {
 	// If both players not matched, match them
 	// Go through pool in reverse, if a player has been matched, swap remove them
 
-	// Lock to change pool
-	var poolToEmpty int
-	openPool.mu.Lock()
-	if openPool.openPool == 0 {
-		openPool.openPool = 1
-		poolToEmpty = 0
-	} else {
-		openPool.openPool = 0
-		poolToEmpty = 1
-	}
-	openPool.mu.Unlock()
+	for _, queue := range queueMap {
 
-	// Empty the pool
-	var pools = []*[]*playerMatchmakingData{&waitingToJoinPoolA, &waitingToJoinPoolB}
-	matchmakingPool = append(matchmakingPool, *pools[poolToEmpty]...)
-	*pools[poolToEmpty] = []*playerMatchmakingData{}
+		var timeFormatInMilliseconds = queue.timeFormatInMilliseconds
+		var incrementInMilliseconds = queue.incrementInMilliseconds
 
-	var validMatches = []*matchingScore{}
+		// Lock to change pool
+		var poolToEmpty int
+		queue.openPool.mu.Lock()
+		if queue.openPool.openPool == 0 {
+			queue.openPool.openPool = 1
+			poolToEmpty = 0
+		} else {
+			queue.openPool.openPool = 0
+			poolToEmpty = 1
+		}
+		queue.openPool.mu.Unlock()
 
-	// Should we sort validMatches first?
+		// Empty the pool
+		var pools = []*[]*playerMatchmakingData{queue.waitingToJoinPoolA, queue.waitingToJoinPoolB}
+		*queue.matchmakingPool = append(*queue.matchmakingPool, *pools[poolToEmpty]...)
+		*pools[poolToEmpty] = []*playerMatchmakingData{}
 
-	// Score players against all other players
-	for playerOneIdx, playerOne := range matchmakingPool {
-		for playerTwoIdx, playerTwo := range matchmakingPool[playerOneIdx+1:] {
-			// playerTwoIdx starts from 0
-			playerTwoIdx += playerOneIdx + 1
-			matchingScore := calculateMatchingScore(playerOne, playerOneIdx, playerTwo, playerTwoIdx)
+		var validMatches = []*matchingScore{}
 
-			// Allows players with high threshold to find matches easier
-			if matchingScore.score*2 <= playerOne.matchmakingThreshold+playerTwo.matchmakingThreshold {
-				validMatches = append(validMatches, matchingScore)
+		// Should we sort validMatches first?
+
+		// Score players against all other players
+		for playerOneIdx, playerOne := range *queue.matchmakingPool {
+			for playerTwoIdx, playerTwo := range (*queue.matchmakingPool)[playerOneIdx+1:] {
+				// playerTwoIdx starts from 0
+				playerTwoIdx += playerOneIdx + 1
+				matchingScore := calculateMatchingScore(playerOne, playerOneIdx, playerTwo, playerTwoIdx)
+
+				// Allows players with high threshold to find matches easier
+				if matchingScore.score*2 <= playerOne.matchmakingThreshold+playerTwo.matchmakingThreshold {
+					validMatches = append(validMatches, matchingScore)
+				}
 			}
 		}
+
+		// Sort Scores
+		sort.Slice(validMatches, func(i, j int) bool {
+			return validMatches[i].score < validMatches[j].score
+		})
+
+		// Go through all scores
+		for _, score := range validMatches {
+			playerOne := (*queue.matchmakingPool)[score.playerOneIdx]
+			playerTwo := (*queue.matchmakingPool)[score.playerTwoIdx]
+
+			queue.awaitingRemoval.mu.Lock()
+			if playerOne.isMatched || queue.awaitingRemoval.awaitingRemoval[playerOne.playerID] {
+				queue.awaitingRemoval.mu.Unlock()
+				continue
+			}
+
+			if playerTwo.isMatched || queue.awaitingRemoval.awaitingRemoval[playerTwo.playerID] {
+				queue.awaitingRemoval.mu.Unlock()
+				continue
+			}
+
+			queue.awaitingRemoval.mu.Unlock()
+			// Match players
+			err := createMatch(playerOne.playerID, playerTwo.playerID, timeFormatInMilliseconds, incrementInMilliseconds)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			playerOne.isMatched = true
+			playerTwo.isMatched = true
+
+		}
+
+		// Cleanup pool
+		for i := len(*queue.matchmakingPool) - 1; i >= 0; i-- {
+			player := (*queue.matchmakingPool)[i]
+			// @TODO
+			// Is it possible for an awaitingRemoval key to be deleted whilst the player is in a waiting pool?
+			queue.awaitingRemoval.mu.Lock()
+			if player.isMatched || queue.awaitingRemoval.awaitingRemoval[player.playerID] {
+				*queue.matchmakingPool = swapRemove(*queue.matchmakingPool, i)
+				delete(queue.awaitingRemoval.awaitingRemoval, player.playerID)
+			}
+			queue.awaitingRemoval.mu.Unlock()
+		}
 	}
-
-	// Sort Scores
-	sort.Slice(validMatches, func(i, j int) bool {
-		return validMatches[i].score < validMatches[j].score
-	})
-
-	// Go through all scores
-	for _, score := range validMatches {
-		playerOne := matchmakingPool[score.playerOneIdx]
-		playerTwo := matchmakingPool[score.playerTwoIdx]
-
-		awaitingRemoval.mu.Lock()
-		if playerOne.isMatched || awaitingRemoval.awaitingRemoval[playerOne.playerID] {
-			awaitingRemoval.mu.Unlock()
-			continue
-		}
-
-		if playerTwo.isMatched || awaitingRemoval.awaitingRemoval[playerTwo.playerID] {
-			awaitingRemoval.mu.Unlock()
-			continue
-		}
-
-		awaitingRemoval.mu.Unlock()
-		// Match players
-		err := createMatch(playerOne.playerID, playerTwo.playerID, 3*60*1000, 2*1000)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		playerOne.isMatched = true
-		playerTwo.isMatched = true
-
-	}
-
-	// Cleanup pool
-	for i := len(matchmakingPool) - 1; i >= 0; i-- {
-		player := matchmakingPool[i]
-		// @TODO
-		// Is it possible for an awaitingRemoval key to be deleted whilst the player is in a waiting pool?
-		awaitingRemoval.mu.Lock()
-		if player.isMatched || awaitingRemoval.awaitingRemoval[player.playerID] {
-			matchmakingPool = swapRemove(matchmakingPool, i)
-			delete(awaitingRemoval.awaitingRemoval, player.playerID)
-		}
-		awaitingRemoval.mu.Unlock()
-	}
-
 }
 
 func matchmakingService() {
@@ -250,11 +297,14 @@ func matchmakingService() {
 	for {
 		// Could use time.After to ensure service runs every 500ms
 		if iterations%20 == 0 {
-			app.infoLog.Printf("Matching iteration: %v\n", iterations)
-			app.infoLog.Println(waitingToJoinPoolA)
-			app.infoLog.Println(waitingToJoinPoolB)
-			app.infoLog.Println(awaitingRemoval.awaitingRemoval)
-			app.infoLog.Println(matchmakingPool)
+			for key, queue := range queueMap {
+				app.infoLog.Println(key)
+				app.infoLog.Printf("Matching iteration: %v\n", iterations)
+				app.infoLog.Println(queue.waitingToJoinPoolA)
+				app.infoLog.Println(queue.waitingToJoinPoolB)
+				app.infoLog.Println(queue.awaitingRemoval.awaitingRemoval)
+				app.infoLog.Println(queue.matchmakingPool)
+			}
 		}
 		matchPlayers()
 		time.Sleep(500 * time.Millisecond)

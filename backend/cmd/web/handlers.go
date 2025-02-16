@@ -57,9 +57,9 @@ type postChessMoveReply struct {
 }
 
 type joinQueueRequest struct {
-	Time      int    `json:"time"`
-	Increment int    `json:"increment"`
-	Action    string `json:"action"`
+	TimeFormatInMilliseconds int64  `json:"timeFormatInMilliseconds"`
+	IncrementInMilliseconds  int64  `json:"incrementInMilliseconds"`
+	Action                   string `json:"action"`
 }
 
 func generateNewPlayerId() int64 {
@@ -171,11 +171,10 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if joinQueue.Action == "join" {
-
-		addPlayerToWaitingPool(playerIDasInt)
+		addPlayerToWaitingPool(playerIDasInt, joinQueue.TimeFormatInMilliseconds, joinQueue.IncrementInMilliseconds)
 	} else {
 		// err = removePlayerFromQueue(playerIDasInt, joinQueue.Time, joinQueue.Increment)
-		removePlayerFromWaitingPool(playerIDasInt)
+		removePlayerFromWaitingPool(playerIDasInt, joinQueue.TimeFormatInMilliseconds, joinQueue.IncrementInMilliseconds)
 	}
 
 }

@@ -161,6 +161,8 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		GameOverStatus: Ongoing,
 	}}
 
+	app.infoLog.Printf("%+v\n", currentGameState)
+
 	if strings.Split(matchState.CurrentFEN, " ")[1] == "w" {
 		turn = byte(0)
 	} else {
@@ -181,8 +183,8 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		clients:                     make(map[*MatchRoomHubClient]bool),
 		whitePlayerID:               matchState.WhitePlayerID,
 		blackPlayerID:               matchState.BlackPlayerID,
-		whitePlayerTimeRemaining:    time.Duration(3 * time.Minute),
-		blackPlayerTimeRemaining:    time.Duration(3 * time.Minute),
+		whitePlayerTimeRemaining:    time.Duration(matchState.TimeFormatInMilliseconds),
+		blackPlayerTimeRemaining:    time.Duration(matchState.TimeFormatInMilliseconds),
 		hasWhitePlayerMadeFirstMove: false,
 		hasBlackPlayerMadeFirstMove: false,
 		turn:                        turn,

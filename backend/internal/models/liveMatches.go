@@ -23,6 +23,7 @@ type LiveMatchModel struct {
 }
 
 func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64) (int64, error) {
+	app.infoLog.Printf("Inserting new match with: %v, %v\n", timeFormatInMilliseconds, incrementInMilliseconds)
 	sqlStmt := `
 	insert or ignore into live_matches (white_player_id, black_player_id, time_format_in_milliseconds, increment_in_milliseconds, white_player_time_remaining_in_milliseconds, black_player_time_remaining_in_milliseconds) VALUES(?, ?, ?, ?, ?, ?);
 	`
@@ -72,7 +73,7 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 		return nil, err
 	}
 
-	return &LiveMatch{
+	match := &LiveMatch{
 		MatchID:                              matchID,
 		WhitePlayerID:                        whitePlayerID,
 		BlackPlayerID:                        blackPlayerID,
@@ -83,7 +84,11 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 		IncrementInMilliseconds:              incrementInMilliseconds,
 		WhitePlayerTimeRemainingMilliseconds: whitePlayerTimeRemainingMilliseconds,
 		BlackPlayerTimeRemainingMilliseconds: blackPlayerTimeRemainingMilliseconds,
-	}, nil
+	}
+
+	app.infoLog.Printf("%+v", match)
+
+	return match, nil
 }
 
 func (m *LiveMatchModel) LogAll() {

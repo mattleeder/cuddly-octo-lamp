@@ -3,7 +3,7 @@ import React from 'react';
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
-import { MatchRoom, JoinQueue } from './ChessUI.tsx'
+import { MatchRoom, JoinQueue, QueueTiles } from './ChessUI.tsx'
 import {
   BrowserRouter as Router,
   Routes,
@@ -50,6 +50,7 @@ function Home() {
         Click on the Vite and React logos to learn more
       </p>
       <JoinQueue />
+      <QueueTiles />
     </>
   )
 }

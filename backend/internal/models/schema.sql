@@ -10,8 +10,8 @@ CREATE TABLE live_matches (
     current_fen TEXT DEFAULT 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
     time_format_in_milliseconds INTEGER NOT NULL,
     increment_in_milliseconds INTEGER NOT NULL,
-    white_player_time_remaining_in_milliseconds INTEGER NOT NULL DEFAULT time_format_in_milliseconds,
-    black_player_time_remaining_in_milliseconds INTEGER NOT NULL DEFAULT time_format_in_milliseconds
+    white_player_time_remaining_in_milliseconds INTEGER NOT NULL,
+    black_player_time_remaining_in_milliseconds INTEGER NOT NULL
 );
 
 CREATE TABLE matchmaking_queue (
