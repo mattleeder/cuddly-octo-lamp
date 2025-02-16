@@ -1,7 +1,7 @@
 import { Microscope, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, AlignJustify, CornerUpLeft, Flag, Handshake, LoaderCircle } from "lucide-react"
 import { useState, useEffect, useRef, useContext, createContext, ReactNode } from "react"
 import React from 'react';
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams, useNavigate, useLocation } from "react-router-dom"
 import { PieceColour, PieceVariant, parseGameStateFromFEN } from "./ChessLogic"
 
 const variantToString = new Map<PieceVariant, string>()
@@ -20,119 +20,17 @@ colourToString.set(PieceColour.Black, 'black')
 
 export function MatchRoom() {
   const { matchid } = useParams()
+  const location = useLocation();
+  const { timeFormatInMilliseconds } = location.state || {};
+  const parsedTimeFormatInMilliseconds = parseInt(timeFormatInMilliseconds)
 
   return (
-    <GameWrapper matchID={matchid as string}>
+    <GameWrapper matchID={matchid as string} timeFormatInMilliseconds={parsedTimeFormatInMilliseconds}>
       <div className='chessMatch'>
         <GameInfoTile />
         <ChessBoard />
       </div>
     </GameWrapper>
-  )
-}
-
-export function JoinQueue() {
-  const [inQueue, setInQueue] = useState(false)
-  const [waiting, setWaiting] = useState(false)
-  const [eventSource, setEventSource] = useState<EventSource | null>(null)
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    return () => {
-      leaveQueue()
-    }
-  }, [])
-
-  enum ClickAction {
-    leaveQueue,
-    joinQueue,
-  }
-
-  async function joinQueue() {
-
-    try {
-      const response = await fetch(import.meta.env.VITE_API_JOIN_QUEUE_URL, {
-        method: "POST",
-        credentials: 'include',
-        body: JSON.stringify({
-          "time": 3,
-          "increment": 0,
-          "action": "join",
-        })
-      })
-
-      if (!response.ok) {
-        console.error(response.status)
-      }
-
-      // Joined, start listening for events
-      const eventSource = new EventSource(import.meta.env.VITE_API_MATCH_LISTEN_URL, {
-        withCredentials: true,
-      })
-      eventSource.onmessage = (event) => {
-        console.log(`message: ${event.data}`)
-        navigate("matchroom/" + event.data)
-      }
-      setEventSource(eventSource)
-      return true
-
-    } catch (error) {
-      console.error(error)
-    }
-
-    // Did not join
-    return false
-  }
-
-  async function leaveQueue() {
-
-    try {
-      const response = await fetch(import.meta.env.VITE_API_JOIN_QUEUE_URL, {
-        method: "POST",
-        credentials: 'include',
-        body: JSON.stringify({
-          "action": "leave"
-        })
-      })
-
-      if (!response.ok) {
-        console.error(response.status)
-      }
-
-      // Left
-      eventSource?.close()
-      return true
-
-    } catch (error) {
-      console.error(error)
-    }
-
-    // Did not leave
-    return false
-  }
-
-  async function toggleQueue() {
-    if (waiting) {
-      return
-    }
-
-    setWaiting(true)
-    const clickAction = inQueue ? ClickAction.leaveQueue : ClickAction.joinQueue
-
-    if (clickAction == ClickAction.leaveQueue) {
-      const result = await leaveQueue()
-      setInQueue(!result)
-    } else {
-      const result = await joinQueue()
-      setInQueue(result)
-    }
-
-    setWaiting(false)
-  }
-
-  const buttonText = inQueue ? "In Queue" : "Join Queue"
-  return (
-    <button onClick={toggleQueue}>{buttonText}</button>
   )
 }
 
@@ -154,13 +52,6 @@ export function ChessBoard() {
   if (!game) {
     throw new Error('ChessBoard must be used within a GameContext Provider');
   }
-
-  useEffect(() => {
-    console.log('ChessBoard Component mounted');
-    return () => {
-      console.log('ChessBoard Component unmounted');
-    };
-  }, []);
 
   enum ClickAction {
     clear,
@@ -228,7 +119,7 @@ export function ChessBoard() {
       if (error instanceof Error) {
         console.error(error.message)
       } else {
-        console.log(error)
+        console.error(error)
       }
     }
 
@@ -251,7 +142,7 @@ export function ChessBoard() {
     if (rect === null) {
       throw new Error("Bounding rect for board is not defined")
     }
-    console.log(rect)
+
     const boardXPosition = Math.floor((event.clientX - rect.left) / (rect.width / 8))
     const boardYPosition = Math.floor((event.clientY - rect.top) / (rect.height / 8))
     let position = boardYPosition * 8 + boardXPosition
@@ -265,11 +156,8 @@ export function ChessBoard() {
     setWaiting(true)
 
     // Get clickAction state
-    console.log(`Position : ${position}`)
-    console.log(`Clicked On: ${game?.matchData.activeState.board[position][0]}`)
     let clickAction = ClickAction.clear
     if (game?.matchData.activeMove != (game as gameContext)?.matchData.stateHistory.length - 1) {
-      console.log("Clicking disable in past moves")
       setWaiting(false)
       return
     } else if (promotionActive && [0, 8, 16, 24].includes(Math.abs(position - promotionSquare))) {
@@ -281,8 +169,6 @@ export function ChessBoard() {
     } else if (game?.matchData.activeState.board[position][0] == game?.playerColour && position != selectedPiece) {
       clickAction = ClickAction.showMoves
     }
-
-    console.log(`Click Action: ${clickAction}`)
 
     // If showing promotion, check promotion selection, if promoting submit move and reset to bare
 
@@ -319,7 +205,6 @@ export function ChessBoard() {
         position = promotionSquare
       }
       // Send current FEN, piece, move, new FEN
-      console.log("Post move")
       wsPostMove(position, selectedPiece, promotionString)
 
       // Clear cache, clear moves
@@ -469,22 +354,22 @@ interface gameContext {
 
 const GameContext = createContext<gameContext | null>(null)
 
-function GameWrapper({ children, matchID }: { children: ReactNode, matchID: string }) {
+function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children: ReactNode, matchID: string, timeFormatInMilliseconds: number }) {
   const [matchData, setMatchData] = useState<matchData>(
     {
       activeState: {
         board: parseGameStateFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")["board"],
         lastMove: [0, 0],
         FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-        whitePlayerTimeRemainingMilliseconds: 3 * 60 * 1000,
-        blackPlayerTimeRemainingMilliseconds: 3 * 60 * 1000,
+        whitePlayerTimeRemainingMilliseconds: timeFormatInMilliseconds,
+        blackPlayerTimeRemainingMilliseconds: timeFormatInMilliseconds,
       },
       stateHistory: [{
         FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
         lastMove: [0, 0],
         algebraicNotation: "",
-        whitePlayerTimeRemainingMilliseconds: 3 * 60 * 1000,
-        blackPlayerTimeRemainingMilliseconds: 3 * 60 * 1000,
+        whitePlayerTimeRemainingMilliseconds: timeFormatInMilliseconds,
+        blackPlayerTimeRemainingMilliseconds: timeFormatInMilliseconds,
       }],
       activeColour: PieceColour.White,
       activeMove: 0,
@@ -535,7 +420,6 @@ function GameWrapper({ children, matchID }: { children: ReactNode, matchID: stri
 
       } else if (Object.prototype.hasOwnProperty.call(parsedMsg, "pastMoves")) {
 
-        console.log("Setting")
         const newHistory = parsedMsg["pastMoves"]
         const activeColour = parseGameStateFromFEN(parsedMsg["pastMoves"].at(-1)["FEN"])["activeColour"]
         const gameOverStatus = parsedMsg["gameOverStatus"]
@@ -546,7 +430,6 @@ function GameWrapper({ children, matchID }: { children: ReactNode, matchID: stri
         }
         let activeMove = matchData.activeMove
 
-        console.log(matchData)
         if (matchData.activeState.FEN == matchData.stateHistory.at(-1)?.FEN) {
           activeState = {
             ...activeState,
@@ -554,7 +437,6 @@ function GameWrapper({ children, matchID }: { children: ReactNode, matchID: stri
             lastMove: newHistory.at(-1)["lastMove"],
             FEN: parsedMsg["pastMoves"].at(-1)["FEN"],
           }
-          console.log("Increment activeMove")
           activeMove = newHistory.length - 1
         }
 
@@ -565,8 +447,6 @@ function GameWrapper({ children, matchID }: { children: ReactNode, matchID: stri
           gameOverStatus: gameOverStatus,
           activeMove: activeMove,
         }
-
-        console.log("New Match Data: ", newMatchData)
 
         setMatchData(newMatchData)
 
@@ -582,13 +462,6 @@ function GameWrapper({ children, matchID }: { children: ReactNode, matchID: stri
 }
 
 function GameInfoTile() {
-
-  useEffect(() => {
-    console.log('GameInfoTile Component mounted');
-    return () => {
-      console.log('GameInfoTile Component unmounted');
-    };
-  }, []);
 
   const game = useContext(GameContext)
   if (!game) {
@@ -608,8 +481,6 @@ function GameInfoTile() {
     if (!game) {
       return true
     }
-    console.log(game.matchData.activeColour)
-    console.log(game.matchData.stateHistory.length)
     return game.matchData.activeColour != PieceColour.Black || game.matchData.stateHistory.length <= 2
   }
 
@@ -636,12 +507,7 @@ function GameInfoTile() {
 }
 
 function GameControls() {
-  useEffect(() => {
-    console.log('Game Controls Component mounted');
-    return () => {
-      console.log('Game Controls unmounted');
-    };
-  }, []);
+
   return (
     <div className='gameControlsContainer'>
       <div className='spacer' />
@@ -669,16 +535,8 @@ function Moves() {
   const tableRef = useRef<HTMLDivElement | null>(null)
   const activeRef = useRef<HTMLTableCellElement | null>(null)
 
-  useEffect(() => {
-    console.log('Moves Component mounted');
-    return () => {
-      console.log('Moves Component unmounted');
-    };
-  }, []);
 
   useEffect(() => {
-    console.log("Active Move Changed")
-    console.log(activeRef.current)
     if (activeRef.current) {
       activeRef.current.scrollIntoView({ behavior: "auto", block: "nearest" })
     }
@@ -733,12 +591,6 @@ function Moves() {
 }
 
 function MoveHistoryControls() {
-  useEffect(() => {
-    console.log('Move History Controls Component mounted');
-    return () => {
-      console.log('Move History Controls unmounted');
-    };
-  }, []);
 
   const game = useContext(GameContext)
 
@@ -799,8 +651,6 @@ function updateActiveState(stateHistoryIndex: number, game: gameContext) {
     whitePlayerTimeRemainingMilliseconds: matchData.activeState.whitePlayerTimeRemainingMilliseconds,
     blackPlayerTimeRemainingMilliseconds: matchData.activeState.blackPlayerTimeRemainingMilliseconds,
   }
-  console.log("MOVEHISTORY")
-  console.log(matchData)
   game.setMatchData(matchData)
 }
 
@@ -898,8 +748,7 @@ export function QueueTiles() {
       try {
         await tryLeaveQueue(queueNameRef.current)
       } catch (e) {
-        console.log("CAUGHT ERROR")
-        console.log(e)
+        console.error(e)
       }
     }
     return () => {
@@ -916,12 +765,9 @@ export function QueueTiles() {
   async function tryJoinQueue(queueName: string) {
     const queueObject = queueObjectsMap.get(queueName)
     if (queueObject === undefined) {
-      console.log(queueName)
-      console.log(queueObjectsMap)
       throw new Error("Queue object not found")
     }
 
-    console.log("Fetching")
     const response = await fetch(import.meta.env.VITE_API_JOIN_QUEUE_URL, {
       signal: AbortSignal.timeout(5000),
       method: "POST",
@@ -933,8 +779,6 @@ export function QueueTiles() {
       })
     })
 
-    console.log("Got Response")
-
     if (!response.ok) {
       throw new Error(response.statusText)
     }
@@ -945,7 +789,15 @@ export function QueueTiles() {
     })
     eventSource.onmessage = (event) => {
       console.log(`message: ${event.data}`)
-      navigate("matchroom/" + event.data.split(",")[0], {})
+      const splitData = event.data.split(",")
+      const matchRoom = splitData[0]
+      const timeFormatInMilliseconds = splitData[1]
+      const incrementInMilliseconds = splitData[2]
+      const state = {
+        timeFormatInMilliseconds,
+        incrementInMilliseconds,
+      }
+      navigate("matchroom/" + matchRoom, { state })
     }
     setEventSource(eventSource)
   }
@@ -953,7 +805,6 @@ export function QueueTiles() {
   async function tryLeaveQueue(queueName: string) {
     const queueObject = queueObjectsMap.get(queueName)
     if (queueObject === undefined) {
-      console.log(queueObjectsMap)
       throw new Error("Queue object not found")
     }
     const response = await fetch(import.meta.env.VITE_API_JOIN_QUEUE_URL, {
@@ -992,21 +843,18 @@ export function QueueTiles() {
     try {
       switch(clickAction) {
       case ClickAction.leaveQueue:
-        console.log(`Leaving ${queueName}`)
         await tryLeaveQueue(queueName)
         setInQueue(false)
         setQueueName("")
         break
 
       case ClickAction.changeQueue:
-        console.log(`Changing from ${queueName} to ${newQueueName}`)
         await tryLeaveQueue(queueName)
         await tryJoinQueue(newQueueName)
         setQueueName(newQueueName)
         break
       
       case ClickAction.joinQueue:
-        console.log(`Joining ${newQueueName}`)
         await tryJoinQueue(newQueueName)
         setInQueue(true)
         setQueueName(newQueueName)
@@ -1014,7 +862,6 @@ export function QueueTiles() {
     } catch (e) {
       console.error(e)
     } finally {
-      console.log("setWaiting(false)")
       setWaiting(false)
     }
 
