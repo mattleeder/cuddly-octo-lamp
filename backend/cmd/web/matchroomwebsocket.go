@@ -129,6 +129,10 @@ type MatchRoomHub struct {
 	timeOfLastMove time.Time
 
 	flagTimer <-chan time.Time
+
+	timeFormatInMilliseconds int64
+
+	increment time.Duration
 }
 
 func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
@@ -155,8 +159,8 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 			FEN:                                  matchState.CurrentFEN,
 			LastMove:                             [2]int{last_move_move, last_move_piece},
 			AlgebraicNotation:                    intToAlgebraicNotation(last_move_move),
-			WhitePlayerTimeRemainingMilliseconds: time.Duration(matchState.WhitePlayerTimeRemainingMilliseconds * int64(time.Millisecond)).Milliseconds(),
-			BlackPlayerTimeRemainingMilliseconds: time.Duration(matchState.BlackPlayerTimeRemainingMilliseconds * int64(time.Millisecond)).Milliseconds(),
+			WhitePlayerTimeRemainingMilliseconds: matchState.WhitePlayerTimeRemainingMilliseconds,
+			BlackPlayerTimeRemainingMilliseconds: matchState.BlackPlayerTimeRemainingMilliseconds,
 		}},
 		GameOverStatus: Ongoing,
 	}}
@@ -175,7 +179,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		return nil, err
 	}
 
-	return &MatchRoomHub{
+	match := &MatchRoomHub{
 		matchID:                     matchID,
 		broadcast:                   make(chan []byte),
 		register:                    make(chan *MatchRoomHubClient),
@@ -183,16 +187,23 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		clients:                     make(map[*MatchRoomHubClient]bool),
 		whitePlayerID:               matchState.WhitePlayerID,
 		blackPlayerID:               matchState.BlackPlayerID,
-		whitePlayerTimeRemaining:    time.Duration(matchState.TimeFormatInMilliseconds),
-		blackPlayerTimeRemaining:    time.Duration(matchState.TimeFormatInMilliseconds),
-		hasWhitePlayerMadeFirstMove: false,
+		whitePlayerTimeRemaining:    time.Duration(matchState.WhitePlayerTimeRemainingMilliseconds) * time.Millisecond,
+		blackPlayerTimeRemaining:    time.Duration(matchState.BlackPlayerTimeRemainingMilliseconds) * time.Millisecond,
+		hasWhitePlayerMadeFirstMove: false, // @TODO: calculate these
 		hasBlackPlayerMadeFirstMove: false,
 		turn:                        turn,
 		currentGameState:            jsonStr,
 		current_fen:                 matchState.CurrentFEN,
 		moveHistory:                 currentGameState[0].MatchStateHistory,
 		timeOfLastMove:              time.Now(),
-	}, nil
+		timeFormatInMilliseconds:    matchState.TimeFormatInMilliseconds,
+		increment:                   time.Duration(matchState.IncrementInMilliseconds) * time.Millisecond,
+	}
+
+	app.infoLog.Println("NEWHUBCREATED HUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUB")
+	app.infoLog.Printf("%+v\n", match)
+
+	return match, nil
 }
 
 type wsChessMove struct {
@@ -258,7 +269,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	if message[0] == byte(0) {
 		if hub.hasWhitePlayerMadeFirstMove {
 			hub.whitePlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
-			hub.whitePlayerTimeRemaining += time.Duration(2 * time.Second)
+			hub.whitePlayerTimeRemaining += hub.increment
 
 		} else {
 			hub.hasWhitePlayerMadeFirstMove = true
@@ -266,7 +277,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	} else {
 		if hub.hasBlackPlayerMadeFirstMove {
 			hub.blackPlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
-			hub.blackPlayerTimeRemaining += time.Duration(2 * time.Second)
+			hub.blackPlayerTimeRemaining += hub.increment
 		} else {
 			hub.hasBlackPlayerMadeFirstMove = true
 		}
