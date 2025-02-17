@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -65,17 +64,17 @@ func (c *MatchRoomHubClient) readPump() {
 	defer func() {
 		c.hub.unregister <- c
 		c.conn.Close()
+		app.infoLog.Println("Client closed")
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
-		app.infoLog.Println("Checking for client sent messages")
 		_, message, err := c.conn.ReadMessage()
 		app.infoLog.Println(message)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
+				app.errorLog.Printf("error: %v", err)
 			}
 			break
 		}

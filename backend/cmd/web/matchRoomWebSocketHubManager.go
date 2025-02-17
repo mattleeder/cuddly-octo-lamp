@@ -7,12 +7,14 @@
 package main
 
 import (
+	"sync"
+
 	"github.com/gorilla/websocket"
 )
 
 // Hub manager, opens new websockets for games in progress
 type MatchRoomHubManager struct {
-
+	mu sync.Mutex
 	// Registered hubs
 	hubs map[int64]*MatchRoomHub
 }
@@ -35,7 +37,15 @@ func (hubManager *MatchRoomHubManager) registerNewHub(matchID int64) (*MatchRoom
 	return hubManager.hubs[matchID], nil
 }
 
+func (hubManager *MatchRoomHubManager) unregisterHub(matchID int64) {
+	hubManager.mu.Lock()
+	defer hubManager.mu.Unlock()
+	delete(hubManager.hubs, matchID)
+}
+
 func (hubManager *MatchRoomHubManager) getHubFromMatchID(matchID int64) (*MatchRoomHub, error) {
+	hubManager.mu.Lock()
+	defer hubManager.mu.Unlock()
 	val, ok := hubManager.hubs[matchID]
 
 	// If hub not running, run it

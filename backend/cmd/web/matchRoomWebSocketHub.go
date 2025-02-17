@@ -341,6 +341,15 @@ func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection() (jsonStr []byte,
 	return jsonStr, nil
 }
 
+func (hub *MatchRoomHub) hasActiveClients() bool {
+	for _, val := range hub.clients {
+		if val {
+			return true
+		}
+	}
+	return false
+}
+
 func (hub *MatchRoomHub) run() {
 	defer app.infoLog.Println("Hub stopped")
 	for {
@@ -360,6 +369,10 @@ func (hub *MatchRoomHub) run() {
 			if _, ok := hub.clients[client]; ok {
 				delete(hub.clients, client)
 				close(client.send)
+			}
+			if !hub.hasActiveClients() {
+				matchRoomHubManager.unregisterHub(hub.matchID)
+				return
 			}
 
 		case <-hub.flagTimer:
