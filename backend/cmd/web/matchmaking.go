@@ -1,8 +1,8 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"sort"
 	"sync"
@@ -163,10 +163,50 @@ func swapRemove[T any](arr []T, idx int) []T {
 	return arr[:len(arr)-1]
 }
 
+func startingMatchHistory(timeFormatInMilliseconds int64) ([]byte, error) {
+	startingHistory := []MatchStateHistory{{
+		FEN:                                  "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+		LastMove:                             [2]int{0, 0},
+		AlgebraicNotation:                    "a8",
+		WhitePlayerTimeRemainingMilliseconds: timeFormatInMilliseconds,
+		BlackPlayerTimeRemainingMilliseconds: timeFormatInMilliseconds,
+	}}
+
+	app.infoLog.Printf("Starting history: %+v\n", startingHistory)
+
+	jsonStr, err := json.Marshal(startingHistory)
+	if err != nil {
+		app.errorLog.Printf("Error marshalling JSON: %v\n", err)
+		return nil, err
+	}
+
+	app.infoLog.Printf("Original data: %s\n", jsonStr)
+
+	var decoded []MatchStateHistory
+
+	err = json.Unmarshal(jsonStr, &decoded)
+	if err != nil {
+		app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
+		return nil, err
+	}
+
+	app.infoLog.Printf("Decoded: %+v\n", decoded)
+
+	return jsonStr, nil
+}
+
 func createMatch(playerOneID int64, playerTwoID int64, timeFormatInMilliseconds int64, incrementInMilliseconds int64) error {
 	playerOneIsWhite := rand.Intn(2) == 1
-	matchID, err := app.liveMatches.InsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds)
+	startingHistory, err := startingMatchHistory(timeFormatInMilliseconds)
 	if err != nil {
+		app.errorLog.Printf("Error creating starting history for new match: %v\n", err)
+		return err
+	}
+
+	var matchID int64
+	matchID, err = app.liveMatches.InsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, startingHistory)
+	if err != nil {
+		app.errorLog.Printf("Error inserting new match: %v\n", err)
 		return err
 	}
 
@@ -267,7 +307,7 @@ func matchPlayers() {
 			// Match players
 			err := createMatch(playerOne.playerID, playerTwo.playerID, timeFormatInMilliseconds, incrementInMilliseconds)
 			if err != nil {
-				log.Println(err)
+				app.errorLog.Println(err)
 				continue
 			}
 			playerOne.isMatched = true

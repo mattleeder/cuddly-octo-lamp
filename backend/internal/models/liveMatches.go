@@ -2,6 +2,8 @@ package models
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 	"time"
 )
 
@@ -16,40 +18,43 @@ type LiveMatch struct {
 	IncrementInMilliseconds              int64         `json:"incrementInMilliseconds"`
 	WhitePlayerTimeRemainingMilliseconds int64         `json:"whitePlayerTimeRemainingMilliseconds"`
 	BlackPlayerTimeRemainingMilliseconds int64         `json:"blackPlayerTimeRemainingMilliseconds"`
+	GameHistoryJSONString                []byte        `json:"gameHistoryJSONstring"` // []MatchStateHistory{}
+	UnixMsTimeOfLastMove                 int64         `json"unixTimeOfLastMove"`
 }
 
 type LiveMatchModel struct {
 	DB *sql.DB
 }
 
-func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64) (int64, error) {
+func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64, gameHistory []byte) (int64, error) {
+	defer m.LogAll()
 	app.infoLog.Printf("Inserting new match with: %v, %v\n", timeFormatInMilliseconds, incrementInMilliseconds)
 	sqlStmt := `
-	insert or ignore into live_matches (white_player_id, black_player_id, time_format_in_milliseconds, increment_in_milliseconds, white_player_time_remaining_in_milliseconds, black_player_time_remaining_in_milliseconds) VALUES(?, ?, ?, ?, ?, ?);
+	insert or ignore into live_matches (white_player_id, black_player_id, time_format_in_milliseconds, increment_in_milliseconds, white_player_time_remaining_in_milliseconds, black_player_time_remaining_in_milliseconds, game_history_json_string, unix_ms_time_of_last_move) VALUES(?, ?, ?, ?, ?, ?, ?, ?);
 	`
 	var result sql.Result
 	var err error
 	// Set white and black remaining time equal to the time format
 	for {
 		if playerOneIsWhite {
-			result, err = m.DB.Exec(sqlStmt, playerOneID, playerTwoID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds)
+			result, err = m.DB.Exec(sqlStmt, playerOneID, playerTwoID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()))
 		} else {
-			result, err = m.DB.Exec(sqlStmt, playerTwoID, playerOneID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds)
+			result, err = m.DB.Exec(sqlStmt, playerTwoID, playerOneID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()))
 		}
 
 		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
 			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
 			time.Sleep(50 * time.Millisecond)
 			continue
+		} else if err != nil {
+			app.errorLog.Println(err)
+			return 0, err
 		}
 
 		break
 	}
 
-	if err != nil {
-		app.errorLog.Println(err)
-		return 0, err
-	}
+	app.infoLog.Println("Succesfully inserted new match")
 
 	return result.LastInsertId()
 }
@@ -67,8 +72,10 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 	var incrementInMilliseconds int64
 	var whitePlayerTimeRemainingMilliseconds int64
 	var blackPlayerTimeRemainingMilliseconds int64
+	var gameHistoryJSONString []byte
+	var unixMsTimeOfLastMove int64
 
-	err := row.Scan(&_matchID, &whitePlayerID, &blackPlayerID, &lastMovePiece, &lastMoveMove, &currentFEN, &timeFormatInMilliseconds, &incrementInMilliseconds, &whitePlayerTimeRemainingMilliseconds, &blackPlayerTimeRemainingMilliseconds)
+	err := row.Scan(&_matchID, &whitePlayerID, &blackPlayerID, &lastMovePiece, &lastMoveMove, &currentFEN, &timeFormatInMilliseconds, &incrementInMilliseconds, &whitePlayerTimeRemainingMilliseconds, &blackPlayerTimeRemainingMilliseconds, &gameHistoryJSONString, &unixMsTimeOfLastMove)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +91,8 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 		IncrementInMilliseconds:              incrementInMilliseconds,
 		WhitePlayerTimeRemainingMilliseconds: whitePlayerTimeRemainingMilliseconds,
 		BlackPlayerTimeRemainingMilliseconds: blackPlayerTimeRemainingMilliseconds,
+		GameHistoryJSONString:                gameHistoryJSONString,
+		UnixMsTimeOfLastMove:                 unixMsTimeOfLastMove,
 	}
 
 	app.infoLog.Printf("%+v", match)
@@ -110,16 +119,126 @@ func (m *LiveMatchModel) LogAll() {
 	}
 }
 
-func (m *LiveMatchModel) UpdateLiveMatch(matchID int64, newFEN string, lastMovePiece int, lastMoveMove int, whitePlayerTimeRemainingMilliseconds int64, blackPlayerTimeRemainingMilliseconds int64) error {
+func (m *LiveMatchModel) UpdateLiveMatch(matchID int64, newFEN string, lastMovePiece int, lastMoveMove int, whitePlayerTimeRemainingMilliseconds int64, blackPlayerTimeRemainingMilliseconds int64, matchStateHistoryJSONstr []byte, timeOfLastMove time.Time) error {
 	defer m.LogAll()
 	sqlStmt := `
 	UPDATE live_matches
-	SET last_move_piece = ?, last_move_move = ?, current_fen = ?, white_player_time_remaining_in_milliseconds = ?, black_player_time_remaining_in_milliseconds = ?
+	SET last_move_piece = ?, last_move_move = ?, current_fen = ?, white_player_time_remaining_in_milliseconds = ?, black_player_time_remaining_in_milliseconds = ?, game_history_json_string = ?, unix_ms_time_of_last_move = ?
 	WHERE match_id = ?
 	`
-	_, err := m.DB.Exec(sqlStmt, lastMovePiece, lastMoveMove, newFEN, whitePlayerTimeRemainingMilliseconds, blackPlayerTimeRemainingMilliseconds, matchID)
+	_, err := m.DB.Exec(sqlStmt, lastMovePiece, lastMoveMove, newFEN, whitePlayerTimeRemainingMilliseconds, blackPlayerTimeRemainingMilliseconds, matchStateHistoryJSONstr, time.Time.UnixMilli(timeOfLastMove), matchID)
 	if err != nil {
 		app.errorLog.Println(err)
+		return err
+	}
+
+	return nil
+}
+
+func (m *LiveMatchModel) MoveMatchToPastMatches(matchID int64, outcome int) error {
+	// outcome int
+	// draw      = 0
+	// whiteWins = 1
+	// blackWins = 2
+	app.infoLog.Printf("Moving %v to past matches", matchID)
+
+	defer m.LogAll()
+	var white_player_points, black_player_points float32
+
+	if outcome == 0 {
+		white_player_points = 0.5
+		black_player_points = 0.5
+	} else if outcome == 1 {
+		white_player_points = 1
+		black_player_points = 0
+	} else if outcome == 2 {
+		white_player_points = 0
+		black_player_points = 1
+	} else {
+		app.errorLog.Printf("Could not understand outcome: %v\n", outcome)
+		return errors.New(fmt.Sprintf("Could not understand outcome: %v\n", outcome))
+	}
+
+	stepOne := `
+		-- Step 1: Insert row into past_matches table
+	INSERT INTO past_matches (
+	    match_id,
+		white_player_id,
+		black_player_id,
+		last_move_piece,
+		last_move_move,
+		final_fen,
+		time_format_in_milliseconds,
+		increment_in_milliseconds,
+		game_history_json_string,
+		white_player_points,
+		black_player_points
+		)
+
+	SELECT match_id,
+           white_player_id,
+           black_player_id,
+           last_move_piece,
+           last_move_move,
+           current_fen as final_fen,
+           time_format_in_milliseconds,
+           increment_in_milliseconds,
+           game_history_json_string,
+		   ?,
+		   ?
+	  FROM live_matches
+	 WHERE match_id = ?;`
+
+	stepTwo := `
+	-- Step 2: Delete row from live_matches table
+	DELETE FROM live_matches
+	 WHERE match_id = ?;
+	`
+
+	var stmtOne, stmtTwo *sql.Stmt
+	// var resultOne, resultTwo sql.Result
+
+	tx, err := m.DB.Begin()
+	if err != nil {
+		app.errorLog.Printf("Error starting transaction: %v\n", err)
+		return err
+	}
+
+	stmtOne, err = tx.Prepare(stepOne)
+	if err != nil {
+		app.errorLog.Printf("Error preparing first statement: %v\n", err)
+		return err
+	}
+	defer stmtOne.Close()
+
+	stmtTwo, err = tx.Prepare(stepTwo)
+	if err != nil {
+		app.errorLog.Printf("Error preparing second statement: %v\n", err)
+		return err
+	}
+	defer stmtTwo.Close()
+
+	_, err = stmtOne.Exec(white_player_points, black_player_points, matchID)
+	if err != nil {
+		app.errorLog.Printf("Error executing first statement: %v\n", err)
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("insert past_matches: unable to rollback: %v", rollbackErr)
+		}
+		return err
+	}
+
+	_, err = stmtTwo.Exec(matchID)
+	if err != nil {
+		app.errorLog.Printf("Error executing second statement: %v\n", err)
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("delete live_matches: unable to rollback: %v", rollbackErr)
+		}
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		app.errorLog.Printf("Error commiting transaction: %v\n", err)
 		return err
 	}
 

@@ -109,7 +109,6 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	defer func() { app.perfLog.Printf("joinQueueHandler took: %s\n", time.Since(start)) }()
-	defer app.matchmakingQueue.LogQueue()
 
 	if r.Method != "POST" {
 		w.Header().Set("Allow", "POST")

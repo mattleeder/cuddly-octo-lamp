@@ -160,7 +160,7 @@ export function ChessBoard() {
     if (game?.matchData.activeMove != (game as gameContext)?.matchData.stateHistory.length - 1) {
       setWaiting(false)
       return
-    } else if (game.matchData.gameOverStatus != 1) {
+    } else if (game.matchData.gameOverStatus != 0) {
       console.log("Game has finished")
       setWaiting(false)
       return
