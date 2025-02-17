@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+// Hub Functions
+// Create New
+// Run
+// GetMessageType
+// HandleMessage
+//
+
 type MatchStateHistory struct {
 	FEN                                  string `json:"FEN"`
 	LastMove                             [2]int `json:"lastMove"`
@@ -40,9 +47,7 @@ type MatchRoomHub struct {
 
 	blackPlayerTimeRemaining time.Duration
 
-	hasWhitePlayerMadeFirstMove bool
-
-	hasBlackPlayerMadeFirstMove bool
+	isTimerActive bool
 
 	turn byte // byte(0) is white, byte(1) is black
 
@@ -63,7 +68,14 @@ type MatchRoomHub struct {
 	fenFreqMap map[string]int
 }
 
+type wsChessMove struct {
+	Piece           int    `json:"piece"`
+	Move            int    `json:"move"`
+	PromotionString string `json:"promotionString"`
+}
+
 func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
+	// Build hub from data in db
 	matchState, err := app.liveMatches.GetFromMatchID(matchID)
 
 	if err != nil {
@@ -71,24 +83,21 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		return nil, err
 	}
 
-	var turn byte
-
 	var matchStateHistory []MatchStateHistory
-
-	app.infoLog.Printf("Retrieved data: %s\n", matchState.GameHistoryJSONString)
 
 	err = json.Unmarshal(matchState.GameHistoryJSONString, &matchStateHistory)
 	if err != nil {
 		app.errorLog.Printf("Error unmarshalling matchStateHistory %v\n", err)
 		return nil, err
 	}
-	app.infoLog.Printf("%+v", matchStateHistory)
 
-	var fenFreqMap = map[string]int{}
+	var turn byte
+	var fenFreqMap = make(map[string]int)
 	var splitFEN []string
 	var fen string
 	var threefoldRepetition = false
 
+	// FEN Freq Map
 	for _, val := range matchStateHistory {
 		splitFEN = strings.Split(val.FEN, " ")
 		fen = strings.Join(splitFEN[:4], " ")
@@ -104,13 +113,11 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		ThreefoldRepetition: threefoldRepetition,
 	}}
 
-	app.infoLog.Printf("currentGameState: %+v\n", currentGameState)
-
 	timeOfLastMove := time.UnixMilli(matchState.UnixMsTimeOfLastMove)
 	var whitePlayerTimeRemaining, blackPlayerTimeRemaining time.Duration
-
 	var flagTimer <-chan time.Time
 
+	// Calculate time remaining for player whose turn it is
 	splitFEN = strings.Split(matchState.CurrentFEN, " ")
 	if splitFEN[1] == "w" {
 		turn = byte(0)
@@ -124,14 +131,9 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		flagTimer = time.After(blackPlayerTimeRemaining)
 	}
 
-	hasWhitePlayerMadeFirstMove := true
-	if splitFEN[4] == "0" {
-		hasWhitePlayerMadeFirstMove = false
-	}
-
-	hasBlackPlayerMadeFirstMove := true
+	var isTimerActive = false
 	if splitFEN[5] == "1" {
-		hasWhitePlayerMadeFirstMove = false
+		isTimerActive = true
 	}
 
 	jsonStr, err := json.Marshal(currentGameState)
@@ -141,36 +143,28 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 	}
 
 	match := &MatchRoomHub{
-		matchID:                     matchID,
-		broadcast:                   make(chan []byte),
-		register:                    make(chan *MatchRoomHubClient),
-		unregister:                  make(chan *MatchRoomHubClient),
-		clients:                     make(map[*MatchRoomHubClient]bool),
-		whitePlayerID:               matchState.WhitePlayerID,
-		blackPlayerID:               matchState.BlackPlayerID,
-		whitePlayerTimeRemaining:    whitePlayerTimeRemaining,
-		blackPlayerTimeRemaining:    blackPlayerTimeRemaining,
-		hasWhitePlayerMadeFirstMove: hasWhitePlayerMadeFirstMove,
-		hasBlackPlayerMadeFirstMove: hasBlackPlayerMadeFirstMove,
-		turn:                        turn,
-		currentGameState:            jsonStr,
-		current_fen:                 matchState.CurrentFEN,
-		moveHistory:                 currentGameState[0].MatchStateHistory,
-		timeOfLastMove:              timeOfLastMove,
-		flagTimer:                   flagTimer,
-		timeFormatInMilliseconds:    matchState.TimeFormatInMilliseconds,
-		increment:                   time.Duration(matchState.IncrementInMilliseconds) * time.Millisecond,
+		matchID:                  matchID,
+		broadcast:                make(chan []byte),
+		register:                 make(chan *MatchRoomHubClient),
+		unregister:               make(chan *MatchRoomHubClient),
+		clients:                  make(map[*MatchRoomHubClient]bool),
+		whitePlayerID:            matchState.WhitePlayerID,
+		blackPlayerID:            matchState.BlackPlayerID,
+		whitePlayerTimeRemaining: whitePlayerTimeRemaining,
+		blackPlayerTimeRemaining: blackPlayerTimeRemaining,
+		isTimerActive:            isTimerActive,
+		turn:                     turn,
+		currentGameState:         jsonStr,
+		current_fen:              matchState.CurrentFEN,
+		moveHistory:              currentGameState[0].MatchStateHistory,
+		timeOfLastMove:           timeOfLastMove,
+		flagTimer:                flagTimer,
+		timeFormatInMilliseconds: matchState.TimeFormatInMilliseconds,
+		increment:                time.Duration(matchState.IncrementInMilliseconds) * time.Millisecond,
+		fenFreqMap:               fenFreqMap,
 	}
 
-	app.infoLog.Printf("Match: %+v\n", match)
-
 	return match, nil
-}
-
-type wsChessMove struct {
-	Piece           int    `json:"piece"`
-	Move            int    `json:"move"`
-	PromotionString string `json:"promotionString"`
 }
 
 func (hub *MatchRoomHub) sendMessageToAllClients(message []byte) {
@@ -211,6 +205,7 @@ func (hub *MatchRoomHub) updateGameStateAfterFlag() (err error) {
 
 	hub.currentGameState = jsonStr
 
+	// Game is over after flag
 	go app.liveMatches.MoveMatchToPastMatches(hub.matchID, outcome)
 
 	return nil
@@ -220,8 +215,8 @@ func (hub *MatchRoomHub) updateMatchThenMoveToFinished(newFEN string, piece int,
 	app.liveMatches.UpdateLiveMatch(hub.matchID, newFEN, piece, move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
 	var outcome int
 	if gameOverStatus == Checkmate || gameOverStatus == WhiteFlagged || gameOverStatus == BlackFlagged {
-		if turn == byte(0) {
-			// White wins as its their turn and turns havent been updated yet
+		if turn == byte(1) {
+			// White wins as its blacks turn
 			outcome = 1
 		} else {
 			// Black wins
@@ -246,27 +241,21 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	// Validate Move
 	var validMove = IsMoveValid(hub.current_fen, chessMove.Piece, chessMove.Move)
 	if !validMove {
-		return err
+		return errors.New("Move is not valid")
 	}
 
-	// Contsruct reply
-	if message[0] == byte(0) {
-		if hub.hasWhitePlayerMadeFirstMove {
-			hub.whitePlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
-			hub.whitePlayerTimeRemaining += hub.increment
-
-		} else {
-			hub.hasWhitePlayerMadeFirstMove = true
-		}
-	} else {
-		if hub.hasBlackPlayerMadeFirstMove {
-			hub.blackPlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
-			hub.blackPlayerTimeRemaining += hub.increment
-		} else {
-			hub.hasBlackPlayerMadeFirstMove = true
-		}
+	// Calcuate new time remaining
+	if message[0] == byte(0) && hub.isTimerActive {
+		hub.whitePlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
+		hub.whitePlayerTimeRemaining += hub.increment
+	} else if message[1] == byte(1) && hub.isTimerActive {
+		hub.blackPlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
+		hub.blackPlayerTimeRemaining += hub.increment
+	} else if message[1] == byte(1) {
+		hub.isTimerActive = true
 	}
 
+	// Calculate reply variables
 	newFEN, gameOverStatus, algebraicNotation := getFENAfterMove(hub.current_fen, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
 	var threefoldRepetition = false
 	splitFEN := strings.Join(strings.Split(newFEN, " ")[:4], " ")
@@ -275,7 +264,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 		threefoldRepetition = true
 	}
 
-	// Need to put move into db
+	// Construct Reply
 	data := []postChessMoveReply{
 		{
 			MatchStateHistory: append(hub.moveHistory, MatchStateHistory{
@@ -303,10 +292,13 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	hub.moveHistory = data[0].MatchStateHistory
 	hub.timeOfLastMove = time.Now()
 
-	if message[0] == byte(0) && hub.hasBlackPlayerMadeFirstMove {
+	// Start new flag timer and update turn
+	if message[0] == byte(0) && hub.isTimerActive {
 		hub.flagTimer = time.After(hub.blackPlayerTimeRemaining)
-	} else if message[0] == byte(1) && hub.hasWhitePlayerMadeFirstMove {
+		hub.turn = byte(1)
+	} else if message[0] == byte(1) && hub.isTimerActive {
 		hub.flagTimer = time.After(hub.whitePlayerTimeRemaining)
+		hub.turn = byte(0)
 	}
 
 	var matchStateHistoryData []byte
@@ -318,8 +310,9 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	// Update database
 	if gameOverStatus != Ongoing {
 		go hub.updateMatchThenMoveToFinished(newFEN, chessMove.Piece, chessMove.Move, gameOverStatus, hub.turn, matchStateHistoryData)
+	} else {
+		go app.liveMatches.UpdateLiveMatch(hub.matchID, newFEN, chessMove.Piece, chessMove.Move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
 	}
-	go app.liveMatches.UpdateLiveMatch(hub.matchID, newFEN, chessMove.Piece, chessMove.Move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
 
 	return nil
 }
@@ -333,9 +326,9 @@ func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection() (jsonStr []byte,
 	}
 
 	// Correct times
-	if hub.turn == byte(0) && hub.hasWhitePlayerMadeFirstMove {
+	if hub.turn == byte(0) && hub.isTimerActive {
 		gameState[0].MatchStateHistory[len(gameState[0].MatchStateHistory)-1].WhitePlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
-	} else if hub.turn == byte(1) && hub.hasBlackPlayerMadeFirstMove {
+	} else if hub.turn == byte(1) && hub.isTimerActive {
 		gameState[0].MatchStateHistory[len(gameState[0].MatchStateHistory)-1].BlackPlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
 	}
 
@@ -380,10 +373,13 @@ func (hub *MatchRoomHub) run() {
 
 		case message := <-hub.broadcast:
 			app.infoLog.Printf("WS Message: %v\n", message)
+
+			// Ignore messages from inactive player
 			if message[0] != hub.turn {
 				continue
 			}
 
+			// Validate move and update
 			err := hub.updateGameStateAfterMove(message)
 			if err != nil {
 				app.errorLog.Println(err)
@@ -391,13 +387,6 @@ func (hub *MatchRoomHub) run() {
 			}
 
 			hub.sendMessageToAllClients(hub.currentGameState)
-
-			// Change turn
-			if hub.turn == byte(0) {
-				hub.turn = byte(1)
-			} else {
-				hub.turn = byte(0)
-			}
 
 		}
 	}

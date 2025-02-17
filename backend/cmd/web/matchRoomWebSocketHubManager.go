@@ -25,6 +25,16 @@ func newMatchRoomHubManager() *MatchRoomHubManager {
 
 var matchRoomHubManager = newMatchRoomHubManager()
 
+func (hubManager *MatchRoomHubManager) registerNewHub(matchID int64) (*MatchRoomHub, error) {
+	newHub, err := newMatchRoomHub(matchID)
+	if err != nil {
+		app.errorLog.Println(err)
+		return nil, err
+	}
+	hubManager.hubs[matchID] = newHub
+	return hubManager.hubs[matchID], nil
+}
+
 func (hubManager *MatchRoomHubManager) getHubFromMatchID(matchID int64) (*MatchRoomHub, error) {
 	val, ok := hubManager.hubs[matchID]
 
@@ -40,16 +50,6 @@ func (hubManager *MatchRoomHubManager) getHubFromMatchID(matchID int64) (*MatchR
 	}
 
 	return val, nil
-}
-
-func (hubManager *MatchRoomHubManager) registerNewHub(matchID int64) (*MatchRoomHub, error) {
-	newHub, err := newMatchRoomHub(matchID)
-	if err != nil {
-		app.errorLog.Println(err)
-		return nil, err
-	}
-	hubManager.hubs[matchID] = newHub
-	return hubManager.hubs[matchID], nil
 }
 
 func (hubManager *MatchRoomHubManager) registerClientToMatchRoomHub(conn *websocket.Conn, matchID int64, playerID *int64) (*MatchRoomHubClient, error) {

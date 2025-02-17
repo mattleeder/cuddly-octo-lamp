@@ -52,6 +52,10 @@ type MatchRoomHubClient struct {
 	send chan []byte
 }
 
+type sendPlayerCode struct {
+	PlayerCode playerCodeEnum `json:"playerCode"`
+}
+
 // readPump pumps messages from the websocket connection to the hub.
 //
 // The application runs readPump in a per-connection goroutine. The application
@@ -128,10 +132,6 @@ func (c *MatchRoomHubClient) writePump() {
 			}
 		}
 	}
-}
-
-type sendPlayerCode struct {
-	PlayerCode playerCodeEnum `json:"playerCode"`
 }
 
 // serveWs handles websocket requests from the peer.
