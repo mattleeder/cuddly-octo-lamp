@@ -33,7 +33,7 @@ func main() {
 	perfLog := log.New(os.Stdout, "PERF\t", log.Lshortfile)
 	debugLog := log.New(os.Stdout, "DEBUG\t", log.Lshortfile)
 
-	// models.InitDatabase(*dbDriverName, *dbDataSourceName)
+	models.InitDatabase(*dbDriverName, *dbDataSourceName)
 	db, err := sql.Open(*dbDriverName, *dbDataSourceName)
 	defer db.Close()
 	if err != nil {
