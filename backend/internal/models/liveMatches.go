@@ -19,7 +19,7 @@ type LiveMatch struct {
 	WhitePlayerTimeRemainingMilliseconds int64         `json:"whitePlayerTimeRemainingMilliseconds"`
 	BlackPlayerTimeRemainingMilliseconds int64         `json:"blackPlayerTimeRemainingMilliseconds"`
 	GameHistoryJSONString                []byte        `json:"gameHistoryJSONstring"` // []MatchStateHistory{}
-	UnixMsTimeOfLastMove                 int64         `json"unixTimeOfLastMove"`
+	UnixMsTimeOfLastMove                 int64         `json:"unixTimeOfLastMove"`
 }
 
 type LiveMatchModel struct {
