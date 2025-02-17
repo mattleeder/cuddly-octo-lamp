@@ -266,7 +266,7 @@ export function ChessBoard() {
 
   const LastMoveComponent = game?.matchData.activeState.lastMove.map((move, idx) => {
     if (game.matchData.activeMove == 0) {
-      return <React.Fragment key={0} />
+      return <React.Fragment key={idx} />
     }
     const row = Math.floor(move / 8)
     const col = move % 8
