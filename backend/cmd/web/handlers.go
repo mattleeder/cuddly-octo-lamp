@@ -52,8 +52,9 @@ type postChessMove struct {
 }
 
 type postChessMoveReply struct {
-	MatchStateHistory []MatchStateHistory `json:"pastMoves"`
-	GameOverStatus    gameOverStatusCode  `json:"gameOverStatus"`
+	MatchStateHistory   []MatchStateHistory `json:"pastMoves"`
+	GameOverStatus      gameOverStatusCode  `json:"gameOverStatus"`
+	ThreefoldRepetition bool                `json:"threefoldRepetition"`
 }
 
 type joinQueueRequest struct {

@@ -133,6 +133,8 @@ type MatchRoomHub struct {
 	timeFormatInMilliseconds int64
 
 	increment time.Duration
+
+	fenFreqMap map[string]int
 }
 
 func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
@@ -156,9 +158,24 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 	}
 	app.infoLog.Printf("%+v", matchStateHistory)
 
+	var fenFreqMap = map[string]int{}
+	var splitFEN []string
+	var fen string
+	var threefoldRepetition = false
+
+	for _, val := range matchStateHistory {
+		splitFEN = strings.Split(val.FEN, " ")
+		fen = strings.Join(splitFEN[:4], " ")
+		fenFreqMap[fen] += 1
+		if fenFreqMap[fen] >= 3 {
+			threefoldRepetition = true
+		}
+	}
+
 	currentGameState := [1]postChessMoveReply{{
-		MatchStateHistory: matchStateHistory,
-		GameOverStatus:    Ongoing,
+		MatchStateHistory:   matchStateHistory,
+		GameOverStatus:      Ongoing,
+		ThreefoldRepetition: threefoldRepetition,
 	}}
 
 	app.infoLog.Printf("currentGameState: %+v\n", currentGameState)
@@ -168,7 +185,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 
 	var flagTimer <-chan time.Time
 
-	splitFEN := strings.Split(matchState.CurrentFEN, " ")
+	splitFEN = strings.Split(matchState.CurrentFEN, " ")
 	if splitFEN[1] == "w" {
 		turn = byte(0)
 		whitePlayerTimeRemaining = time.Duration(matchState.WhitePlayerTimeRemainingMilliseconds)*time.Millisecond - time.Since(timeOfLastMove)
@@ -325,6 +342,13 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	}
 
 	newFEN, gameOverStatus, algebraicNotation := getFENAfterMove(hub.current_fen, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
+	var threefoldRepetition = false
+	splitFEN := strings.Join(strings.Split(newFEN, " ")[:4], " ")
+	hub.fenFreqMap[splitFEN] += 1
+	if hub.fenFreqMap[splitFEN] >= 3 {
+		threefoldRepetition = true
+	}
+
 	// Need to put move into db
 	data := []postChessMoveReply{
 		{
@@ -335,7 +359,8 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 				WhitePlayerTimeRemainingMilliseconds: hub.whitePlayerTimeRemaining.Milliseconds(),
 				BlackPlayerTimeRemainingMilliseconds: hub.blackPlayerTimeRemaining.Milliseconds(),
 			}),
-			GameOverStatus: gameOverStatus,
+			GameOverStatus:      gameOverStatus,
+			ThreefoldRepetition: threefoldRepetition,
 		},
 	}
 
