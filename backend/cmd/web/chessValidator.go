@@ -91,6 +91,7 @@ const (
 	InsufficientMaterial
 	WhiteFlagged
 	BlackFlagged
+	Draw
 )
 
 type pieceType struct {

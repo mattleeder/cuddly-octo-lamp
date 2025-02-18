@@ -120,7 +120,7 @@ type userMessageBody struct {
 }
 
 // Responses
-type postMoveBodyResponse struct {
+type postMoveResponse struct {
 	MessageType clientMessageType `json:"messageType"`
 	Body        postMoveBody      `json:"body"`
 }
@@ -185,7 +185,7 @@ type MatchRoomHub struct {
 
 	turn playerTurn // byte(0) is white, byte(1) is black
 
-	currentGameState []byte // onMoveBody
+	currentGameState []byte // onMoveResponse
 
 	current_fen string
 
@@ -460,7 +460,7 @@ func (hub *MatchRoomHub) updateTimeRemaining() {
 func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 
 	// Parse Message
-	var chessMove postMoveBodyResponse
+	var chessMove postMoveResponse
 	err = json.Unmarshal(message[1:], &chessMove)
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error unmarshalling JSON: %v\n", err))
@@ -584,33 +584,84 @@ func (hub *MatchRoomHub) getMessageType(message []byte) clientMessageType {
 	return unknown
 }
 
-func (hub *MatchRoomHub) acceptEventOffer(event eventType) {
+func (hub *MatchRoomHub) makeDraw(reason gameOverStatusCode) []byte {
+	var data onMoveResponse
+	err := json.Unmarshal(hub.currentGameState, &data)
+	if err != nil {
+		app.errorLog.Printf("Error unmarshaling hub.currentGameState: %s", err)
+	}
+
+	var jsonStr []byte
+	data.Body.GameOverStatusCode = reason
+	jsonStr, err = json.Marshal(data)
+	if err != nil {
+		app.errorLog.Printf("Error marshaling onMoveResponse: %s", err)
+	}
+
+	hub.currentGameState = jsonStr
+
+	go app.liveMatches.MoveMatchToPastMatches(hub.matchID, 0)
+
+	return jsonStr
+}
+
+// @TODO: implement this
+func (hub *MatchRoomHub) takeBack() []byte {
+	return nil
+}
+
+func (hub *MatchRoomHub) acceptEventOffer(event eventType) []byte {
 	// @TODO implement
 	switch event {
 	case takeback:
-		break
+		return hub.takeBack()
 
 	case draw:
-		break
+		return hub.makeDraw(Draw)
 	}
 }
 
-func (hub *MatchRoomHub) makeNewEventOffer(sender messageIdentifier, event eventType) {
-	hub.offerActive = &offerInfo{sender, event}
+func (hub *MatchRoomHub) endGame(reason gameOverStatusCode) {
+	// Function should
+	// End game
+	// Send final update to players
+	// Handle database changes
 }
 
-func (hub *MatchRoomHub) handlePlayerEvent(message []byte) {
+func (hub *MatchRoomHub) makeNewEventOffer(sender messageIdentifier, event eventType) []byte {
+	hub.offerActive = &offerInfo{sender, event}
+	var responseFrom string
+	if sender == messageIdentifier(WhitePlayer) {
+		responseFrom = "white"
+	} else {
+		responseFrom = "black"
+	}
+
+	response := opponentEventResponse{
+		MessageType: opponentEvent,
+		Body:        opponentEventBody{Sender: responseFrom, EventType: event},
+	}
+
+	jsonStr, err := json.Marshal(response)
+	if err != nil {
+		app.errorLog.Printf("Could not marshal opponentEventResponse: %s\n", err)
+		return nil
+	}
+	return jsonStr
+}
+
+func (hub *MatchRoomHub) handlePlayerEvent(message []byte) []byte {
 	var data playerEventResponse
 	err := json.Unmarshal(message[1:], &data)
 	if err != nil {
 		app.errorLog.Printf("Could not unmarshal playerEvent: %s", err)
-		return
+		return nil
 	}
 
 	if hub.offerActive == nil || hub.offerActive.event != data.Body.EventType {
-		hub.makeNewEventOffer(messageIdentifier(message[0]), data.Body.EventType)
+		return hub.makeNewEventOffer(messageIdentifier(message[0]), data.Body.EventType)
 	} else if hub.offerActive != nil && byte(hub.offerActive.sender) != message[0] {
-		hub.acceptEventOffer(data.Body.EventType)
+		return hub.acceptEventOffer(data.Body.EventType)
 	}
 }
 
@@ -634,8 +685,7 @@ func (hub *MatchRoomHub) handleMessage(message []byte) (response []byte) {
 
 	case playerEvent:
 		// @TODO: implement this fully
-		hub.handlePlayerEvent(message)
-		return
+		return hub.handlePlayerEvent(message)
 
 	default:
 		app.errorLog.Printf("Could not understand message: %s\n", message)
