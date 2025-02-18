@@ -49,7 +49,7 @@ type MatchRoomHub struct {
 
 	isTimerActive bool
 
-	turn byte // byte(0) is white, byte(1) is black
+	turn playerTurn // byte(0) is white, byte(1) is black
 
 	currentGameState []byte
 
@@ -74,6 +74,24 @@ type wsChessMove struct {
 	PromotionString string `json:"promotionString"`
 }
 
+type msgType int
+
+const (
+	PlayerMove = iota
+	PlayerMessage
+	DrawOffer
+	DrawClaim
+	SpectatorMessage
+	Unknown
+)
+
+type playerTurn byte
+
+const (
+	WhiteTurn = byte(iota)
+	BlackTurn = byte(iota)
+)
+
 func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 	// Build hub from data in db
 	matchState, err := app.liveMatches.GetFromMatchID(matchID)
@@ -91,7 +109,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		return nil, err
 	}
 
-	var turn byte
+	var turn playerTurn
 	var fenFreqMap = make(map[string]int)
 	var splitFEN []string
 	var fen string
@@ -117,23 +135,29 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 	var whitePlayerTimeRemaining, blackPlayerTimeRemaining time.Duration
 	var flagTimer <-chan time.Time
 
-	// Calculate time remaining for player whose turn it is
 	splitFEN = strings.Split(matchState.CurrentFEN, " ")
-	if splitFEN[1] == "w" {
-		turn = byte(0)
-		whitePlayerTimeRemaining = time.Duration(matchState.WhitePlayerTimeRemainingMilliseconds)*time.Millisecond - time.Since(timeOfLastMove)
-		blackPlayerTimeRemaining = time.Duration(matchState.BlackPlayerTimeRemainingMilliseconds) * time.Millisecond
-		flagTimer = time.After(whitePlayerTimeRemaining)
-	} else {
-		turn = byte(1)
-		whitePlayerTimeRemaining = time.Duration(matchState.WhitePlayerTimeRemainingMilliseconds) * time.Millisecond
-		blackPlayerTimeRemaining = time.Duration(matchState.BlackPlayerTimeRemainingMilliseconds)*time.Millisecond - time.Since(timeOfLastMove)
-		flagTimer = time.After(blackPlayerTimeRemaining)
+
+	// Calculate time remaining for player whose turn it is
+	var isTimerActive = false
+	if splitFEN[5] != "1" {
+		isTimerActive = true
 	}
 
-	var isTimerActive = false
-	if splitFEN[5] == "1" {
-		isTimerActive = true
+	whitePlayerTimeRemaining = time.Duration(matchState.WhitePlayerTimeRemainingMilliseconds) * time.Millisecond
+	blackPlayerTimeRemaining = time.Duration(matchState.BlackPlayerTimeRemainingMilliseconds) * time.Millisecond
+
+	if splitFEN[1] == "w" {
+		turn = playerTurn(WhiteTurn)
+	} else {
+		turn = playerTurn(BlackTurn)
+	}
+
+	if turn == playerTurn(WhiteTurn) && isTimerActive {
+		whitePlayerTimeRemaining = time.Duration(matchState.WhitePlayerTimeRemainingMilliseconds)*time.Millisecond - time.Since(timeOfLastMove)
+		flagTimer = time.After(whitePlayerTimeRemaining)
+	} else if turn == playerTurn(BlackTurn) && isTimerActive {
+		blackPlayerTimeRemaining = time.Duration(matchState.BlackPlayerTimeRemainingMilliseconds)*time.Millisecond - time.Since(timeOfLastMove)
+		flagTimer = time.After(blackPlayerTimeRemaining)
 	}
 
 	jsonStr, err := json.Marshal(currentGameState)
@@ -187,7 +211,7 @@ func (hub *MatchRoomHub) updateGameStateAfterFlag() (err error) {
 	}
 
 	var outcome int
-	if hub.turn == byte(0) {
+	if hub.turn == playerTurn(WhiteTurn) {
 		gameState[0].GameOverStatus = WhiteFlagged
 		outcome = 2
 	} else {
@@ -211,11 +235,11 @@ func (hub *MatchRoomHub) updateGameStateAfterFlag() (err error) {
 	return nil
 }
 
-func (hub *MatchRoomHub) updateMatchThenMoveToFinished(newFEN string, piece int, move int, gameOverStatus gameOverStatusCode, turn byte, matchStateHistoryData []byte) {
+func (hub *MatchRoomHub) updateMatchThenMoveToFinished(newFEN string, piece int, move int, gameOverStatus gameOverStatusCode, turn playerTurn, matchStateHistoryData []byte) {
 	app.liveMatches.UpdateLiveMatch(hub.matchID, newFEN, piece, move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
 	var outcome int
 	if gameOverStatus == Checkmate || gameOverStatus == WhiteFlagged || gameOverStatus == BlackFlagged {
-		if turn == byte(1) {
+		if turn == playerTurn(BlackTurn) {
 			// White wins as its blacks turn
 			outcome = 1
 		} else {
@@ -227,6 +251,20 @@ func (hub *MatchRoomHub) updateMatchThenMoveToFinished(newFEN string, piece int,
 	}
 	app.liveMatches.MoveMatchToPastMatches(hub.matchID, outcome)
 	app.pastMatches.LogAll()
+}
+
+func (hub *MatchRoomHub) changeTurn() {
+	if hub.turn == playerTurn(WhiteTurn) {
+		hub.turn = playerTurn(BlackTurn)
+	} else {
+		hub.turn = playerTurn(WhiteTurn)
+	}
+
+	if hub.isTimerActive && hub.turn == playerTurn(BlackTurn) {
+		hub.flagTimer = time.After(hub.blackPlayerTimeRemaining)
+	} else if hub.isTimerActive {
+		hub.flagTimer = time.After(hub.whitePlayerTimeRemaining)
+	}
 }
 
 func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
@@ -245,13 +283,13 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	}
 
 	// Calcuate new time remaining
-	if message[0] == byte(0) && hub.isTimerActive {
+	if message[0] == WhiteTurn && hub.isTimerActive {
 		hub.whitePlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
 		hub.whitePlayerTimeRemaining += hub.increment
-	} else if message[1] == byte(1) && hub.isTimerActive {
+	} else if message[0] == BlackTurn && hub.isTimerActive {
 		hub.blackPlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
 		hub.blackPlayerTimeRemaining += hub.increment
-	} else if message[1] == byte(1) {
+	} else if message[0] == BlackTurn {
 		hub.isTimerActive = true
 	}
 
@@ -292,14 +330,8 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	hub.moveHistory = data[0].MatchStateHistory
 	hub.timeOfLastMove = time.Now()
 
-	// Start new flag timer and update turn
-	if message[0] == byte(0) && hub.isTimerActive {
-		hub.flagTimer = time.After(hub.blackPlayerTimeRemaining)
-		hub.turn = byte(1)
-	} else if message[0] == byte(1) && hub.isTimerActive {
-		hub.flagTimer = time.After(hub.whitePlayerTimeRemaining)
-		hub.turn = byte(0)
-	}
+	// Ppdate turn and start new flag timer
+	hub.changeTurn()
 
 	var matchStateHistoryData []byte
 	matchStateHistoryData, err = json.Marshal(data[0].MatchStateHistory)
@@ -326,9 +358,9 @@ func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection() (jsonStr []byte,
 	}
 
 	// Correct times
-	if hub.turn == byte(0) && hub.isTimerActive {
+	if hub.turn == playerTurn(WhiteTurn) && hub.isTimerActive {
 		gameState[0].MatchStateHistory[len(gameState[0].MatchStateHistory)-1].WhitePlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
-	} else if hub.turn == byte(1) && hub.isTimerActive {
+	} else if hub.turn == playerTurn(BlackTurn) && hub.isTimerActive {
 		gameState[0].MatchStateHistory[len(gameState[0].MatchStateHistory)-1].BlackPlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
 	}
 
@@ -350,10 +382,43 @@ func (hub *MatchRoomHub) hasActiveClients() bool {
 	return false
 }
 
+func (hub *MatchRoomHub) getMessageType(message []byte) msgType {
+	if message[0] == WhiteTurn || message[0] == BlackTurn {
+		return PlayerMove
+	}
+	app.errorLog.Printf("Unknown message type\n")
+	return Unknown
+}
+
+func (hub *MatchRoomHub) handleMessage(message []byte) (response []byte) {
+	switch msgType := hub.getMessageType(message); msgType {
+	case PlayerMove:
+
+		// Ignore messages from inactive player
+		if message[0] != byte(hub.turn) {
+			app.infoLog.Printf("Not your turn\n")
+			return nil
+		}
+
+		// Validate move and update
+		err := hub.updateGameStateAfterMove(message)
+		if err != nil {
+			app.errorLog.Println(err)
+			return nil
+		}
+
+		return hub.currentGameState
+
+	default:
+		app.errorLog.Printf("Could not understand message: %s\n", message)
+		return nil
+	}
+}
+
 func (hub *MatchRoomHub) run() {
+	app.infoLog.Println("Hub running")
 	defer app.infoLog.Println("Hub stopped")
 	for {
-		app.infoLog.Println("Hub running")
 		select {
 		// Clients get currentGameState on register
 		case client := <-hub.register:
@@ -385,21 +450,14 @@ func (hub *MatchRoomHub) run() {
 			hub.sendMessageToAllClients(hub.currentGameState)
 
 		case message := <-hub.broadcast:
+			app.infoLog.Printf("WS Message: %s\n", message)
 			app.infoLog.Printf("WS Message: %v\n", message)
 
-			// Ignore messages from inactive player
-			if message[0] != hub.turn {
-				continue
+			response := hub.handleMessage(message)
+			app.infoLog.Printf("Response: %s\n", response)
+			if response != nil {
+				hub.sendMessageToAllClients(response)
 			}
-
-			// Validate move and update
-			err := hub.updateGameStateAfterMove(message)
-			if err != nil {
-				app.errorLog.Println(err)
-				continue
-			}
-
-			hub.sendMessageToAllClients(hub.currentGameState)
 
 		}
 	}

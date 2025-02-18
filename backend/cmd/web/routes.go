@@ -13,7 +13,7 @@ func (app *application) routes() *http.ServeMux {
 	mux.HandleFunc("/getMoves", getChessMovesHandler)
 	mux.HandleFunc("/joinQueue", joinQueueHandler)
 	mux.HandleFunc("/listenformatch", matchFoundSSEHandler)
-	mux.HandleFunc("/matchroom/{matchID}", getMatchStateHandler)
+	// mux.HandleFunc("/matchroom/{matchID}", getMatchStateHandler)
 	mux.HandleFunc("/matchroom/{matchID}/ws", serveMatchroomWs)
 
 	// Add the pprof routes

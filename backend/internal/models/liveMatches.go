@@ -111,7 +111,7 @@ func (m *LiveMatchModel) LogAll() {
 
 	defer rows.Close()
 	for rows.Next() {
-		app.rowsLog.Println(rows)
+		app.rowsLog.Printf("%v\n", rows)
 	}
 	err = rows.Err()
 	if err != nil {

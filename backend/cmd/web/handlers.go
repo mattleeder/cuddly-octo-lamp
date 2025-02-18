@@ -252,63 +252,63 @@ type MatchStateResponse struct {
 	MatchState models.LiveMatch `json:"matchStateData"`
 }
 
-func getMatchStateHandler(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
-	defer func() { app.perfLog.Printf("getMatchStateHandler took: %s\n", time.Since(start)) }()
+// func getMatchStateHandler(w http.ResponseWriter, r *http.Request) {
+// 	start := time.Now()
+// 	defer func() { app.perfLog.Printf("getMatchStateHandler took: %s\n", time.Since(start)) }()
 
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-	w.Header().Set("Access-Control-Allow-Credentials", "true")
-	w.Header().Set("Content-Type", "application/json")
+// 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+// 	w.Header().Set("Access-Control-Allow-Credentials", "true")
+// 	w.Header().Set("Content-Type", "application/json")
 
-	var couldBePlayer = true
-	var err error
-	var playerid string
-	var matchID int64
+// 	var couldBePlayer = true
+// 	var err error
+// 	var playerid string
+// 	var matchID int64
 
-	playerid, err = ReadSigned(r, app.secretKey, "playerid")
-	if err != nil {
-		couldBePlayer = false
-	}
+// 	playerid, err = ReadSigned(r, app.secretKey, "playerid")
+// 	if err != nil {
+// 		couldBePlayer = false
+// 	}
 
-	var playerIDasInt int64
-	if couldBePlayer {
-		playerIDasInt, err = strconv.ParseInt(playerid, 10, 64)
-		if err != nil {
-			couldBePlayer = false
-		}
-	}
+// 	var playerIDasInt int64
+// 	if couldBePlayer {
+// 		playerIDasInt, err = strconv.ParseInt(playerid, 10, 64)
+// 		if err != nil {
+// 			couldBePlayer = false
+// 		}
+// 	}
 
-	matchID, err = strconv.ParseInt(r.PathValue("matchID"), 10, 64)
-	if err != nil {
-		http.Error(w, "Could not parse match room", http.StatusInternalServerError)
-		return
-	}
+// 	matchID, err = strconv.ParseInt(r.PathValue("matchID"), 10, 64)
+// 	if err != nil {
+// 		http.Error(w, "Could not parse match room", http.StatusInternalServerError)
+// 		return
+// 	}
 
-	var matchStateData *models.LiveMatch
-	matchStateData, err = app.liveMatches.GetFromMatchID(matchID)
-	if err != nil {
-		app.serverError(w, err)
-	}
+// 	var matchStateData *models.LiveMatch
+// 	matchStateData, err = app.liveMatches.GetFromMatchID(matchID)
+// 	if err != nil {
+// 		app.serverError(w, err)
+// 	}
 
-	var playerCode playerCodeEnum
+// 	var playerCode playerCodeEnum
 
-	if !couldBePlayer {
-		playerCode = Spectator
-	} else if playerIDasInt == matchStateData.WhitePlayerID {
-		playerCode = WhitePieces
-	} else {
-		playerCode = BlackPieces
-	}
+// 	if !couldBePlayer {
+// 		playerCode = Spectator
+// 	} else if playerIDasInt == matchStateData.WhitePlayerID {
+// 		playerCode = WhitePieces
+// 	} else {
+// 		playerCode = BlackPieces
+// 	}
 
-	response := MatchStateResponse{PlayerCode: playerCode, MatchState: *matchStateData}
+// 	response := MatchStateResponse{PlayerCode: playerCode, MatchState: *matchStateData}
 
-	var jsonStr []byte
+// 	var jsonStr []byte
 
-	jsonStr, err = json.Marshal(response)
-	if err != nil {
-		app.serverError(w, err)
-		return
-	}
+// 	jsonStr, err = json.Marshal(response)
+// 	if err != nil {
+// 		app.serverError(w, err)
+// 		return
+// 	}
 
-	w.Write(jsonStr)
-}
+// 	w.Write(jsonStr)
+// }
