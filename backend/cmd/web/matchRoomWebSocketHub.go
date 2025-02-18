@@ -430,9 +430,8 @@ func (hub *MatchRoomHub) changeTurn() {
 
 	if hub.isTimerActive && hub.turn == playerTurn(BlackTurn) {
 		hub.flagTimer = time.After(hub.blackPlayerTimeRemaining)
-	} else if hub.isTimerActive {
+	} else if hub.isTimerActive || hub.turn == playerTurn(WhiteTurn) {
 		hub.flagTimer = time.After(hub.whitePlayerTimeRemaining)
-	} else if hub.turn == playerTurn(WhiteTurn) {
 		hub.isTimerActive = true
 	}
 }
@@ -535,8 +534,6 @@ func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection() (jsonStr []byte,
 	}
 
 	// Correct times
-	app.infoLog.Printf("Current game state: %+v\n", gameState)
-	app.infoLog.Printf("Current game state: %s\n", hub.currentGameState)
 	if hub.turn == playerTurn(WhiteTurn) && hub.isTimerActive {
 		gameState.Body.MatchStateHistory[len(gameState.Body.MatchStateHistory)-1].WhitePlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
 	} else if hub.turn == playerTurn(BlackTurn) && hub.isTimerActive {
@@ -586,7 +583,6 @@ func (hub *MatchRoomHub) handleMessage(message []byte) (response []byte) {
 
 		// Ignore messages from inactive player
 		if message[0] != byte(hub.turn) {
-			app.infoLog.Printf("Not your turn\n")
 			return nil
 		}
 
@@ -700,7 +696,6 @@ func (hub *MatchRoomHub) run() {
 
 		case message := <-hub.broadcast:
 			app.infoLog.Printf("WS Message: %s\n", message)
-			app.infoLog.Printf("WS Message: %v\n", message)
 
 			response := hub.handleMessage(message)
 			app.infoLog.Printf("Response: %s\n", response)
