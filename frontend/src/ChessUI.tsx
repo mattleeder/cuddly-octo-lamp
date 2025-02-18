@@ -84,9 +84,12 @@ export function ChessBoard() {
 
   function wsPostMove(position: number, piece: number, promotion: string) {
     game?.webSocket?.send(JSON.stringify({
-      "piece": piece,
-      "move": position,
-      "promotionString": promotion,
+      "messageType": "postMove",
+      "body": {
+        "piece": piece,
+        "move": position,
+        "promotionString": promotion,
+      }
     }))
   }
 

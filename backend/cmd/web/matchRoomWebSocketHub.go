@@ -460,14 +460,14 @@ func (hub *MatchRoomHub) updateTimeRemaining() {
 func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 
 	// Parse Message
-	var chessMove postMoveBody
+	var chessMove postMoveBodyResponse
 	err = json.Unmarshal(message[1:], &chessMove)
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error unmarshalling JSON: %v\n", err))
 	}
 
 	// Validate Move
-	var validMove = IsMoveValid(hub.current_fen, chessMove.Piece, chessMove.Move)
+	var validMove = IsMoveValid(hub.current_fen, chessMove.Body.Piece, chessMove.Body.Move)
 	if !validMove {
 		return errors.New("Move is not valid")
 	}
@@ -476,7 +476,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	hub.updateTimeRemaining()
 
 	// Calculate reply variables
-	newFEN, gameOverStatus, algebraicNotation := getFENAfterMove(hub.current_fen, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
+	newFEN, gameOverStatus, algebraicNotation := getFENAfterMove(hub.current_fen, chessMove.Body.Piece, chessMove.Body.Move, chessMove.Body.PromotionString)
 	var threefoldRepetition = false
 	splitFEN := strings.Join(strings.Split(newFEN, " ")[:4], " ")
 	hub.fenFreqMap[splitFEN] += 1
@@ -490,7 +490,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 		Body: onMoveBody{
 			MatchStateHistory: append(hub.moveHistory, MatchStateHistory{
 				FEN:                                  newFEN,
-				LastMove:                             [2]int{chessMove.Piece, chessMove.Move},
+				LastMove:                             [2]int{chessMove.Body.Piece, chessMove.Body.Move},
 				AlgebraicNotation:                    algebraicNotation,
 				WhitePlayerTimeRemainingMilliseconds: hub.whitePlayerTimeRemaining.Milliseconds(),
 				BlackPlayerTimeRemainingMilliseconds: hub.blackPlayerTimeRemaining.Milliseconds(),
@@ -524,9 +524,9 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 
 	// Update database
 	if gameOverStatus != Ongoing {
-		go hub.updateMatchThenMoveToFinished(newFEN, chessMove.Piece, chessMove.Move, gameOverStatus, hub.turn, matchStateHistoryData)
+		go hub.updateMatchThenMoveToFinished(newFEN, chessMove.Body.Piece, chessMove.Body.Move, gameOverStatus, hub.turn, matchStateHistoryData)
 	} else {
-		go app.liveMatches.UpdateLiveMatch(hub.matchID, newFEN, chessMove.Piece, chessMove.Move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
+		go app.liveMatches.UpdateLiveMatch(hub.matchID, newFEN, chessMove.Body.Piece, chessMove.Body.Move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
 	}
 
 	return nil
@@ -633,6 +633,9 @@ func (hub *MatchRoomHub) handleMessage(message []byte) (response []byte) {
 		return hub.currentGameState
 
 	case playerEvent:
+		// @TODO: implement this fully
+		hub.handlePlayerEvent(message)
+		return
 
 	default:
 		app.errorLog.Printf("Could not understand message: %s\n", message)
