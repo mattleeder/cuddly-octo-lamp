@@ -354,6 +354,8 @@ interface gameContext {
   setMatchData: React.Dispatch<React.SetStateAction<matchData>>,
   webSocket: WebSocket | null,
   playerColour: PieceColour,
+  isWhiteConnected: boolean,
+  isBlackConnected: boolean,
 }
 
 const GameContext = createContext<gameContext | null>(null)
@@ -417,6 +419,8 @@ function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children
     })
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
   const [playerColour, setPlayerColour] = useState(PieceColour.Spectator)
+  const [isWhiteConnected, setIsWhiteConnected] = useState(false)
+  const [isBlackConnected, setIsBlackConnected] = useState(false)
 
   useEffect(() => {
     // Connect to websocket for matchroom
@@ -450,9 +454,16 @@ function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children
 
   function onConnectHandler(body: OnConnectMessage) {
     onMoveHandler(body as OnMoveMessage)
+    setIsWhiteConnected(body["whitePlayerConnected"])
+    setIsBlackConnected(body["blackPlayerConnected"])
   }
 
   function connectionStatusHandler(body: ConnectionStatusMessage) {
+    if (body["playerColour"] == "white") {
+      setIsWhiteConnected(body["isConnected"])
+    } else if (body["playerColour"] == "black") {
+      setIsBlackConnected(body["isConnected"])
+    }
 
   }
 
@@ -529,7 +540,7 @@ function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children
   }
 
   return (
-    <GameContext.Provider value={{ matchData, setMatchData, webSocket, playerColour }}>
+    <GameContext.Provider value={{ matchData, setMatchData, webSocket, playerColour, isWhiteConnected, isBlackConnected }}>
       {children}
     </GameContext.Provider>
   )
@@ -542,10 +553,14 @@ function GameInfoTile() {
     throw new Error('GameInfoTile must be used within a GameContext Provider');
   }
 
-  function PlayerInfo() {
+  function PlayerInfo({ connected }: { connected: boolean }) {
+    let classname = "playerPingStatus"
+    if (connected) {
+      classname += " connected"
+    }
     return (
       <div className='playerInfo'>
-        <div className='playerPingStatus'>O</div>
+        <div className={classname}></div>
         <div className='playerName'>Player</div>
       </div>
     )
@@ -569,11 +584,11 @@ function GameInfoTile() {
     <div>
       <CountdownTimer className="playerTimeBlack" paused={isBlackClockPaused()} countdownTimerMilliseconds={game.matchData.activeState.blackPlayerTimeRemainingMilliseconds}/>
       <div className='gameInfo'>
-        <PlayerInfo />
+        <PlayerInfo connected={game.isWhiteConnected}/>
         <MoveHistoryControls />
         <Moves />
         <GameControls />
-        <PlayerInfo />
+        <PlayerInfo connected={game.isBlackConnected}/>
       </div>
       <CountdownTimer className="playerTimeWhite" paused={isWhiteClockPaused()} countdownTimerMilliseconds={game.matchData.activeState.whitePlayerTimeRemainingMilliseconds}/>
     </div>

@@ -180,7 +180,7 @@ type MatchRoomHub struct {
 
 	turn playerTurn // byte(0) is white, byte(1) is black
 
-	currentGameState []byte
+	currentGameState []byte // onMoveBody
 
 	current_fen string
 
@@ -245,10 +245,13 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		}
 	}
 
-	currentGameState := onMoveBody{
-		MatchStateHistory:   matchStateHistory,
-		GameOverStatusCode:  Ongoing,
-		ThreefoldRepetition: threefoldRepetition,
+	currentGameState := onMoveResponse{
+		MessageType: onMove,
+		Body: onMoveBody{
+			MatchStateHistory:   matchStateHistory,
+			GameOverStatusCode:  Ongoing,
+			ThreefoldRepetition: threefoldRepetition,
+		},
 	}
 
 	timeOfLastMove := time.UnixMilli(matchState.UnixMsTimeOfLastMove)
@@ -300,7 +303,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		turn:                     turn,
 		currentGameState:         jsonStr,
 		current_fen:              matchState.CurrentFEN,
-		moveHistory:              currentGameState.MatchStateHistory,
+		moveHistory:              currentGameState.Body.MatchStateHistory,
 		timeOfLastMove:           timeOfLastMove,
 		flagTimer:                flagTimer,
 		timeFormatInMilliseconds: matchState.TimeFormatInMilliseconds,
@@ -367,7 +370,7 @@ func (hub *MatchRoomHub) sendMessageToAllSpectators(message []byte) {
 }
 
 func (hub *MatchRoomHub) updateGameStateAfterFlag() (err error) {
-	var gameState onMoveBody
+	var gameState onMoveResponse
 	err = json.Unmarshal(hub.currentGameState, &gameState)
 	if err != nil {
 		app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
@@ -376,10 +379,10 @@ func (hub *MatchRoomHub) updateGameStateAfterFlag() (err error) {
 
 	var outcome int
 	if hub.turn == playerTurn(WhiteTurn) {
-		gameState.GameOverStatusCode = WhiteFlagged
+		gameState.Body.GameOverStatusCode = WhiteFlagged
 		outcome = 2
 	} else {
-		gameState.GameOverStatusCode = BlackFlagged
+		gameState.Body.GameOverStatusCode = BlackFlagged
 		outcome = 1
 	}
 
@@ -524,7 +527,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 }
 
 func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection() (jsonStr []byte, err error) {
-	var gameState onMoveBody
+	var gameState onMoveResponse
 	err = json.Unmarshal(hub.currentGameState, &gameState)
 	if err != nil {
 		app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
@@ -532,18 +535,20 @@ func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection() (jsonStr []byte,
 	}
 
 	// Correct times
+	app.infoLog.Printf("Current game state: %+v\n", gameState)
+	app.infoLog.Printf("Current game state: %s\n", hub.currentGameState)
 	if hub.turn == playerTurn(WhiteTurn) && hub.isTimerActive {
-		gameState.MatchStateHistory[len(gameState.MatchStateHistory)-1].WhitePlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
+		gameState.Body.MatchStateHistory[len(gameState.Body.MatchStateHistory)-1].WhitePlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
 	} else if hub.turn == playerTurn(BlackTurn) && hub.isTimerActive {
-		gameState.MatchStateHistory[len(gameState.MatchStateHistory)-1].BlackPlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
+		gameState.Body.MatchStateHistory[len(gameState.Body.MatchStateHistory)-1].BlackPlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
 	}
 
 	var response = onConnectResponse{
 		MessageType: onConnect,
 		Body: onConnectBody{
-			MatchStateHistory:    gameState.MatchStateHistory,
-			GameOverStatusCode:   gameState.GameOverStatusCode,
-			ThreefoldRepetition:  gameState.ThreefoldRepetition,
+			MatchStateHistory:    gameState.Body.MatchStateHistory,
+			GameOverStatusCode:   gameState.Body.GameOverStatusCode,
+			ThreefoldRepetition:  gameState.Body.ThreefoldRepetition,
 			WhitePlayerConnected: hub.whitePlayerConnected,
 			BlackPlayerConnected: hub.blackPlayerConnected,
 		},
