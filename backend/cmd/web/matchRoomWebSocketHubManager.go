@@ -69,15 +69,15 @@ func (hubManager *MatchRoomHubManager) registerClientToMatchRoomHub(conn *websoc
 		return nil, err
 	}
 
-	var playerCode playerCodeEnum = Spectator
+	var playerCode messageIdentifier = messageIdentifier(Spectator)
 
 	if playerID == nil {
 		// Do nothing
 	} else if *playerID == val.whitePlayerID {
-		playerCode = WhitePieces
+		playerCode = messageIdentifier(WhitePlayer)
 	} else if *playerID == val.blackPlayerID {
-		playerCode = BlackPieces
+		playerCode = messageIdentifier(BlackPlayer)
 	}
 
-	return &MatchRoomHubClient{hub: val, conn: conn, playerCode: playerCode, send: make(chan []byte, 256)}, nil
+	return &MatchRoomHubClient{hub: val, conn: conn, playerIdentifier: playerCode, send: make(chan []byte, 256)}, nil
 }

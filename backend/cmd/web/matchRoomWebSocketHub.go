@@ -78,10 +78,15 @@ type msgType int
 
 const (
 	PlayerMove = iota
-	PlayerMessage
+	Resign
 	DrawOffer
 	DrawClaim
+	TakebackOffer
+	TakebackAccept
 	SpectatorMessage
+	PlayerMessage
+	Abort
+	GiveExtraTime
 	Unknown
 )
 
@@ -392,7 +397,7 @@ func (hub *MatchRoomHub) hasActiveClients() bool {
 }
 
 func (hub *MatchRoomHub) getMessageType(message []byte) msgType {
-	if message[0] == WhiteTurn || message[0] == BlackTurn {
+	if message[0] == byte(WhitePlayer) || message[0] == byte(BlackPlayer) {
 		return PlayerMove
 	}
 	app.errorLog.Printf("Unknown message type\n")

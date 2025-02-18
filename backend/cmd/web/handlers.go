@@ -1,7 +1,6 @@
 package main
 
 import (
-	"burrchess/internal/models"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,14 +11,6 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
-)
-
-type playerCodeEnum int
-
-const (
-	WhitePieces = iota
-	BlackPieces
-	Spectator
 )
 
 var (
@@ -245,9 +236,4 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 			w.(http.Flusher).Flush()
 		}
 	}
-}
-
-type MatchStateResponse struct {
-	PlayerCode playerCodeEnum   `json:"playerCode"`
-	MatchState models.LiveMatch `json:"matchStateData"`
 }

@@ -10,6 +10,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type messageIdentifier byte
+
+const (
+	WhitePlayer = byte(iota)
+	BlackPlayer = byte(iota)
+	Spectator   = byte(iota)
+)
+
 const (
 	// Time allowed to write a message to the peer.
 	writeWait = 10 * time.Second
@@ -45,14 +53,14 @@ type MatchRoomHubClient struct {
 	conn *websocket.Conn
 
 	// White, black or spectator
-	playerCode playerCodeEnum
+	playerIdentifier messageIdentifier
 
 	// Buffered channel of outbound messages
 	send chan []byte
 }
 
 type sendPlayerCode struct {
-	PlayerCode playerCodeEnum `json:"playerCode"`
+	PlayerCode messageIdentifier `json:"playerCode"`
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -80,7 +88,7 @@ func (c *MatchRoomHubClient) readPump() {
 		}
 
 		// Append sender to message
-		sender := []byte{byte(c.playerCode)}
+		sender := []byte{byte(c.playerIdentifier)}
 		message = append(sender, message...)
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
 		c.hub.broadcast <- message
@@ -179,7 +187,7 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send player code
-	var codeMessage [1]sendPlayerCode = [1]sendPlayerCode{{PlayerCode: client.playerCode}}
+	var codeMessage [1]sendPlayerCode = [1]sendPlayerCode{{PlayerCode: client.playerIdentifier}}
 	var jsonStr []byte
 	jsonStr, err = json.Marshal(codeMessage)
 	if err != nil {
