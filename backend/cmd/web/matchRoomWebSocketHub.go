@@ -150,6 +150,11 @@ type pingStatus struct {
 	IsConnected  bool   `json:"isConnected"`
 }
 
+type offerInfo struct {
+	sender messageIdentifier
+	event  eventType
+}
+
 const pingTimeout = 10 * time.Second
 
 // Hub maintains the set of active clients and broadcasts messages to the
@@ -203,6 +208,8 @@ type MatchRoomHub struct {
 	whitePlayerTimeout <-chan time.Time
 
 	blackPlayerTimeout <-chan time.Time
+
+	offerActive *offerInfo
 }
 
 type playerTurn byte
@@ -577,6 +584,36 @@ func (hub *MatchRoomHub) getMessageType(message []byte) clientMessageType {
 	return unknown
 }
 
+func (hub *MatchRoomHub) acceptEventOffer(event eventType) {
+	// @TODO implement
+	switch event {
+	case takeback:
+		break
+
+	case draw:
+		break
+	}
+}
+
+func (hub *MatchRoomHub) makeNewEventOffer(sender messageIdentifier, event eventType) {
+	hub.offerActive = &offerInfo{sender, event}
+}
+
+func (hub *MatchRoomHub) handlePlayerEvent(message []byte) {
+	var data playerEventResponse
+	err := json.Unmarshal(message[1:], &data)
+	if err != nil {
+		app.errorLog.Printf("Could not unmarshal playerEvent: %s", err)
+		return
+	}
+
+	if hub.offerActive == nil || hub.offerActive.event != data.Body.EventType {
+		hub.makeNewEventOffer(messageIdentifier(message[0]), data.Body.EventType)
+	} else if hub.offerActive != nil && byte(hub.offerActive.sender) != message[0] {
+		hub.acceptEventOffer(data.Body.EventType)
+	}
+}
+
 func (hub *MatchRoomHub) handleMessage(message []byte) (response []byte) {
 	switch msgType := hub.getMessageType(message); msgType {
 	case postMove:
@@ -594,6 +631,8 @@ func (hub *MatchRoomHub) handleMessage(message []byte) (response []byte) {
 		}
 
 		return hub.currentGameState
+
+	case playerEvent:
 
 	default:
 		app.errorLog.Printf("Could not understand message: %s\n", message)
@@ -693,6 +732,8 @@ func (hub *MatchRoomHub) run() {
 
 		case <-hub.whitePlayerTimeout:
 		case <-hub.blackPlayerTimeout:
+			// @TODO, add logic
+			continue
 
 		case message := <-hub.broadcast:
 			app.infoLog.Printf("WS Message: %s\n", message)
