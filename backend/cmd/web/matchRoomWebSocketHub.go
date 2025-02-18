@@ -254,6 +254,7 @@ func (hub *MatchRoomHub) updateMatchThenMoveToFinished(newFEN string, piece int,
 }
 
 func (hub *MatchRoomHub) changeTurn() {
+	// Swap turn and activate timer if changing back to whites turn
 	if hub.turn == playerTurn(WhiteTurn) {
 		hub.turn = playerTurn(BlackTurn)
 	} else {
@@ -264,6 +265,22 @@ func (hub *MatchRoomHub) changeTurn() {
 		hub.flagTimer = time.After(hub.blackPlayerTimeRemaining)
 	} else if hub.isTimerActive {
 		hub.flagTimer = time.After(hub.whitePlayerTimeRemaining)
+	} else if hub.turn == playerTurn(WhiteTurn) {
+		hub.isTimerActive = true
+	}
+}
+
+func (hub *MatchRoomHub) updateTimeRemaining() {
+	if !hub.isTimerActive {
+		return
+	}
+
+	if hub.turn == playerTurn(WhiteTurn) {
+		hub.whitePlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
+		hub.whitePlayerTimeRemaining += hub.increment
+	} else if byte(hub.turn) == BlackTurn {
+		hub.blackPlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
+		hub.blackPlayerTimeRemaining += hub.increment
 	}
 }
 
@@ -283,15 +300,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	}
 
 	// Calcuate new time remaining
-	if message[0] == WhiteTurn && hub.isTimerActive {
-		hub.whitePlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
-		hub.whitePlayerTimeRemaining += hub.increment
-	} else if message[0] == BlackTurn && hub.isTimerActive {
-		hub.blackPlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
-		hub.blackPlayerTimeRemaining += hub.increment
-	} else if message[0] == BlackTurn {
-		hub.isTimerActive = true
-	}
+	hub.updateTimeRemaining()
 
 	// Calculate reply variables
 	newFEN, gameOverStatus, algebraicNotation := getFENAfterMove(hub.current_fen, chessMove.Piece, chessMove.Move, chessMove.PromotionString)
