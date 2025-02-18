@@ -137,7 +137,7 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 			Value:    playerid,
 			Domain:   "localhost",
 			HttpOnly: true,
-			SameSite: http.SameSiteStrictMode,
+			SameSite: http.SameSiteNoneMode,
 			Secure:   true,
 		}
 

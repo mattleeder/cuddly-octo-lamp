@@ -334,9 +334,10 @@ func matchmakingService() {
 	iterations := 0
 	app.infoLog.Printf("Starting matchmakingService")
 	defer app.infoLog.Printf("Ending matchmakingService")
+	logMatchmaking := false
 	for {
 		// Could use time.After to ensure service runs every 500ms
-		if iterations%20 == 0 {
+		if logMatchmaking && iterations%20 == 0 {
 			for key, queue := range queueMap {
 				app.infoLog.Println(key)
 				app.infoLog.Printf("Matching iteration: %v\n", iterations)

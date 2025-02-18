@@ -23,7 +23,7 @@ const (
 	writeWait = 10 * time.Second
 
 	// Time allowed to read the next pong message from the peer.
-	pongWait = 60 * time.Second
+	pongWait = 20 * time.Second
 
 	// Send pings to peer with this period. Must be less than pongWait.
 	pingPeriod = (pongWait * 9) / 10
@@ -59,8 +59,31 @@ type MatchRoomHubClient struct {
 	send chan []byte
 }
 
-type sendPlayerCode struct {
+type sendPlayerCodeResponse struct {
+	MessageType hubMessageType     `json:"messageType"`
+	Body        sendPlayerCodeBody `json:"body"`
+}
+
+type sendPlayerCodeBody struct {
 	PlayerCode messageIdentifier `json:"playerCode"`
+}
+
+func pingClient(conn *websocket.Conn) {
+	ticker := time.NewTicker(5 * time.Second) // Ping every 5 seconds
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			// Send a ping message to the client
+			err := conn.WriteMessage(websocket.PingMessage, nil)
+			if err != nil {
+				app.errorLog.Println("Ping error:", err)
+				return
+			}
+			app.infoLog.Println("Sent ping to client")
+		}
+	}
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -76,7 +99,12 @@ func (c *MatchRoomHubClient) readPump() {
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	c.conn.SetPongHandler(func(string) error {
+		c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		app.infoLog.Println("Received pong from client")
+		return nil
+	})
+	// go pingClient(c.conn)
 	for {
 		_, message, err := c.conn.ReadMessage()
 		app.infoLog.Println(message)
@@ -187,7 +215,10 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send player code
-	var codeMessage [1]sendPlayerCode = [1]sendPlayerCode{{PlayerCode: client.playerIdentifier}}
+	var codeMessage = sendPlayerCodeResponse{
+		MessageType: sendPlayerCode,
+		Body:        sendPlayerCodeBody{PlayerCode: client.playerIdentifier},
+	}
 	var jsonStr []byte
 	jsonStr, err = json.Marshal(codeMessage)
 	if err != nil {

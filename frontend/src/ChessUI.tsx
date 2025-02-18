@@ -358,6 +358,42 @@ interface gameContext {
 
 const GameContext = createContext<gameContext | null>(null)
 
+interface MatchStateHistory {
+  FEN: string
+  lastMove: [number, number]
+  algebraicNotation: string
+  whitePlayerTimeRemainingMilliseconds: number
+  blackPlayerTimeRemainingMilliseconds: number
+}
+
+interface OnConnectMessage {
+  matchStateHistory: MatchStateHistory[]
+  gameOverStatus: number
+  threefoldRepetition: boolean
+  whitePlayerConnected: boolean
+  blackPlayerConnected: boolean
+}
+
+interface OnMoveMessage {
+  matchStateHistory: MatchStateHistory[]
+  gameOverStatus: number
+  threefoldRepetition: boolean
+}
+
+interface ConnectionStatusMessage {
+  playerColour: string
+  isConnected: boolean
+}
+
+interface PlayerCodeMessage {
+  playerCode: number
+}
+
+interface ChessWebSocketMessage {
+  messageType: string
+  body: OnConnectMessage | OnMoveMessage | ConnectionStatusMessage | PlayerCodeMessage
+}
+
 function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children: ReactNode, matchID: string, timeFormatInMilliseconds: number }) {
   const [matchData, setMatchData] = useState<matchData>(
     {
@@ -400,6 +436,63 @@ function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children
 
   if (webSocket) {
     webSocket.onmessage = (event) => readMessage(event.data)
+    webSocket.onerror = (event) => console.error(event)
+    webSocket.onclose = () => console.log("Websocket closed")
+  }
+
+  function sendPlayerCodeHandler(body: PlayerCodeMessage) {
+    if (body["playerCode"] == 0) {
+      setPlayerColour(PieceColour.White)
+    } else if (body["playerCode"] == 1) {
+      setPlayerColour(PieceColour.Black)
+    }
+  }
+
+  function onConnectHandler(body: OnConnectMessage) {
+    onMoveHandler(body as OnMoveMessage)
+  }
+
+  function connectionStatusHandler(body: ConnectionStatusMessage) {
+
+  }
+
+  function onMoveHandler(body: OnMoveMessage) {
+    const newHistory = body["matchStateHistory"]
+    if (newHistory.length == 0) {
+      console.error("New history has length 0")
+      return
+    }
+    const latestHistoryEntry = newHistory.at(-1) as MatchStateHistory
+    const latestFEN = latestHistoryEntry["FEN"]
+    const activeColour = parseGameStateFromFEN(latestFEN)["activeColour"]
+    const gameOverStatus = body["gameOverStatus"]
+
+    let activeState = {
+      ...matchData.activeState,
+      whitePlayerTimeRemainingMilliseconds:  latestHistoryEntry["whitePlayerTimeRemainingMilliseconds"],
+      blackPlayerTimeRemainingMilliseconds:  latestHistoryEntry["blackPlayerTimeRemainingMilliseconds"],
+    }
+    let activeMove = matchData.activeMove
+
+    if (matchData.activeState.FEN == matchData.stateHistory.at(-1)?.FEN) {
+      activeState = {
+        ...activeState,
+        board: parseGameStateFromFEN(latestFEN).board,
+        lastMove: latestHistoryEntry["lastMove"],
+        FEN: latestFEN,
+      }
+      activeMove = newHistory.length - 1
+    }
+
+    const newMatchData: matchData = {
+      activeState: activeState,
+      stateHistory: newHistory,
+      activeColour: activeColour,
+      gameOverStatus: gameOverStatus,
+      activeMove: activeMove,
+    }
+
+    setMatchData(newMatchData)
   }
 
   function readMessage(message: unknown) {
@@ -411,49 +504,26 @@ function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children
     }
 
     for (const msg of message.split("\n")) {
-      const parsedMsg = JSON.parse(msg)[0]
+      const parsedMsg: ChessWebSocketMessage = JSON.parse(msg)
 
-      if (Object.prototype.hasOwnProperty.call(parsedMsg, "playerCode")) {
-        const playerCode = parsedMsg["playerCode"]
+      const messageType = parsedMsg["messageType"]
 
-        if (playerCode == 0) {
-          setPlayerColour(PieceColour.White)
-        } else if (playerCode == 1) {
-          setPlayerColour(PieceColour.Black)
-        }
-
-      } else if (Object.prototype.hasOwnProperty.call(parsedMsg, "pastMoves")) {
-
-        const newHistory = parsedMsg["pastMoves"]
-        const activeColour = parseGameStateFromFEN(parsedMsg["pastMoves"].at(-1)["FEN"])["activeColour"]
-        const gameOverStatus = parsedMsg["gameOverStatus"]
-        let activeState = {
-          ...matchData.activeState,
-          whitePlayerTimeRemainingMilliseconds:  newHistory.at(-1)["whitePlayerTimeRemainingMilliseconds"],
-          blackPlayerTimeRemainingMilliseconds:  newHistory.at(-1)["blackPlayerTimeRemainingMilliseconds"],
-        }
-        let activeMove = matchData.activeMove
-
-        if (matchData.activeState.FEN == matchData.stateHistory.at(-1)?.FEN) {
-          activeState = {
-            ...activeState,
-            board: parseGameStateFromFEN(newHistory.at(-1)["FEN"]).board,
-            lastMove: newHistory.at(-1)["lastMove"],
-            FEN: parsedMsg["pastMoves"].at(-1)["FEN"],
-          }
-          activeMove = newHistory.length - 1
-        }
-
-        const newMatchData: matchData = {
-          activeState: activeState,
-          stateHistory: newHistory,
-          activeColour: activeColour,
-          gameOverStatus: gameOverStatus,
-          activeMove: activeMove,
-        }
-
-        setMatchData(newMatchData)
-
+      switch (messageType) {
+      case "sendPlayerCode":
+        sendPlayerCodeHandler(parsedMsg["body"] as PlayerCodeMessage)
+        break;
+      case "onConnect":
+        onConnectHandler(parsedMsg["body"] as OnConnectMessage)
+        break;
+      case "connectionStatus":
+        connectionStatusHandler(parsedMsg["body"] as ConnectionStatusMessage)
+        break;
+      case "onMove":
+        onMoveHandler(parsedMsg["body"] as OnMoveMessage)
+        break;
+      default:
+        console.error("Could not understand message from websocket")
+        console.log(message)
       }
     }
   }

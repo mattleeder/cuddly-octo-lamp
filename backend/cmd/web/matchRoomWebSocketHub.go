@@ -8,12 +8,134 @@ import (
 	"time"
 )
 
-// Hub Functions
-// Create New
-// Run
-// GetMessageType
-// HandleMessage
-//
+// WEBSOCKET TO CLIENT TYPES
+
+type hubMessageType string
+
+const (
+	onConnect        = "onConnect"
+	onMove           = "onMove"
+	connectionStatus = "connectionStatus"
+	opponentEvent    = "opponentEvent"
+	userMessage      = "userMessage"
+	sendPlayerCode   = "sendPlayerCode"
+)
+
+type eventType string
+
+const (
+	takeback       = "takeback"
+	takebackAccept = "takebackAccept"
+	draw           = "draw"
+	drawAccept     = "drawAccept"
+	resign         = "resign"
+	extraTime      = "extraTime"
+	abort          = "abort"
+	rematch        = "rematch"
+	rematchAccept  = "rematchAccept"
+)
+
+// Bodies
+
+type onConnectBody struct {
+	MatchStateHistory    []MatchStateHistory `json:"matchStateHistory"`
+	GameOverStatusCode   gameOverStatusCode  `json:"gameOverStatus"`
+	ThreefoldRepetition  bool                `json:"threefoldRepetition"`
+	WhitePlayerConnected bool                `json:"whitePlayerConnected"`
+	BlackPlayerConnected bool                `json:"blackPlayerConnected"`
+}
+
+type onMoveBody struct {
+	MatchStateHistory   []MatchStateHistory `json:"matchStateHistory"`
+	GameOverStatusCode  gameOverStatusCode  `json:"gameOverStatus"`
+	ThreefoldRepetition bool                `json:"threefoldRepetition"`
+}
+
+type onPlayerConnectionChangeBody struct {
+	PlayerColour string `json:"playerColour"`
+	IsConnected  bool   `json:"isConnected"`
+}
+
+type opponentEventBody struct {
+	Sender    string    `json:"sender"`
+	EventType eventType `json:"eventType"`
+}
+
+type onUserMessageBody struct {
+	Sender         string `json:"sender"`
+	MessageContent string `json:"messageContent"`
+}
+
+// Responses
+
+type onConnectResponse struct {
+	MessageType hubMessageType `json:"messageType"`
+	Body        onConnectBody  `json:"body"`
+}
+
+type onMoveResponse struct {
+	MessageType hubMessageType `json:"messageType"`
+	Body        onMoveBody     `json:"body"`
+}
+
+type onPlayerConnectionChangeResponse struct {
+	MessageType hubMessageType               `json:"messageType"`
+	Body        onPlayerConnectionChangeBody `json:"body"`
+}
+
+type opponentEventResponse struct {
+	MessageType hubMessageType    `json:"messageType"`
+	Body        opponentEventBody `json:"body"`
+}
+
+type onUserMessageResponse struct {
+	MessageType hubMessageType    `json:"messageType"`
+	Body        onUserMessageBody `json:"body"`
+}
+
+// CLIENT TO WEBSOCKET TYPES
+
+type clientMessageType string
+
+const (
+	postMove    = "postMove"
+	playerEvent = "playerEvent"
+	chatMessage = "userMessage"
+	unknown     = "unknown"
+)
+
+// Bodies
+type postMoveBody struct {
+	Piece           int    `json:"piece"`
+	Move            int    `json:"move"`
+	PromotionString string `json:"promotionString"`
+}
+
+type playerEventBody struct {
+	EventType eventType `json:"eventType"`
+}
+
+type userMessageBody struct {
+	MessageContent string `json:"messageContent"`
+}
+
+// Responses
+type postMoveBodyResponse struct {
+	MessageType clientMessageType `json:"messageType"`
+	Body        postMoveBody      `json:"body"`
+}
+
+type playerEventResponse struct {
+	MessageType clientMessageType `json:"messageType"`
+	Body        playerEventBody   `json:"body"`
+}
+
+type userMessageResponse struct {
+	MessageType clientMessageType `json:"messageType"`
+	Body        userMessageBody   `json:"body"`
+}
+
+//////////////////////////////////////////////////////////////
 
 type MatchStateHistory struct {
 	FEN                                  string `json:"FEN"`
@@ -22,6 +144,13 @@ type MatchStateHistory struct {
 	WhitePlayerTimeRemainingMilliseconds int64  `json:"whitePlayerTimeRemainingMilliseconds"`
 	BlackPlayerTimeRemainingMilliseconds int64  `json:"blackPlayerTimeRemainingMilliseconds"`
 }
+
+type pingStatus struct {
+	PlayerColour string `json:"playerColour"`
+	IsConnected  bool   `json:"isConnected"`
+}
+
+const pingTimeout = 10 * time.Second
 
 // Hub maintains the set of active clients and broadcasts messages to the
 // clients.
@@ -66,29 +195,15 @@ type MatchRoomHub struct {
 	increment time.Duration
 
 	fenFreqMap map[string]int
+
+	whitePlayerConnected bool
+
+	blackPlayerConnected bool
+
+	whitePlayerTimeout <-chan time.Time
+
+	blackPlayerTimeout <-chan time.Time
 }
-
-type wsChessMove struct {
-	Piece           int    `json:"piece"`
-	Move            int    `json:"move"`
-	PromotionString string `json:"promotionString"`
-}
-
-type msgType int
-
-const (
-	PlayerMove = iota
-	Resign
-	DrawOffer
-	DrawClaim
-	TakebackOffer
-	TakebackAccept
-	SpectatorMessage
-	PlayerMessage
-	Abort
-	GiveExtraTime
-	Unknown
-)
 
 type playerTurn byte
 
@@ -130,11 +245,11 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		}
 	}
 
-	currentGameState := [1]postChessMoveReply{{
+	currentGameState := onMoveBody{
 		MatchStateHistory:   matchStateHistory,
-		GameOverStatus:      Ongoing,
+		GameOverStatusCode:  Ongoing,
 		ThreefoldRepetition: threefoldRepetition,
-	}}
+	}
 
 	timeOfLastMove := time.UnixMilli(matchState.UnixMsTimeOfLastMove)
 	var whitePlayerTimeRemaining, blackPlayerTimeRemaining time.Duration
@@ -185,12 +300,14 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		turn:                     turn,
 		currentGameState:         jsonStr,
 		current_fen:              matchState.CurrentFEN,
-		moveHistory:              currentGameState[0].MatchStateHistory,
+		moveHistory:              currentGameState.MatchStateHistory,
 		timeOfLastMove:           timeOfLastMove,
 		flagTimer:                flagTimer,
 		timeFormatInMilliseconds: matchState.TimeFormatInMilliseconds,
 		increment:                time.Duration(matchState.IncrementInMilliseconds) * time.Millisecond,
 		fenFreqMap:               fenFreqMap,
+		whitePlayerConnected:     false,
+		blackPlayerConnected:     false,
 	}
 
 	return match, nil
@@ -207,8 +324,50 @@ func (hub *MatchRoomHub) sendMessageToAllClients(message []byte) {
 	}
 }
 
+func (hub *MatchRoomHub) sendMessageToAllPlayers(message []byte) {
+	for client := range hub.clients {
+		if client.playerIdentifier != messageIdentifier(WhitePlayer) && client.playerIdentifier != messageIdentifier(BlackPlayer) {
+			continue
+		}
+		select {
+		case client.send <- message:
+		default:
+			close(client.send)
+			delete(hub.clients, client)
+		}
+	}
+}
+
+func (hub *MatchRoomHub) sendMessageToOnePlayer(message []byte, colour messageIdentifier) {
+	for client := range hub.clients {
+		if client.playerIdentifier != colour {
+			continue
+		}
+		select {
+		case client.send <- message:
+		default:
+			close(client.send)
+			delete(hub.clients, client)
+		}
+	}
+}
+
+func (hub *MatchRoomHub) sendMessageToAllSpectators(message []byte) {
+	for client := range hub.clients {
+		if client.playerIdentifier == messageIdentifier(WhitePlayer) || client.playerIdentifier == messageIdentifier(BlackPlayer) {
+			continue
+		}
+		select {
+		case client.send <- message:
+		default:
+			close(client.send)
+			delete(hub.clients, client)
+		}
+	}
+}
+
 func (hub *MatchRoomHub) updateGameStateAfterFlag() (err error) {
-	var gameState []postChessMoveReply
+	var gameState onMoveBody
 	err = json.Unmarshal(hub.currentGameState, &gameState)
 	if err != nil {
 		app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
@@ -217,10 +376,10 @@ func (hub *MatchRoomHub) updateGameStateAfterFlag() (err error) {
 
 	var outcome int
 	if hub.turn == playerTurn(WhiteTurn) {
-		gameState[0].GameOverStatus = WhiteFlagged
+		gameState.GameOverStatusCode = WhiteFlagged
 		outcome = 2
 	} else {
-		gameState[0].GameOverStatus = BlackFlagged
+		gameState.GameOverStatusCode = BlackFlagged
 		outcome = 1
 	}
 
@@ -292,7 +451,7 @@ func (hub *MatchRoomHub) updateTimeRemaining() {
 func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 
 	// Parse Message
-	var chessMove wsChessMove
+	var chessMove postMoveBody
 	err = json.Unmarshal(message[1:], &chessMove)
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error unmarshalling JSON: %v\n", err))
@@ -317,8 +476,9 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	}
 
 	// Construct Reply
-	data := []postChessMoveReply{
-		{
+	data := onMoveResponse{
+		MessageType: onMove,
+		Body: onMoveBody{
 			MatchStateHistory: append(hub.moveHistory, MatchStateHistory{
 				FEN:                                  newFEN,
 				LastMove:                             [2]int{chessMove.Piece, chessMove.Move},
@@ -326,7 +486,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 				WhitePlayerTimeRemainingMilliseconds: hub.whitePlayerTimeRemaining.Milliseconds(),
 				BlackPlayerTimeRemainingMilliseconds: hub.blackPlayerTimeRemaining.Milliseconds(),
 			}),
-			GameOverStatus:      gameOverStatus,
+			GameOverStatusCode:  gameOverStatus,
 			ThreefoldRepetition: threefoldRepetition,
 		},
 	}
@@ -341,14 +501,14 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	// Update game state
 	hub.current_fen = newFEN
 	hub.currentGameState = jsonStr
-	hub.moveHistory = data[0].MatchStateHistory
+	hub.moveHistory = data.Body.MatchStateHistory
 	hub.timeOfLastMove = time.Now()
 
 	// Ppdate turn and start new flag timer
 	hub.changeTurn()
 
 	var matchStateHistoryData []byte
-	matchStateHistoryData, err = json.Marshal(data[0].MatchStateHistory)
+	matchStateHistoryData, err = json.Marshal(data.Body.MatchStateHistory)
 	if err != nil {
 		app.errorLog.Printf("Error marshalling matchStateHistoryData: %s", err)
 	}
@@ -364,7 +524,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 }
 
 func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection() (jsonStr []byte, err error) {
-	var gameState []postChessMoveReply
+	var gameState onMoveBody
 	err = json.Unmarshal(hub.currentGameState, &gameState)
 	if err != nil {
 		app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
@@ -373,12 +533,23 @@ func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection() (jsonStr []byte,
 
 	// Correct times
 	if hub.turn == playerTurn(WhiteTurn) && hub.isTimerActive {
-		gameState[0].MatchStateHistory[len(gameState[0].MatchStateHistory)-1].WhitePlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
+		gameState.MatchStateHistory[len(gameState.MatchStateHistory)-1].WhitePlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
 	} else if hub.turn == playerTurn(BlackTurn) && hub.isTimerActive {
-		gameState[0].MatchStateHistory[len(gameState[0].MatchStateHistory)-1].BlackPlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
+		gameState.MatchStateHistory[len(gameState.MatchStateHistory)-1].BlackPlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
 	}
 
-	jsonStr, err = json.Marshal(gameState)
+	var response = onConnectResponse{
+		MessageType: onConnect,
+		Body: onConnectBody{
+			MatchStateHistory:    gameState.MatchStateHistory,
+			GameOverStatusCode:   gameState.GameOverStatusCode,
+			ThreefoldRepetition:  gameState.ThreefoldRepetition,
+			WhitePlayerConnected: hub.whitePlayerConnected,
+			BlackPlayerConnected: hub.blackPlayerConnected,
+		},
+	}
+
+	jsonStr, err = json.Marshal(response)
 	if err != nil {
 		app.errorLog.Printf("Error marshalling JSON: %v\n", err)
 		return []byte{}, err
@@ -396,17 +567,17 @@ func (hub *MatchRoomHub) hasActiveClients() bool {
 	return false
 }
 
-func (hub *MatchRoomHub) getMessageType(message []byte) msgType {
+func (hub *MatchRoomHub) getMessageType(message []byte) clientMessageType {
 	if message[0] == byte(WhitePlayer) || message[0] == byte(BlackPlayer) {
-		return PlayerMove
+		return postMove
 	}
 	app.errorLog.Printf("Unknown message type\n")
-	return Unknown
+	return unknown
 }
 
 func (hub *MatchRoomHub) handleMessage(message []byte) (response []byte) {
 	switch msgType := hub.getMessageType(message); msgType {
-	case PlayerMove:
+	case postMove:
 
 		// Ignore messages from inactive player
 		if message[0] != byte(hub.turn) {
@@ -429,6 +600,60 @@ func (hub *MatchRoomHub) handleMessage(message []byte) (response []byte) {
 	}
 }
 
+func (hub *MatchRoomHub) pingStatusMessage(playerColour string, isConnected bool) ([]byte, error) {
+	data := onPlayerConnectionChangeResponse{
+		MessageType: connectionStatus,
+		Body:        onPlayerConnectionChangeBody{PlayerColour: playerColour, IsConnected: isConnected},
+	}
+	jsonStr, err := json.Marshal(data)
+	if err != nil {
+		app.errorLog.Printf("Unable to marshal pingStatus: %s", err)
+	}
+	return jsonStr, nil
+}
+
+func (hub *MatchRoomHub) setConnected(client *MatchRoomHubClient) {
+	// Sets connections status of players and sends message to all clients
+	if client.playerIdentifier == messageIdentifier(WhitePlayer) {
+		hub.whitePlayerConnected = true
+		hub.whitePlayerTimeout = nil
+		pingMessage, err := hub.pingStatusMessage("white", true)
+		if err != nil {
+			app.errorLog.Printf("Could not generate pingMessage: %s", err)
+		}
+		hub.sendMessageToAllClients(pingMessage)
+	} else if client.playerIdentifier == messageIdentifier(BlackPlayer) {
+		hub.blackPlayerConnected = true
+		hub.blackPlayerTimeout = nil
+		pingMessage, err := hub.pingStatusMessage("black", true)
+		if err != nil {
+			app.errorLog.Printf("Could not generate pingMessage: %s", err)
+		}
+		hub.sendMessageToAllClients(pingMessage)
+	}
+}
+
+func (hub *MatchRoomHub) setDisconnected(client *MatchRoomHubClient) {
+	// Sets connections status of players and sends message to all clients
+	if client.playerIdentifier == messageIdentifier(WhitePlayer) {
+		hub.whitePlayerConnected = false
+		hub.whitePlayerTimeout = time.After(pingTimeout)
+		pingMessage, err := hub.pingStatusMessage("white", false)
+		if err != nil {
+			app.errorLog.Printf("Could not generate pingMessage: %s", err)
+		}
+		hub.sendMessageToAllClients(pingMessage)
+	} else if client.playerIdentifier == messageIdentifier(BlackPlayer) {
+		hub.blackPlayerConnected = false
+		hub.blackPlayerTimeout = time.After(pingTimeout)
+		pingMessage, err := hub.pingStatusMessage("black", false)
+		if err != nil {
+			app.errorLog.Printf("Could not generate pingMessage: %s", err)
+		}
+		hub.sendMessageToAllClients(pingMessage)
+	}
+}
+
 func (hub *MatchRoomHub) run() {
 	app.infoLog.Println("Hub running")
 	defer app.infoLog.Println("Hub stopped")
@@ -437,6 +662,7 @@ func (hub *MatchRoomHub) run() {
 		// Clients get currentGameState on register
 		case client := <-hub.register:
 			hub.clients[client] = true
+			hub.setConnected(client)
 			jsonStr, err := hub.getCurrentMatchStateForNewConnection()
 			if err != nil {
 				app.errorLog.Printf("Could not get json for new connection: %v\n", err)
@@ -449,6 +675,7 @@ func (hub *MatchRoomHub) run() {
 				delete(hub.clients, client)
 				close(client.send)
 			}
+			hub.setDisconnected(client)
 			if !hub.hasActiveClients() {
 				matchRoomHubManager.unregisterHub(hub.matchID)
 				return
@@ -462,6 +689,9 @@ func (hub *MatchRoomHub) run() {
 			}
 
 			hub.sendMessageToAllClients(hub.currentGameState)
+
+		case <-hub.whitePlayerTimeout:
+		case <-hub.blackPlayerTimeout:
 
 		case message := <-hub.broadcast:
 			app.infoLog.Printf("WS Message: %s\n", message)
