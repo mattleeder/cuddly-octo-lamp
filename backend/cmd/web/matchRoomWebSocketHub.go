@@ -1,6 +1,7 @@
 package main
 
 import (
+	"burrchess/internal/models"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -221,7 +222,12 @@ const (
 
 func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 	// Build hub from data in db
-	matchState, err := app.liveMatches.GetFromMatchID(matchID)
+	sqlReturn, err := app.dbTaskQueue.EnQueueReturn(func() (any, error) { return app.liveMatches.GetFromMatchID(matchID) })
+	matchState, ok := sqlReturn.(*models.LiveMatch)
+	if !ok {
+		app.errorLog.Println("matchState is not *models.LiveMatch")
+		return nil, errors.New("matchState is not *models.LiveMatch")
+	}
 
 	if err != nil {
 		app.errorLog.Println(err)
@@ -404,7 +410,7 @@ func (hub *MatchRoomHub) updateGameStateAfterFlag() (err error) {
 	hub.currentGameState = jsonStr
 
 	// Game is over after flag
-	go app.liveMatches.MoveMatchToPastMatches(hub.matchID, outcome)
+	app.dbTaskQueue.EnQueueErrorOnlyTask(func() error { return app.liveMatches.MoveMatchToPastMatches(hub.matchID, outcome) })
 
 	return nil
 }
@@ -455,6 +461,21 @@ func (hub *MatchRoomHub) updateTimeRemaining() {
 		hub.blackPlayerTimeRemaining -= time.Since(hub.timeOfLastMove)
 		hub.blackPlayerTimeRemaining += hub.increment
 	}
+}
+
+func (hub *MatchRoomHub) getOutcomeInt(gameOverStatus gameOverStatusCode) int {
+	if gameOverStatus == Checkmate {
+		if hub.turn == Black {
+			return 2
+		} else {
+			return 1
+		}
+	} else if gameOverStatus == WhiteFlagged {
+		return 2
+	} else if gameOverStatus == BlackFlagged {
+		return 1
+	}
+	return 0
 }
 
 func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
@@ -523,10 +544,13 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	}
 
 	// Update database
+	app.dbTaskQueue.EnQueueErrorOnlyTask(func() error {
+		return app.liveMatches.UpdateLiveMatch(hub.matchID, newFEN, chessMove.Body.Piece, chessMove.Body.Move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
+	})
+
 	if gameOverStatus != Ongoing {
-		go hub.updateMatchThenMoveToFinished(newFEN, chessMove.Body.Piece, chessMove.Body.Move, gameOverStatus, hub.turn, matchStateHistoryData)
-	} else {
-		go app.liveMatches.UpdateLiveMatch(hub.matchID, newFEN, chessMove.Body.Piece, chessMove.Body.Move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
+		outcome := hub.getOutcomeInt(gameOverStatus)
+		app.dbTaskQueue.EnQueueErrorOnlyTask(func() error { app.liveMatches.MoveMatchToPastMatches(hub.matchID, outcome) })
 	}
 
 	return nil
@@ -626,6 +650,7 @@ func (hub *MatchRoomHub) endGame(reason gameOverStatusCode) {
 	// End game
 	// Send final update to players
 	// Handle database changes
+
 }
 
 func (hub *MatchRoomHub) makeNewEventOffer(sender messageIdentifier, event eventType) []byte {

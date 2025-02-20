@@ -17,6 +17,7 @@ type application struct {
 	secretKey   []byte
 	liveMatches *models.LiveMatchModel
 	pastMatches *models.PastMatchModel
+	dbTaskQueue *models.TaskQueue
 }
 
 var app *application
@@ -48,6 +49,7 @@ func main() {
 		secretKey:   []byte("}\xa4\xc3\x85D\x89\xb75\xf0\xe6\xcf\xcaZ\x00k\x88\xe4\x8f\xd0\xd6\x95\x0e\xa6\xf9\xc2;!\xa2\xc4[\xca\x91"),
 		liveMatches: &models.LiveMatchModel{DB: db},
 		pastMatches: &models.PastMatchModel{DB: db},
+		dbTaskQueue: models.DBTaskQueue,
 	}
 
 	srv := &http.Server{

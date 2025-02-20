@@ -100,6 +100,12 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 	return match, nil
 }
 
+func (m *LiveMatchModel) GetFromMatchIDClosure(matchID int64) func() (*LiveMatch, error) {
+	return func() (*LiveMatch, error) {
+		return m.GetFromMatchID(matchID)
+	}
+}
+
 func (m *LiveMatchModel) LogAll() {
 	app.infoLog.Println("Live Matches:")
 
