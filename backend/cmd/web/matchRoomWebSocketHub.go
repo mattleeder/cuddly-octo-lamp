@@ -214,6 +214,8 @@ type MatchRoomHub struct {
 	blackCanClaimTimeout bool
 
 	offerActive *offerInfo
+
+	gameEnded bool
 }
 
 type playerTurn byte
@@ -613,6 +615,7 @@ func (hub *MatchRoomHub) acceptEventOffer(event eventType) {
 
 func (hub *MatchRoomHub) endGame(reason gameOverStatusCode) error {
 	// Updates game state and updates DB. Does not send response
+	hub.flagTimer = nil
 	var gameState onMoveResponse
 	err := json.Unmarshal(hub.currentGameState, &gameState)
 	if err != nil {
@@ -632,6 +635,7 @@ func (hub *MatchRoomHub) endGame(reason gameOverStatusCode) error {
 
 	hub.currentGameState = jsonStr
 	var outcome = hub.getOutcomeInt(reason)
+	hub.gameEnded = true
 	app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, outcome)
 	return nil
 }
@@ -703,6 +707,10 @@ func (hub *MatchRoomHub) handleMessage(message []byte) {
 	switch msgType := hub.getMessageType(message); msgType {
 	case postMove:
 
+		if hub.gameEnded {
+			return
+		}
+
 		// Ignore messages from inactive player
 		if message[0] != byte(hub.turn) {
 			return
@@ -719,6 +727,10 @@ func (hub *MatchRoomHub) handleMessage(message []byte) {
 		return
 
 	case playerEvent:
+
+		if hub.gameEnded {
+			return
+		}
 		// @TODO: implement this fully
 		hub.handlePlayerEvent(message)
 
