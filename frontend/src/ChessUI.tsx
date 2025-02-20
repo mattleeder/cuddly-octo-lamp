@@ -634,7 +634,7 @@ function GameInfoTile() {
 
   return (
     <div>
-      <CountdownTimer className="playerTimeBlack" paused={isBlackClockPaused()} countdownTimerMilliseconds={game.matchData.activeState.blackPlayerTimeRemainingMilliseconds}/>
+      <CountdownTimer className="playerTimeBlack" paused={isBlackClockPaused() || game.matchData.gameOverStatus != 0} countdownTimerMilliseconds={game.matchData.activeState.blackPlayerTimeRemainingMilliseconds}/>
       <div className='gameInfo'>
         <EventTypeDialog />
         <PlayerInfo connected={game.isWhiteConnected}/>
@@ -643,7 +643,7 @@ function GameInfoTile() {
         <GameControls />
         <PlayerInfo connected={game.isBlackConnected}/>
       </div>
-      <CountdownTimer className="playerTimeWhite" paused={isWhiteClockPaused()} countdownTimerMilliseconds={game.matchData.activeState.whitePlayerTimeRemainingMilliseconds}/>
+      <CountdownTimer className="playerTimeWhite" paused={isWhiteClockPaused() || game.matchData.gameOverStatus != 0} countdownTimerMilliseconds={game.matchData.activeState.whitePlayerTimeRemainingMilliseconds}/>
     </div>
   )
 }
