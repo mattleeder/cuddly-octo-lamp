@@ -24,13 +24,14 @@ const (
 type eventType string
 
 const (
-	takeback      = "takeback"
-	draw          = "draw"
-	resign        = "resign"
-	extraTime     = "extraTime"
-	abort         = "abort"
-	rematch       = "rematch"
-	rematchAccept = "rematchAccept"
+	takeback   = "takeback"
+	draw       = "draw"
+	resign     = "resign"
+	extraTime  = "extraTime"
+	abort      = "abort"
+	rematch    = "rematch"
+	disconnect = "disconnect"
+	decline    = "decline"
 )
 
 // Bodies
@@ -50,8 +51,9 @@ type onMoveBody struct {
 }
 
 type onPlayerConnectionChangeBody struct {
-	PlayerColour string `json:"playerColour"`
-	IsConnected  bool   `json:"isConnected"`
+	PlayerColour             string `json:"playerColour"`
+	IsConnected              bool   `json:"isConnected"`
+	MillisecondsUntilTimeout int64  `json:"millisecondsUntilTimeout"`
 }
 
 type opponentEventBody struct {
@@ -135,6 +137,11 @@ type userMessageResponse struct {
 
 //////////////////////////////////////////////////////////////
 
+type userJSON struct {
+	MessageType string          `json:"messageType"`
+	Body        json.RawMessage `json:"body"`
+}
+
 type MatchStateHistory struct {
 	FEN                                  string `json:"FEN"`
 	LastMove                             [2]int `json:"lastMove"`
@@ -143,17 +150,12 @@ type MatchStateHistory struct {
 	BlackPlayerTimeRemainingMilliseconds int64  `json:"blackPlayerTimeRemainingMilliseconds"`
 }
 
-type pingStatus struct {
-	PlayerColour string `json:"playerColour"`
-	IsConnected  bool   `json:"isConnected"`
-}
-
 type offerInfo struct {
 	sender messageIdentifier
 	event  eventType
 }
 
-const pingTimeout = 10 * time.Second
+const pingTimeout = 20 * time.Second
 
 // Hub maintains the set of active clients and broadcasts messages to the
 // clients.
@@ -206,6 +208,10 @@ type MatchRoomHub struct {
 	whitePlayerTimeout <-chan time.Time
 
 	blackPlayerTimeout <-chan time.Time
+
+	whiteCanClaimTimeout bool
+
+	blackCanClaimTimeout bool
 
 	offerActive *offerInfo
 }
@@ -429,9 +435,9 @@ func (hub *MatchRoomHub) getOutcomeInt(gameOverStatus gameOverStatusCode) int {
 		} else {
 			return 1
 		}
-	} else if gameOverStatus == WhiteFlagged {
+	} else if gameOverStatus == WhiteFlagged || gameOverStatus == WhiteResigned {
 		return 2
-	} else if gameOverStatus == BlackFlagged {
+	} else if gameOverStatus == BlackFlagged || gameOverStatus == BlackResigned {
 		return 1
 	}
 	return 0
@@ -557,50 +563,51 @@ func (hub *MatchRoomHub) hasActiveClients() bool {
 }
 
 func (hub *MatchRoomHub) getMessageType(message []byte) clientMessageType {
-	if message[0] == byte(WhitePlayer) || message[0] == byte(BlackPlayer) {
-		return postMove
+	var msg userJSON
+	err := json.Unmarshal(message[1:], &msg)
+	if err != nil {
+		app.errorLog.Printf("Unable to parse message into userJSON: %s\n", err)
+		return unknown
 	}
+
+	switch msg.MessageType {
+	case "postMove":
+		if message[0] != byte(WhitePlayer) && message[0] != byte(BlackPlayer) {
+			app.errorLog.Printf("Non-player trying to post move: %s\n", message)
+			return unknown
+		}
+		return postMove
+
+	case "playerEvent":
+		if message[0] != byte(WhitePlayer) && message[0] != byte(BlackPlayer) {
+			app.errorLog.Printf("Non-player trying to send playerEvent: %s\n", message)
+			return unknown
+		}
+		return playerEvent
+	}
+
 	app.errorLog.Printf("Unknown message type\n")
 	return unknown
 }
 
-func (hub *MatchRoomHub) makeDraw(reason gameOverStatusCode) []byte {
-	var data onMoveResponse
-	err := json.Unmarshal(hub.currentGameState, &data)
-	if err != nil {
-		app.errorLog.Printf("Error unmarshaling hub.currentGameState: %s", err)
-	}
-
-	var jsonStr []byte
-	data.Body.GameOverStatusCode = reason
-	jsonStr, err = json.Marshal(data)
-	if err != nil {
-		app.errorLog.Printf("Error marshaling onMoveResponse: %s", err)
-	}
-
-	hub.currentGameState = jsonStr
-
-	go app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, 0)
-
-	return jsonStr
-}
-
 // @TODO: implement this
-func (hub *MatchRoomHub) takeBack() []byte {
-	return nil
+func (hub *MatchRoomHub) takeBack() {
+
 }
 
-func (hub *MatchRoomHub) acceptEventOffer(event eventType) []byte {
+func (hub *MatchRoomHub) acceptEventOffer(event eventType) {
 	// @TODO implement
+	app.infoLog.Printf("Making accepting event of type %s\n", event)
 	switch event {
 	case takeback:
-		return hub.takeBack()
+		hub.takeBack()
 
 	case draw:
-		return hub.makeDraw(Draw)
+		hub.endGame(Draw)
+		hub.sendMessageToAllClients(hub.currentGameState)
 
 	default:
-		return []byte{}
+		return
 	}
 }
 
@@ -629,13 +636,17 @@ func (hub *MatchRoomHub) endGame(reason gameOverStatusCode) error {
 	return nil
 }
 
-func (hub *MatchRoomHub) makeNewEventOffer(sender messageIdentifier, event eventType) []byte {
+func (hub *MatchRoomHub) makeNewEventOffer(sender messageIdentifier, event eventType) {
+	app.infoLog.Printf("Making new event from %v of type %s\n", sender, event)
 	hub.offerActive = &offerInfo{sender, event}
 	var responseFrom string
+	var receiver messageIdentifier
 	if sender == messageIdentifier(WhitePlayer) {
 		responseFrom = "white"
+		receiver = messageIdentifier(BlackPlayer)
 	} else {
 		responseFrom = "black"
+		receiver = messageIdentifier(WhitePlayer)
 	}
 
 	response := opponentEventResponse{
@@ -646,60 +657,81 @@ func (hub *MatchRoomHub) makeNewEventOffer(sender messageIdentifier, event event
 	jsonStr, err := json.Marshal(response)
 	if err != nil {
 		app.errorLog.Printf("Could not marshal opponentEventResponse: %s\n", err)
-		return nil
+		return
 	}
-	return jsonStr
+
+	hub.sendMessageToOnePlayer(jsonStr, receiver)
 }
 
-func (hub *MatchRoomHub) handlePlayerEvent(message []byte) []byte {
+func isOneSidedEvent(event eventType) bool {
+	return event == extraTime || event == resign || event == abort
+}
+
+func (hub *MatchRoomHub) oneSidedEvent(sender messageIdentifier, event eventType) {
+	switch event {
+	case extraTime:
+		return
+	case resign:
+		if sender == White {
+			hub.endGame(WhiteResigned)
+		} else {
+			hub.endGame(BlackResigned)
+		}
+		hub.sendMessageToAllClients(hub.currentGameState)
+	}
+}
+
+func (hub *MatchRoomHub) handlePlayerEvent(message []byte) {
 	var data playerEventResponse
 	err := json.Unmarshal(message[1:], &data)
 	if err != nil {
 		app.errorLog.Printf("Could not unmarshal playerEvent: %s", err)
-		return nil
+		return
 	}
 
-	if hub.offerActive == nil || hub.offerActive.event != data.Body.EventType {
-		return hub.makeNewEventOffer(messageIdentifier(message[0]), data.Body.EventType)
+	if isOneSidedEvent(data.Body.EventType) {
+		hub.oneSidedEvent(messageIdentifier(message[0]), data.Body.EventType)
+	} else if hub.offerActive == nil || hub.offerActive.event != data.Body.EventType {
+		hub.makeNewEventOffer(messageIdentifier(message[0]), data.Body.EventType)
 	} else if hub.offerActive != nil && byte(hub.offerActive.sender) != message[0] {
-		return hub.acceptEventOffer(data.Body.EventType)
+		hub.acceptEventOffer(data.Body.EventType)
 	}
 
-	return []byte{}
 }
 
-func (hub *MatchRoomHub) handleMessage(message []byte) (response []byte) {
+func (hub *MatchRoomHub) handleMessage(message []byte) {
 	switch msgType := hub.getMessageType(message); msgType {
 	case postMove:
 
 		// Ignore messages from inactive player
 		if message[0] != byte(hub.turn) {
-			return nil
+			return
 		}
 
 		// Validate move and update
 		err := hub.updateGameStateAfterMove(message)
 		if err != nil {
 			app.errorLog.Println(err)
-			return nil
+			return
 		}
 
-		return hub.currentGameState
+		hub.sendMessageToAllPlayers(hub.currentGameState)
+		return
 
 	case playerEvent:
 		// @TODO: implement this fully
-		return hub.handlePlayerEvent(message)
+		hub.handlePlayerEvent(message)
 
 	default:
 		app.errorLog.Printf("Could not understand message: %s\n", message)
-		return nil
+		return
 	}
 }
 
-func (hub *MatchRoomHub) pingStatusMessage(playerColour string, isConnected bool) ([]byte, error) {
+func (hub *MatchRoomHub) pingStatusMessage(playerColour string, isConnected bool, millisecondsUntilTimeout int64) ([]byte, error) {
 	data := onPlayerConnectionChangeResponse{
 		MessageType: connectionStatus,
-		Body:        onPlayerConnectionChangeBody{PlayerColour: playerColour, IsConnected: isConnected},
+		Body:        onPlayerConnectionChangeBody{PlayerColour: playerColour, IsConnected: isConnected, MillisecondsUntilTimeout: millisecondsUntilTimeout},
 	}
 	jsonStr, err := json.Marshal(data)
 	if err != nil {
@@ -712,16 +744,18 @@ func (hub *MatchRoomHub) setConnected(client *MatchRoomHubClient) {
 	// Sets connections status of players and sends message to all clients
 	if client.playerIdentifier == messageIdentifier(WhitePlayer) {
 		hub.whitePlayerConnected = true
+		hub.blackCanClaimTimeout = false
 		hub.whitePlayerTimeout = nil
-		pingMessage, err := hub.pingStatusMessage("white", true)
+		pingMessage, err := hub.pingStatusMessage("white", true, 0)
 		if err != nil {
 			app.errorLog.Printf("Could not generate pingMessage: %s", err)
 		}
 		hub.sendMessageToAllClients(pingMessage)
 	} else if client.playerIdentifier == messageIdentifier(BlackPlayer) {
 		hub.blackPlayerConnected = true
+		hub.whiteCanClaimTimeout = false
 		hub.blackPlayerTimeout = nil
-		pingMessage, err := hub.pingStatusMessage("black", true)
+		pingMessage, err := hub.pingStatusMessage("black", true, 0)
 		if err != nil {
 			app.errorLog.Printf("Could not generate pingMessage: %s", err)
 		}
@@ -734,7 +768,7 @@ func (hub *MatchRoomHub) setDisconnected(client *MatchRoomHubClient) {
 	if client.playerIdentifier == messageIdentifier(WhitePlayer) {
 		hub.whitePlayerConnected = false
 		hub.whitePlayerTimeout = time.After(pingTimeout)
-		pingMessage, err := hub.pingStatusMessage("white", false)
+		pingMessage, err := hub.pingStatusMessage("white", false, pingTimeout.Milliseconds())
 		if err != nil {
 			app.errorLog.Printf("Could not generate pingMessage: %s", err)
 		}
@@ -742,7 +776,7 @@ func (hub *MatchRoomHub) setDisconnected(client *MatchRoomHubClient) {
 	} else if client.playerIdentifier == messageIdentifier(BlackPlayer) {
 		hub.blackPlayerConnected = false
 		hub.blackPlayerTimeout = time.After(pingTimeout)
-		pingMessage, err := hub.pingStatusMessage("black", false)
+		pingMessage, err := hub.pingStatusMessage("black", false, pingTimeout.Milliseconds())
 		if err != nil {
 			app.errorLog.Printf("Could not generate pingMessage: %s", err)
 		}
@@ -793,18 +827,15 @@ func (hub *MatchRoomHub) run() {
 			hub.sendMessageToAllClients(hub.currentGameState)
 
 		case <-hub.whitePlayerTimeout:
+			hub.blackCanClaimTimeout = true
+
 		case <-hub.blackPlayerTimeout:
-			// @TODO, add logic
-			continue
+			hub.whiteCanClaimTimeout = true
 
 		case message := <-hub.broadcast:
 			app.infoLog.Printf("WS Message: %s\n", message)
 
-			response := hub.handleMessage(message)
-			app.infoLog.Printf("Response: %s\n", response)
-			if response != nil {
-				hub.sendMessageToAllClients(response)
-			}
+			hub.handleMessage(message)
 
 		}
 	}

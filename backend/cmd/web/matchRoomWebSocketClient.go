@@ -81,7 +81,6 @@ func pingClient(conn *websocket.Conn) {
 				app.errorLog.Println("Ping error:", err)
 				return
 			}
-			app.infoLog.Println("Sent ping to client")
 		}
 	}
 }
@@ -101,7 +100,6 @@ func (c *MatchRoomHubClient) readPump() {
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		c.conn.SetReadDeadline(time.Now().Add(pongWait))
-		app.infoLog.Println("Received pong from client")
 		return nil
 	})
 	// go pingClient(c.conn)

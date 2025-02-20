@@ -92,6 +92,9 @@ const (
 	WhiteFlagged
 	BlackFlagged
 	Draw
+	WhiteResigned
+	BlackResigned
+	Abort
 )
 
 type pieceType struct {

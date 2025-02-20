@@ -310,7 +310,7 @@ export function ChessBoard() {
       return <></>
     }
 
-    const gameOverStatusCodes = ["Ongoing", "Stalemate", "Checkmate", "Threefold Repetition", "Insufficient Material", "White Flagged", "Black Flagged"]
+    const gameOverStatusCodes = ["Ongoing", "Stalemate", "Checkmate", "Threefold Repetition", "Insufficient Material", "White Flagged", "Black Flagged", "Draw", "White Resigned", "Black Resigned", "Game Aborted"]
     const gameOverText = gameOverStatusCodes[game?.matchData.gameOverStatus || 0]
 
     return <div style={{ transform: `translate(${0}px, ${180}px)`, color: "black" }}>{gameOverText}</div>
@@ -326,6 +326,16 @@ export function ChessBoard() {
       <GameOverComponent />
     </div>
   )
+}
+
+enum OpponentEventType {
+  None = "none",
+  Takeback = "takeback",
+  Draw = "draw",
+  Rematch = "rematch",
+  Disconnect = "disconnect",
+  Decline = "decline",
+  Resign = "resign",
 }
 
 interface boardInfo {
@@ -359,6 +369,9 @@ interface gameContext {
   playerColour: PieceColour,
   isWhiteConnected: boolean,
   isBlackConnected: boolean,
+  opponentEventType: OpponentEventType,
+  setOpponentEventType: React.Dispatch<React.SetStateAction<OpponentEventType>>,
+  millisecondsUntilOpponentTimeout: number | null,
 }
 
 const GameContext = createContext<gameContext | null>(null)
@@ -388,6 +401,7 @@ interface OnMoveMessage {
 interface ConnectionStatusMessage {
   playerColour: string
   isConnected: boolean
+  millisecondsUntilTimeout: number,
 }
 
 interface PlayerCodeMessage {
@@ -396,7 +410,12 @@ interface PlayerCodeMessage {
 
 interface ChessWebSocketMessage {
   messageType: string
-  body: OnConnectMessage | OnMoveMessage | ConnectionStatusMessage | PlayerCodeMessage
+  body: OnConnectMessage | OnMoveMessage | ConnectionStatusMessage | PlayerCodeMessage | OpponentEventMessage
+}
+
+interface OpponentEventMessage {
+  sender: string,
+  eventType: string,
 }
 
 function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children: ReactNode, matchID: string, timeFormatInMilliseconds: number }) {
@@ -424,6 +443,8 @@ function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children
   const [playerColour, setPlayerColour] = useState(PieceColour.Spectator)
   const [isWhiteConnected, setIsWhiteConnected] = useState(false)
   const [isBlackConnected, setIsBlackConnected] = useState(false)
+  const [millisecondsUntilOpponentTimeout, setMillisecondsUntilOpponentTimeout] = useState<number | null>(null)
+  const [opponentEventType, setOpponentEventType] = useState(OpponentEventType.None)
 
   useEffect(() => {
     // Connect to websocket for matchroom
@@ -467,10 +488,17 @@ function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children
     } else if (body["playerColour"] == "black") {
       setIsBlackConnected(body["isConnected"])
     }
-
+    
+    if (body["isConnected"]) {
+      // Should always be opponent
+      setMillisecondsUntilOpponentTimeout(null)
+    } else {
+      setOpponentEventType(OpponentEventType.Disconnect)
+    }
   }
 
   function onMoveHandler(body: OnMoveMessage) {
+    setOpponentEventType(OpponentEventType.None)
     const newHistory = body["matchStateHistory"]
     if (newHistory.length == 0) {
       console.error("New history has length 0")
@@ -509,6 +537,24 @@ function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children
     setMatchData(newMatchData)
   }
 
+  function opponentEventHandler(body: OpponentEventMessage) {
+    switch (body.eventType) {
+
+    case "takeback":
+      setOpponentEventType(OpponentEventType.Takeback)
+      break
+
+    case "draw":
+      setOpponentEventType(OpponentEventType.Draw)
+      break
+
+    case "rematch":
+      setOpponentEventType(OpponentEventType.Rematch)
+      break
+
+    }
+  }
+
   function readMessage(message: unknown) {
     console.log("FROM WEBSOCKET")
     console.log(message)
@@ -535,6 +581,9 @@ function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children
       case "onMove":
         onMoveHandler(parsedMsg["body"] as OnMoveMessage)
         break;
+      case "opponentEvent":
+        opponentEventHandler(parsedMsg["body"] as OpponentEventMessage)
+        break;
       default:
         console.error("Could not understand message from websocket")
         console.log(message)
@@ -543,7 +592,7 @@ function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { children
   }
 
   return (
-    <GameContext.Provider value={{ matchData, setMatchData, webSocket, playerColour, isWhiteConnected, isBlackConnected }}>
+    <GameContext.Provider value={{ matchData, setMatchData, webSocket, playerColour, isWhiteConnected, isBlackConnected, opponentEventType, setOpponentEventType, millisecondsUntilOpponentTimeout }}>
       {children}
     </GameContext.Provider>
   )
@@ -587,6 +636,7 @@ function GameInfoTile() {
     <div>
       <CountdownTimer className="playerTimeBlack" paused={isBlackClockPaused()} countdownTimerMilliseconds={game.matchData.activeState.blackPlayerTimeRemainingMilliseconds}/>
       <div className='gameInfo'>
+        <EventTypeDialog />
         <PlayerInfo connected={game.isWhiteConnected}/>
         <MoveHistoryControls />
         <Moves />
@@ -598,7 +648,39 @@ function GameInfoTile() {
   )
 }
 
+function sendDrawEvent(websocket: WebSocket | null) {
+  if (!websocket) {
+    console.error("Websocket is null")
+    return
+  }
+
+  websocket.send(JSON.stringify({
+    "messageType": "playerEvent",
+    "body": {
+      "eventType": OpponentEventType.Draw,
+    }
+  }))
+}
+
+function sendResignEvent(websocket: WebSocket | null) {
+  if (!websocket) {
+    console.error("Websocket is null")
+    return
+  }
+
+  websocket.send(JSON.stringify({
+    "messageType": "playerEvent",
+    "body": {
+      "eventType": OpponentEventType.Resign,
+    }
+  }))
+}
+
 function GameControls() {
+  const game = useContext(GameContext)
+  if (!game) {
+    throw new Error("GameControls must be used within a GameContext")
+  }
 
   return (
     <div className='gameControlsContainer'>
@@ -607,10 +689,10 @@ function GameControls() {
         <CornerUpLeft size={12} color='#000000' />
       </div>
       <div className='gameControlsButton'>
-        <Handshake size={12} color='#000000' />
+        <Handshake onClick={() => sendDrawEvent(game.webSocket)} size={12} color='#000000' />
       </div>
       <div className='gameControlsButton'>
-        <Flag size={12} color='#000000' />
+        <Flag onClick={() => sendResignEvent(game.webSocket)} size={12} color='#000000' />
       </div>
       <div className='spacer' />
     </div>
@@ -680,6 +762,59 @@ function Moves() {
     </div>
   )
 
+}
+
+function acceptEvent(websocket: WebSocket | null, eventType: OpponentEventType) {
+  if (websocket == null) {
+    console.error("Websocket is null")
+    return
+  }
+
+  websocket.send(JSON.stringify({
+    "messageType": "playerEvent",
+    "body": {
+      "eventType": eventType,
+    }
+  }))
+
+}
+
+function declineEvent(game: gameContext) {
+  if (game.webSocket == null) {
+    console.error("Websocket is null")
+    return
+  }
+
+  game.webSocket.send(JSON.stringify({
+    "messageType": "playerEvent",
+    "body": {
+      "eventType": OpponentEventType.Decline,
+    }
+  }))
+
+  game.setOpponentEventType(OpponentEventType.None)
+  
+}
+
+function EventTypeDialog() {
+  const game = useContext(GameContext)
+  if (!game) {
+    throw new Error("EventTypeDialog must be used within a gameContext")
+  }
+
+  if (game.opponentEventType == OpponentEventType.None) {
+    return <></>
+  }
+
+  return (
+    <div className="eventTypeDialog">
+      <span>Event</span>
+      <div>
+        <button onClick={() => acceptEvent(game.webSocket, game.opponentEventType)}>Accept</button>
+        <button onClick={() => declineEvent(game)}>Decline</button>
+      </div>
+    </div>
+  )
 }
 
 function MoveHistoryControls() {
