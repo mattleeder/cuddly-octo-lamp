@@ -204,7 +204,7 @@ func createMatch(playerOneID int64, playerTwoID int64, timeFormatInMilliseconds 
 	}
 
 	var matchID int64
-	matchID, err = app.liveMatches.InsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, startingHistory)
+	matchID, err = app.liveMatches.EnQueueReturnInsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, startingHistory)
 	if err != nil {
 		app.errorLog.Printf("Error inserting new match: %v\n", err)
 		return err

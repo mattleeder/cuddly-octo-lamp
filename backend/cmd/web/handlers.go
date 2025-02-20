@@ -222,7 +222,7 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 		clients.mu.Unlock()
 	}()
 
-	defer app.liveMatches.LogAll()
+	defer app.liveMatches.EnQueueLogAll()
 
 	for {
 		select {

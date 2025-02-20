@@ -59,6 +59,27 @@ func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerO
 	return result.LastInsertId()
 }
 
+func (m *LiveMatchModel) EnQueueReturnInsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64, gameHistory []byte) (int64, error) {
+	result, err := DBTaskQueue.EnQueueReturn(func() (any, error) {
+		return m.InsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, gameHistory)
+	})
+	if err != nil {
+		return 0, err
+	}
+	coercedResult, ok := result.(int64)
+	if !ok {
+		app.errorLog.Println("coercedResult is not int64")
+		return 0, errors.New("coercedResult is not int64")
+	}
+	return coercedResult, nil
+}
+
+func (m *LiveMatchModel) EnQueueInsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64, gameHistory []byte) {
+	DBTaskQueue.EnQueue(func() (any, error) {
+		return m.InsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, gameHistory)
+	})
+}
+
 func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 	row := m.DB.QueryRow("select * from live_matches where match_id=?;", matchID)
 
@@ -134,6 +155,13 @@ func (m *LiveMatchModel) LogAll() {
 	}
 }
 
+func (m *LiveMatchModel) EnQueueLogAll() {
+	DBTaskQueue.EnQueueErrorOnlyTask(func() error {
+		m.LogAll()
+		return nil
+	})
+}
+
 func (m *LiveMatchModel) UpdateLiveMatch(matchID int64, newFEN string, lastMovePiece int, lastMoveMove int, whitePlayerTimeRemainingMilliseconds int64, blackPlayerTimeRemainingMilliseconds int64, matchStateHistoryJSONstr []byte, timeOfLastMove time.Time) error {
 	defer m.LogAll()
 	sqlStmt := `
@@ -148,6 +176,19 @@ func (m *LiveMatchModel) UpdateLiveMatch(matchID int64, newFEN string, lastMoveP
 	}
 
 	return nil
+}
+
+func (m *LiveMatchModel) EnQueueReturnUpdateLiveMatch(matchID int64, newFEN string, lastMovePiece int, lastMoveMove int, whitePlayerTimeRemainingMilliseconds int64, blackPlayerTimeRemainingMilliseconds int64, matchStateHistoryJSONstr []byte, timeOfLastMove time.Time) error {
+	err := DBTaskQueue.EnQueueReturnErrorOnlyTask(func() error {
+		return m.UpdateLiveMatch(matchID, newFEN, lastMovePiece, lastMoveMove, whitePlayerTimeRemainingMilliseconds, blackPlayerTimeRemainingMilliseconds, matchStateHistoryJSONstr, timeOfLastMove)
+	})
+	return err
+}
+
+func (m *LiveMatchModel) EnQueueUpdateLiveMatch(matchID int64, newFEN string, lastMovePiece int, lastMoveMove int, whitePlayerTimeRemainingMilliseconds int64, blackPlayerTimeRemainingMilliseconds int64, matchStateHistoryJSONstr []byte, timeOfLastMove time.Time) {
+	DBTaskQueue.EnQueueErrorOnlyTask(func() error {
+		return m.UpdateLiveMatch(matchID, newFEN, lastMovePiece, lastMoveMove, whitePlayerTimeRemainingMilliseconds, blackPlayerTimeRemainingMilliseconds, matchStateHistoryJSONstr, timeOfLastMove)
+	})
 }
 
 func (m *LiveMatchModel) MoveMatchToPastMatches(matchID int64, outcome int) error {
@@ -258,4 +299,17 @@ func (m *LiveMatchModel) MoveMatchToPastMatches(matchID int64, outcome int) erro
 	}
 
 	return nil
+}
+
+func (m *LiveMatchModel) EnQueueReturnMoveMatchToPastMatches(matchID int64, outcome int) error {
+	err := DBTaskQueue.EnQueueReturnErrorOnlyTask(func() error {
+		return m.MoveMatchToPastMatches(matchID, outcome)
+	})
+	return err
+}
+
+func (m *LiveMatchModel) EnQueueMoveMatchToPastMatches(matchID int64, outcome int) {
+	DBTaskQueue.EnQueueErrorOnlyTask(func() error {
+		return m.MoveMatchToPastMatches(matchID, outcome)
+	})
 }

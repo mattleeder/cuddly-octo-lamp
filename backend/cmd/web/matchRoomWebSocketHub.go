@@ -375,7 +375,7 @@ func (hub *MatchRoomHub) sendMessageToAllSpectators(message []byte) {
 }
 
 func (hub *MatchRoomHub) updateMatchThenMoveToFinished(newFEN string, piece int, move int, gameOverStatus gameOverStatusCode, turn playerTurn, matchStateHistoryData []byte) {
-	app.liveMatches.UpdateLiveMatch(hub.matchID, newFEN, piece, move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
+	app.liveMatches.EnQueueReturnUpdateLiveMatch(hub.matchID, newFEN, piece, move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
 	var outcome int
 	if gameOverStatus == Checkmate || gameOverStatus == WhiteFlagged || gameOverStatus == BlackFlagged {
 		if turn == playerTurn(BlackTurn) {
@@ -388,7 +388,7 @@ func (hub *MatchRoomHub) updateMatchThenMoveToFinished(newFEN string, piece int,
 	} else {
 		outcome = 0
 	}
-	app.liveMatches.MoveMatchToPastMatches(hub.matchID, outcome)
+	app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, outcome)
 	app.pastMatches.LogAll()
 }
 
@@ -503,9 +503,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	}
 
 	// Update database
-	app.dbTaskQueue.EnQueueErrorOnlyTask(func() error {
-		return app.liveMatches.UpdateLiveMatch(hub.matchID, newFEN, chessMove.Body.Piece, chessMove.Body.Move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
-	})
+	app.liveMatches.EnQueueUpdateLiveMatch(hub.matchID, newFEN, chessMove.Body.Piece, chessMove.Body.Move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
 
 	if gameOverStatus != Ongoing {
 		return hub.endGame(gameOverStatus)
@@ -582,7 +580,7 @@ func (hub *MatchRoomHub) makeDraw(reason gameOverStatusCode) []byte {
 
 	hub.currentGameState = jsonStr
 
-	go app.liveMatches.MoveMatchToPastMatches(hub.matchID, 0)
+	go app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, 0)
 
 	return jsonStr
 }
@@ -627,7 +625,7 @@ func (hub *MatchRoomHub) endGame(reason gameOverStatusCode) error {
 
 	hub.currentGameState = jsonStr
 	var outcome = hub.getOutcomeInt(reason)
-	app.dbTaskQueue.EnQueueErrorOnlyTask(func() error { return app.liveMatches.MoveMatchToPastMatches(hub.matchID, outcome) })
+	app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, outcome)
 	return nil
 }
 
