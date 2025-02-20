@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"reflect"
 )
 
 type application struct {
@@ -95,28 +94,11 @@ var app *application
 
 var DBTaskQueue *TaskQueue
 
-const numdbTaskQueueWorkers = 5
-
-func CreateClosure(fn any, args ...any) func() {
-	return func() {
-		// Use reflection to call the function with the provided arguments
-		reflectFn := reflect.ValueOf(fn)
-		if reflectFn.Kind() != reflect.Func {
-			app.errorLog.Panicln("fn must be a function")
-		}
-
-		// Convert args to []reflect.Value
-		reflectArgs := make([]reflect.Value, len(args))
-		for i, arg := range args {
-			reflectArgs[i] = reflect.ValueOf(arg)
-		}
-
-		// Call the function
-		reflectFn.Call(reflectArgs)
-	}
-}
+const numdbTaskQueueWorkers = 1
 
 func init() {
+
+	println("RUNNING MODELS INIT")
 
 	infoLog := log.New(os.Stdout, "DB INFO\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr, "DB ERROR\t", log.Ldate|log.Ltime|log.Llongfile)
@@ -130,13 +112,14 @@ func init() {
 		perfLog:  perfLog,
 	}
 
-	app.infoLog.Println("RAN MODELS INIT")
+	DBTaskQueue = &TaskQueue{tasks: make(chan Task, 10)}
 
 	for i := 0; i < numdbTaskQueueWorkers; i++ {
 		app.infoLog.Printf("Starting DB Task Queue Worker Number %v\n", i)
 		go DBTaskQueue.runWorker()
 	}
 
+	app.infoLog.Println("EXITING MODELS INIT")
 }
 
 func InitDatabase(driverName string, dataSourceName string) {

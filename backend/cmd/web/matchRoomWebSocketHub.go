@@ -1,7 +1,6 @@
 package main
 
 import (
-	"burrchess/internal/models"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,15 +24,13 @@ const (
 type eventType string
 
 const (
-	takeback       = "takeback"
-	takebackAccept = "takebackAccept"
-	draw           = "draw"
-	drawAccept     = "drawAccept"
-	resign         = "resign"
-	extraTime      = "extraTime"
-	abort          = "abort"
-	rematch        = "rematch"
-	rematchAccept  = "rematchAccept"
+	takeback      = "takeback"
+	draw          = "draw"
+	resign        = "resign"
+	extraTime     = "extraTime"
+	abort         = "abort"
+	rematch       = "rematch"
+	rematchAccept = "rematchAccept"
 )
 
 // Bodies
@@ -222,12 +219,7 @@ const (
 
 func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 	// Build hub from data in db
-	sqlReturn, err := app.dbTaskQueue.EnQueueReturn(func() (any, error) { return app.liveMatches.GetFromMatchID(matchID) })
-	matchState, ok := sqlReturn.(*models.LiveMatch)
-	if !ok {
-		app.errorLog.Println("matchState is not *models.LiveMatch")
-		return nil, errors.New("matchState is not *models.LiveMatch")
-	}
+	matchState, err := app.liveMatches.EnQueueReturnGetFromMatchID(matchID)
 
 	if err != nil {
 		app.errorLog.Println(err)
@@ -382,39 +374,6 @@ func (hub *MatchRoomHub) sendMessageToAllSpectators(message []byte) {
 	}
 }
 
-func (hub *MatchRoomHub) updateGameStateAfterFlag() (err error) {
-	var gameState onMoveResponse
-	err = json.Unmarshal(hub.currentGameState, &gameState)
-	if err != nil {
-		app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
-		return err
-	}
-
-	var outcome int
-	if hub.turn == playerTurn(WhiteTurn) {
-		gameState.Body.GameOverStatusCode = WhiteFlagged
-		outcome = 2
-	} else {
-		gameState.Body.GameOverStatusCode = BlackFlagged
-		outcome = 1
-	}
-
-	var jsonStr []byte
-
-	jsonStr, err = json.Marshal(gameState)
-	if err != nil {
-		app.errorLog.Printf("Error marshalling JSON: %v\n", err)
-		return err
-	}
-
-	hub.currentGameState = jsonStr
-
-	// Game is over after flag
-	app.dbTaskQueue.EnQueueErrorOnlyTask(func() error { return app.liveMatches.MoveMatchToPastMatches(hub.matchID, outcome) })
-
-	return nil
-}
-
 func (hub *MatchRoomHub) updateMatchThenMoveToFinished(newFEN string, piece int, move int, gameOverStatus gameOverStatusCode, turn playerTurn, matchStateHistoryData []byte) {
 	app.liveMatches.UpdateLiveMatch(hub.matchID, newFEN, piece, move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
 	var outcome int
@@ -549,8 +508,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	})
 
 	if gameOverStatus != Ongoing {
-		outcome := hub.getOutcomeInt(gameOverStatus)
-		app.dbTaskQueue.EnQueueErrorOnlyTask(func() error { app.liveMatches.MoveMatchToPastMatches(hub.matchID, outcome) })
+		return hub.endGame(gameOverStatus)
 	}
 
 	return nil
@@ -642,15 +600,35 @@ func (hub *MatchRoomHub) acceptEventOffer(event eventType) []byte {
 
 	case draw:
 		return hub.makeDraw(Draw)
+
+	default:
+		return []byte{}
 	}
 }
 
-func (hub *MatchRoomHub) endGame(reason gameOverStatusCode) {
-	// Function should
-	// End game
-	// Send final update to players
-	// Handle database changes
+func (hub *MatchRoomHub) endGame(reason gameOverStatusCode) error {
+	// Updates game state and updates DB. Does not send response
+	var gameState onMoveResponse
+	err := json.Unmarshal(hub.currentGameState, &gameState)
+	if err != nil {
+		app.errorLog.Printf("Error unmarshalling JSON: %v\n", err)
+		return err
+	}
 
+	gameState.Body.GameOverStatusCode = reason
+
+	var jsonStr []byte
+
+	jsonStr, err = json.Marshal(gameState)
+	if err != nil {
+		app.errorLog.Printf("Error marshalling JSON: %v\n", err)
+		return err
+	}
+
+	hub.currentGameState = jsonStr
+	var outcome = hub.getOutcomeInt(reason)
+	app.dbTaskQueue.EnQueueErrorOnlyTask(func() error { return app.liveMatches.MoveMatchToPastMatches(hub.matchID, outcome) })
+	return nil
 }
 
 func (hub *MatchRoomHub) makeNewEventOffer(sender messageIdentifier, event eventType) []byte {
@@ -688,6 +666,8 @@ func (hub *MatchRoomHub) handlePlayerEvent(message []byte) []byte {
 	} else if hub.offerActive != nil && byte(hub.offerActive.sender) != message[0] {
 		return hub.acceptEventOffer(data.Body.EventType)
 	}
+
+	return []byte{}
 }
 
 func (hub *MatchRoomHub) handleMessage(message []byte) (response []byte) {
@@ -800,7 +780,13 @@ func (hub *MatchRoomHub) run() {
 			}
 
 		case <-hub.flagTimer:
-			err := hub.updateGameStateAfterFlag()
+			var gameOverStatus gameOverStatusCode
+			if hub.turn == playerTurn(WhiteTurn) {
+				gameOverStatus = WhiteFlagged
+			} else {
+				gameOverStatus = BlackFlagged
+			}
+			err := hub.endGame(gameOverStatus)
 			if err != nil {
 				app.errorLog.Println(err)
 				continue

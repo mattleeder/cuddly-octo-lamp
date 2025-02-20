@@ -100,10 +100,19 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 	return match, nil
 }
 
-func (m *LiveMatchModel) GetFromMatchIDClosure(matchID int64) func() (*LiveMatch, error) {
-	return func() (*LiveMatch, error) {
+func (m *LiveMatchModel) EnQueueReturnGetFromMatchID(matchID int64) (*LiveMatch, error) {
+	result, err := DBTaskQueue.EnQueueReturn(func() (any, error) {
 		return m.GetFromMatchID(matchID)
+	})
+	if err != nil {
+		return nil, err
 	}
+	matchState, ok := result.(*LiveMatch)
+	if !ok {
+		app.errorLog.Println("matchState is not *models.LiveMatch")
+		return nil, errors.New("matchState is not *models.LiveMatch")
+	}
+	return matchState, nil
 }
 
 func (m *LiveMatchModel) LogAll() {
