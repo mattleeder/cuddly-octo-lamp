@@ -34,6 +34,12 @@ export function ChessBoard() {
   if (!game) {
     throw new Error('ChessBoard must be used within a GameContext Provider');
   }
+
+  const [flip, setFlip] = useState(false)
+
+  useEffect(() => {
+    setFlip(game.playerColour == PieceColour.Black)
+  }, [game.playerColour])
   
     enum ClickAction {
       clear,
@@ -131,6 +137,10 @@ export function ChessBoard() {
       const boardXPosition = Math.floor((event.clientX - rect.left) / (rect.width / 8))
       const boardYPosition = Math.floor((event.clientY - rect.top) / (rect.height / 8))
       let position = boardYPosition * 8 + boardXPosition
+
+      if (flip) {
+        position = 63 - position
+      }
   
       // If waiting do nothing
       if (waiting) {
@@ -219,31 +229,39 @@ export function ChessBoard() {
   
       setWaiting(false)
     }
+
+    function getRowAndColFromBoardIndex(idx: number): [number, number] {
+      const row = Math.floor(idx / 8)
+      const col = idx % 8
+
+      // Checks if the board needs to be flipped and transforms the row and col
+      if (flip) {
+        return [Math.abs(7 - row), Math.abs(7 - col)]
+      }
+      return [row, col]
+    }
     
     const PiecesComponent = game?.matchData.activeState.board.map((square, idx) => {
       const [colour, variant] = square
       if (colour === null || variant === null) {
         return <React.Fragment key={idx} />
       }
-  
-      const row = Math.floor(idx / 8)
-      const col = idx % 8
+
+      const [row, col] = getRowAndColFromBoardIndex(idx)
       return (
         <div key={idx} className={`${colourToString.get(colour)}-${variantToString.get(variant)}`} style={{ transform: `translate(${col * 50}px, ${row * 50}px)` }} />
       )
     })
   
     const MovesComponent = (moves).map((move, idx) => {
-      const row = Math.floor(move / 8)
-      const col = move % 8
+      const [row, col] = getRowAndColFromBoardIndex(move)
       return (
         <div key={idx} className='potential-move' style={{ transform: `translate(${col * 50}px, ${row * 50}px)` }} />
       )
     })
   
     const CapturesComponent = captures.map((move, idx) => {
-      const row = Math.floor(move / 8)
-      const col = move % 8
+      const [row, col] = getRowAndColFromBoardIndex(move)
       return (
         <div key={idx} className='potential-capture' style={{ transform: `translate(${col * 50}px, ${row * 50}px)` }} />
       )
@@ -253,8 +271,7 @@ export function ChessBoard() {
       if (game.matchData.activeMove == 0) {
         return <React.Fragment key={idx} />
       }
-      const row = Math.floor(move / 8)
-      const col = move % 8
+      const [row, col] = getRowAndColFromBoardIndex(move)
       return (
         <div key={idx} className='last-move' style={{ transform: `translate(${col * 50}px, ${row * 50}px)` }} />
       )
@@ -265,24 +282,20 @@ export function ChessBoard() {
         return <></>
       }
   
-      const col = promotionSquare % 8
+      const [_, col] = getRowAndColFromBoardIndex(promotionSquare)
   
       let promotionColour = colourToString.get(PieceColour.Black)
-      let promotionDirection = -1
-      let verticalOffset = 350
   
       if (promotionSquare <= 7) {
         promotionColour = colourToString.get(PieceColour.White)
-        promotionDirection = 1
-        verticalOffset = 0
       }
   
       return (
         <>
-          <div className={`${promotionColour}-queen promotion`} style={{ transform: `translate(${col * 50}px, ${verticalOffset}px)` }} />
-          <div className={`${promotionColour}-knight promotion`} style={{ transform: `translate(${col * 50}px, ${verticalOffset + promotionDirection * 50}px)` }} />
-          <div className={`${promotionColour}-rook promotion`} style={{ transform: `translate(${col * 50}px, ${verticalOffset + promotionDirection * 50 * 2}px)` }} />
-          <div className={`${promotionColour}-bishop promotion`} style={{ transform: `translate(${col * 50}px, ${verticalOffset + promotionDirection * 50 * 3}px)` }} />
+          <div className={`${promotionColour}-queen promotion`} style={{ transform: `translate(${col * 50}px, ${0 * 50}px)` }} />
+          <div className={`${promotionColour}-knight promotion`} style={{ transform: `translate(${col * 50}px, ${1 * 50}px)` }} />
+          <div className={`${promotionColour}-rook promotion`} style={{ transform: `translate(${col * 50}px, ${2 * 50}px)` }} />
+          <div className={`${promotionColour}-bishop promotion`} style={{ transform: `translate(${col * 50}px, ${3 * 50}px)` }} />
         </>
       )
     }
