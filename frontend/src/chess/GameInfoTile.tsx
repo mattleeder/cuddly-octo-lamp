@@ -4,54 +4,20 @@ import { useContext, useRef, useEffect, useState } from "react";
 import { PieceColour, parseGameStateFromFEN } from "./ChessLogic";
 import { GameContext, OpponentEventType, gameContext, boardHistory } from "./GameContext";
 
-export function GameInfoTile() {
 
-  const game = useContext(GameContext)
+function isClockPaused(game: gameContext, colour: PieceColour) {
   if (!game) {
-    throw new Error('GameInfoTile must be used within a GameContext Provider');
+    return true
   }
+  return game.matchData.gameOverStatus != 0 || game.matchData.activeColour != colour|| game.matchData.stateHistory.length <= 2
+}
+
+function isBlackClockPaused(game: gameContext) {
+  return isClockPaused(game, PieceColour.Black)
+}
   
-  function PlayerInfo({ connected }: { connected: boolean }) {
-    let classname = "playerPingStatus"
-    if (connected) {
-      classname += " connected"
-    }
-    return (
-      <div className='playerInfo'>
-        <div className={classname}></div>
-        <div className='playerName'>Player</div>
-      </div>
-    )
-  }
-  
-  function isBlackClockPaused() {
-    if (!game) {
-      return true
-    }
-    return game.matchData.activeColour != PieceColour.Black || game.matchData.stateHistory.length <= 2
-  }
-  
-  function isWhiteClockPaused() {
-    if (!game) {
-      return true
-    }
-    return game.matchData.activeColour != PieceColour.White || game.matchData.stateHistory.length <= 2
-  }
-  
-  return (
-    <div>
-      <CountdownTimer className="playerTimeBlack" paused={isBlackClockPaused() || game.matchData.gameOverStatus != 0} countdownTimerMilliseconds={game.matchData.activeState.blackPlayerTimeRemainingMilliseconds}/>
-      <div className='gameInfo'>
-        <EventTypeDialog />
-        <PlayerInfo connected={game.isWhiteConnected}/>
-        <MoveHistoryControls />
-        <Moves />
-        <GameControls />
-        <PlayerInfo connected={game.isBlackConnected}/>
-      </div>
-      <CountdownTimer className="playerTimeWhite" paused={isWhiteClockPaused() || game.matchData.gameOverStatus != 0} countdownTimerMilliseconds={game.matchData.activeState.whitePlayerTimeRemainingMilliseconds}/>
-    </div>
-  )
+function isWhiteClockPaused(game: gameContext) {
+  return isClockPaused(game, PieceColour.White)
 }
   
 function sendDrawEvent(websocket: WebSocket | null) {
@@ -82,6 +48,94 @@ function sendResignEvent(websocket: WebSocket | null) {
   }))
 }
 
+function acceptEvent(websocket: WebSocket | null, eventType: OpponentEventType) {
+  if (websocket == null) {
+    console.error("Websocket is null")
+    return
+  }
+  
+  websocket.send(JSON.stringify({
+    "messageType": "playerEvent",
+    "body": {
+      "eventType": eventType,
+    }
+  }))
+  
+}
+  
+function declineEvent(game: gameContext) {
+  if (game.webSocket == null) {
+    console.error("Websocket is null")
+    return
+  }
+  
+  game.webSocket.send(JSON.stringify({
+    "messageType": "playerEvent",
+    "body": {
+      "eventType": OpponentEventType.Decline,
+    }
+  }))
+  
+  game.setOpponentEventType(OpponentEventType.None)
+    
+}
+
+function PlayerInfo({ connected }: { connected: boolean }) {
+  let classname = "playerPingStatus"
+  if (connected) {
+    classname += " connected"
+  }
+  return (
+    <div className='playerInfo'>
+      <div className={classname}></div>
+      <div className='playerName'>Player</div>
+    </div>
+  )
+}
+
+function updateActiveState(stateHistoryIndex: number, game: gameContext) {
+  console.log("updateActiveState Called")
+  console.log(stateHistoryIndex)
+  if (!game) {
+    throw new Error("updateActiveState must be called within a GameContext")
+  }
+  if (stateHistoryIndex == game.matchData.activeMove) {
+    return
+  }
+  if (stateHistoryIndex < 0 || game.matchData.stateHistory.length - 1 < stateHistoryIndex) {
+    return
+  }
+  const activeMoveNumber = stateHistoryIndex
+  const matchData = {
+    ...game.matchData
+  }
+  matchData.activeMove = activeMoveNumber
+  matchData.activeState = {
+    board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
+    lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
+    FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
+    whitePlayerTimeRemainingMilliseconds: matchData.activeState.whitePlayerTimeRemainingMilliseconds,
+    blackPlayerTimeRemainingMilliseconds: matchData.activeState.blackPlayerTimeRemainingMilliseconds,
+  }
+  game.setMatchData(matchData)
+}
+
+function formatDuration(durationInMilliseconds: number): string {
+  if (durationInMilliseconds <= 0) {
+    return "00:00:00.0"
+  }
+  const time = new Date(durationInMilliseconds);
+  // const hours = time.getUTCHours();
+  const minutes = time.getUTCMinutes();
+  const seconds = time.getUTCSeconds();
+  const milliseconds = time.getUTCMilliseconds();
+    
+  let result = String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0")
+  if (durationInMilliseconds < 10_000) {
+    result += "." + milliseconds.toPrecision(1)[0]
+  }
+  return result;
+}
 
 function GameControls() {
   const game = useContext(GameContext)
@@ -170,38 +224,7 @@ function Moves() {
   )
   
 }
-  
-function acceptEvent(websocket: WebSocket | null, eventType: OpponentEventType) {
-  if (websocket == null) {
-    console.error("Websocket is null")
-    return
-  }
-  
-  websocket.send(JSON.stringify({
-    "messageType": "playerEvent",
-    "body": {
-      "eventType": eventType,
-    }
-  }))
-  
-}
-  
-function declineEvent(game: gameContext) {
-  if (game.webSocket == null) {
-    console.error("Websocket is null")
-    return
-  }
-  
-  game.webSocket.send(JSON.stringify({
-    "messageType": "playerEvent",
-    "body": {
-      "eventType": OpponentEventType.Decline,
-    }
-  }))
-  
-  game.setOpponentEventType(OpponentEventType.None)
-    
-}
+
   
 function EventTypeDialog() {
   const game = useContext(GameContext)
@@ -261,33 +284,6 @@ function MoveHistoryControls() {
   )
 }
   
-function updateActiveState(stateHistoryIndex: number, game: gameContext) {
-  console.log("updateActiveState Called")
-  console.log(stateHistoryIndex)
-  if (!game) {
-    throw new Error("updateActiveState must be called within a GameContext")
-  }
-  if (stateHistoryIndex == game.matchData.activeMove) {
-    return
-  }
-  if (stateHistoryIndex < 0 || game.matchData.stateHistory.length - 1 < stateHistoryIndex) {
-    return
-  }
-  const activeMoveNumber = stateHistoryIndex
-  const matchData = {
-    ...game.matchData
-  }
-  matchData.activeMove = activeMoveNumber
-  matchData.activeState = {
-    board: parseGameStateFromFEN(matchData.stateHistory[activeMoveNumber]["FEN"])["board"],
-    lastMove: matchData.stateHistory[activeMoveNumber]["lastMove"],
-    FEN: matchData.stateHistory[activeMoveNumber]["FEN"],
-    whitePlayerTimeRemainingMilliseconds: matchData.activeState.whitePlayerTimeRemainingMilliseconds,
-    blackPlayerTimeRemainingMilliseconds: matchData.activeState.blackPlayerTimeRemainingMilliseconds,
-  }
-  game.setMatchData(matchData)
-}
-  
 function CountdownTimer({ countdownTimerMilliseconds, paused, className } : { countdownTimerMilliseconds: number, paused: boolean, className: string }) {
   // On mount, record the time using Date.now(), use a prop to get the count
   // Create a state to hold the remaining time
@@ -321,20 +317,26 @@ function CountdownTimer({ countdownTimerMilliseconds, paused, className } : { co
     </div>
   )
 }
-  
-function formatDuration(durationInMilliseconds: number): string {
-  if (durationInMilliseconds <= 0) {
-    return "00:00:00.0"
+
+export function GameInfoTile() {
+
+  const game = useContext(GameContext)
+  if (!game) {
+    throw new Error('GameInfoTile must be used within a GameContext Provider');
   }
-  const time = new Date(durationInMilliseconds);
-  // const hours = time.getUTCHours();
-  const minutes = time.getUTCMinutes();
-  const seconds = time.getUTCSeconds();
-  const milliseconds = time.getUTCMilliseconds();
   
-  let result = String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0")
-  if (durationInMilliseconds < 10_000) {
-    result += "." + milliseconds.toPrecision(1)[0]
-  }
-  return result;
+  return (
+    <div>
+      <CountdownTimer className="playerTimeBlack" paused={isBlackClockPaused(game)} countdownTimerMilliseconds={game.matchData.activeState.blackPlayerTimeRemainingMilliseconds}/>
+      <div className='gameInfo'>
+        <EventTypeDialog />
+        <PlayerInfo connected={game.isWhiteConnected}/>
+        <MoveHistoryControls />
+        <Moves />
+        <GameControls />
+        <PlayerInfo connected={game.isBlackConnected}/>
+      </div>
+      <CountdownTimer className="playerTimeWhite" paused={isWhiteClockPaused(game)} countdownTimerMilliseconds={game.matchData.activeState.whitePlayerTimeRemainingMilliseconds}/>
+    </div>
+  )
 }
