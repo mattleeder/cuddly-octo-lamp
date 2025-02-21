@@ -36,6 +36,8 @@ export interface gameContext {
   opponentEventType: OpponentEventType,
   setOpponentEventType: React.Dispatch<React.SetStateAction<OpponentEventType>>,
   millisecondsUntilOpponentTimeout: number | null,
+  threefoldRepetition: boolean,
+  setThreefoldRepetition: React.Dispatch<React.SetStateAction<boolean>>,
 }
 
 export const GameContext = createContext<gameContext | null>(null)
@@ -90,6 +92,7 @@ export enum OpponentEventType {
   Disconnect = "disconnect",
   Decline = "decline",
   Resign = "resign",
+  ThreefoldRepetition = "threefoldRepetition"
 }
 
 function sendPlayerCodeHandler(
@@ -110,8 +113,9 @@ function onConnectHandler(
   setOpponentEventType: React.Dispatch<React.SetStateAction<OpponentEventType>>,
   matchData: matchData,
   setMatchData: React.Dispatch<React.SetStateAction<matchData>>,
+  setThreefoldRepetition: React.Dispatch<React.SetStateAction<boolean>>,
 ) {
-  onMoveHandler(body as OnMoveMessage, setOpponentEventType, matchData, setMatchData)
+  onMoveHandler(body as OnMoveMessage, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition)
   setIsWhiteConnected(body["whitePlayerConnected"])
   setIsBlackConnected(body["blackPlayerConnected"])
 }
@@ -142,7 +146,9 @@ function onMoveHandler(
   setOpponentEventType: React.Dispatch<React.SetStateAction<OpponentEventType>>,
   matchData: matchData,
   setMatchData: React.Dispatch<React.SetStateAction<matchData>>,
+  setThreefoldRepetition: React.Dispatch<React.SetStateAction<boolean>>
 ) {
+  setThreefoldRepetition(body["threefoldRepetition"])
   setOpponentEventType(OpponentEventType.None)
   const newHistory = body["matchStateHistory"]
   if (newHistory.length == 0) {
@@ -209,6 +215,7 @@ function readMessage(
   setOpponentEventType: React.Dispatch<React.SetStateAction<OpponentEventType>>,
   matchData: matchData,
   setMatchData: React.Dispatch<React.SetStateAction<matchData>>,
+  setThreefoldRepetition: React.Dispatch<React.SetStateAction<boolean>>,
 ) {
   console.log("FROM WEBSOCKET")
   console.log(message)
@@ -227,13 +234,13 @@ function readMessage(
       sendPlayerCodeHandler(parsedMsg["body"] as PlayerCodeMessage, setPlayerColour)
       break;
     case "onConnect":
-      onConnectHandler(parsedMsg["body"] as OnConnectMessage, setIsWhiteConnected, setIsBlackConnected, setOpponentEventType, matchData, setMatchData)
+      onConnectHandler(parsedMsg["body"] as OnConnectMessage, setIsWhiteConnected, setIsBlackConnected, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition)
       break;
     case "connectionStatus":
       connectionStatusHandler(parsedMsg["body"] as ConnectionStatusMessage, setIsWhiteConnected, setIsBlackConnected, setMillisecondsUntilOpponentTimeout, setOpponentEventType)
       break;
     case "onMove":
-      onMoveHandler(parsedMsg["body"] as OnMoveMessage, setOpponentEventType, matchData, setMatchData)
+      onMoveHandler(parsedMsg["body"] as OnMoveMessage, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition)
       break;
     case "opponentEvent":
       opponentEventHandler(parsedMsg["body"] as OpponentEventMessage, setOpponentEventType)
@@ -273,6 +280,7 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
   const [isBlackConnected, setIsBlackConnected] = useState(false)
   const [millisecondsUntilOpponentTimeout, setMillisecondsUntilOpponentTimeout] = useState<number | null>(null)
   const [opponentEventType, setOpponentEventType] = useState(OpponentEventType.None)
+  const [threefoldRepetition, setThreefoldRepetition] = useState(false)
   
   useEffect(() => {
     // Connect to websocket for matchroom
@@ -282,7 +290,7 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
 
       const ws = new WebSocket(import.meta.env.VITE_API_MATCHROOM_URL + matchID + '/ws')
       ws.onopen = () => console.log("Websocket connected")
-      ws.onmessage = (event) => readMessage(event.data, setPlayerColour, setIsWhiteConnected, setIsBlackConnected, setMillisecondsUntilOpponentTimeout, setOpponentEventType, matchData, setMatchData)
+      ws.onmessage = (event) => readMessage(event.data, setPlayerColour, setIsWhiteConnected, setIsBlackConnected, setMillisecondsUntilOpponentTimeout, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition)
       ws.onerror = (event) => console.error(event)
       ws.onclose = () => {
         console.log("Websocket closed")
@@ -313,7 +321,7 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
   }, [matchData])
   
   return (
-    <GameContext.Provider value={{ matchData, setMatchData, webSocket, playerColour, isWhiteConnected, isBlackConnected, opponentEventType, setOpponentEventType, millisecondsUntilOpponentTimeout }}>
+    <GameContext.Provider value={{ matchData, setMatchData, webSocket, playerColour, isWhiteConnected, isBlackConnected, opponentEventType, setOpponentEventType, millisecondsUntilOpponentTimeout, threefoldRepetition, setThreefoldRepetition }}>
       {children}
     </GameContext.Provider>
   )

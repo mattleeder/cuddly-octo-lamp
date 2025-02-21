@@ -24,14 +24,15 @@ const (
 type eventType string
 
 const (
-	takeback   = "takeback"
-	draw       = "draw"
-	resign     = "resign"
-	extraTime  = "extraTime"
-	abort      = "abort"
-	rematch    = "rematch"
-	disconnect = "disconnect"
-	decline    = "decline"
+	takeback            = "takeback"
+	draw                = "draw"
+	resign              = "resign"
+	extraTime           = "extraTime"
+	abort               = "abort"
+	rematch             = "rematch"
+	disconnect          = "disconnect"
+	decline             = "decline"
+	threefoldRepetition = "threefoldRepetition"
 )
 
 // Bodies
@@ -216,6 +217,8 @@ type MatchRoomHub struct {
 	offerActive *offerInfo
 
 	gameEnded bool
+
+	threefoldRepetition bool
 }
 
 type playerTurn byte
@@ -324,6 +327,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		fenFreqMap:               fenFreqMap,
 		whitePlayerConnected:     false,
 		blackPlayerConnected:     false,
+		threefoldRepetition:      threefoldRepetition,
 	}
 
 	return match, nil
@@ -471,6 +475,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	if hub.fenFreqMap[splitFEN] >= 3 {
 		threefoldRepetition = true
 	}
+	hub.threefoldRepetition = threefoldRepetition
 
 	// Construct Reply
 	data := onMoveResponse{
@@ -690,6 +695,14 @@ func (hub *MatchRoomHub) handlePlayerEvent(message []byte) {
 	err := json.Unmarshal(message[1:], &data)
 	if err != nil {
 		app.errorLog.Printf("Could not unmarshal playerEvent: %s", err)
+		return
+	}
+
+	if data.Body.EventType == threefoldRepetition {
+		if hub.threefoldRepetition {
+			hub.endGame(ThreefoldRepetition)
+			hub.sendMessageToAllClients(hub.currentGameState)
+		}
 		return
 	}
 

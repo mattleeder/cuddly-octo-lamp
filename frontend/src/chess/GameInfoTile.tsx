@@ -47,24 +47,31 @@ function sendResignEvent(websocket: WebSocket | null) {
   }))
 }
 
-function acceptEvent(websocket: WebSocket | null, eventType: OpponentEventType) {
-  if (websocket == null) {
+function acceptEvent(game: gameContext, eventType: OpponentEventType) {
+  if (game.webSocket == null) {
     console.error("Websocket is null")
     return
   }
   
-  websocket.send(JSON.stringify({
+  game.webSocket.send(JSON.stringify({
     "messageType": "playerEvent",
     "body": {
       "eventType": eventType,
     }
   }))
+
+  game.setOpponentEventType(OpponentEventType.None)
   
 }
   
-function declineEvent(game: gameContext) {
+function declineEvent(game: gameContext, isThreefold = false) {
   if (game.webSocket == null) {
     console.error("Websocket is null")
+    return
+  }
+
+  if (isThreefold) {
+    game.setThreefoldRepetition(false)
     return
   }
   
@@ -74,8 +81,9 @@ function declineEvent(game: gameContext) {
       "eventType": OpponentEventType.Decline,
     }
   }))
-  
+
   game.setOpponentEventType(OpponentEventType.None)
+  
     
 }
 
@@ -230,6 +238,20 @@ function EventTypeDialog() {
   if (!game) {
     throw new Error("EventTypeDialog must be used within a gameContext")
   }
+
+  console.log(`Threefold Repetition? ${game.threefoldRepetition}`)
+
+  if (game.threefoldRepetition) {
+    return (
+      <div className="eventTypeDialog">
+        <span>Threefold Repetition</span>
+        <div>
+          <button onClick={() => acceptEvent(game, OpponentEventType.ThreefoldRepetition)}>Accept</button>
+          <button onClick={() => declineEvent(game, true)}>Decline</button>
+        </div>
+      </div>
+    )
+  }
   
   if (game.opponentEventType == OpponentEventType.None) {
     return <></>
@@ -239,7 +261,7 @@ function EventTypeDialog() {
     <div className="eventTypeDialog">
       <span>Event</span>
       <div>
-        <button onClick={() => acceptEvent(game.webSocket, game.opponentEventType)}>Accept</button>
+        <button onClick={() => acceptEvent(game, game.opponentEventType)}>Accept</button>
         <button onClick={() => declineEvent(game)}>Decline</button>
       </div>
     </div>
