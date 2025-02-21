@@ -1,6 +1,5 @@
-import React from "react";
+import React, { useContext, useRef, useEffect, useState } from "react";
 import { CornerUpLeft, Handshake, Flag, Microscope, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, AlignJustify } from "lucide-react";
-import { useContext, useRef, useEffect, useState } from "react";
 import { PieceColour, parseGameStateFromFEN } from "./ChessLogic";
 import { GameContext, OpponentEventType, gameContext, boardHistory } from "./GameContext";
 
