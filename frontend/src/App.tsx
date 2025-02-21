@@ -1,6 +1,7 @@
 import React from 'react';
 import './App.css'
-import { MatchRoom, QueueTiles } from './ChessUI.tsx'
+import { MatchRoom } from './chess/MatchRoom.tsx'
+import { QueueTiles } from './chess/QueueTiles.tsx';
 import {
   BrowserRouter as Router,
   Routes,
