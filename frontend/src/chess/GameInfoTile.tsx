@@ -345,10 +345,27 @@ export function GameInfoTile() {
   if (!game) {
     throw new Error('GameInfoTile must be used within a GameContext Provider');
   }
+
+  let topTime
+  let bottomTime
+  let topPaused
+  let bottomPaused
+
+  if (game.flip) {
+    topTime = game.matchData.activeState.whitePlayerTimeRemainingMilliseconds
+    topPaused = isWhiteClockPaused(game)
+    bottomTime = game.matchData.activeState.blackPlayerTimeRemainingMilliseconds
+    bottomPaused = isBlackClockPaused(game)
+  } else {
+    topTime = game.matchData.activeState.blackPlayerTimeRemainingMilliseconds
+    topPaused = isBlackClockPaused(game)
+    bottomTime = game.matchData.activeState.whitePlayerTimeRemainingMilliseconds
+    bottomPaused = isWhiteClockPaused(game)
+  }
   
   return (
     <div>
-      <CountdownTimer className="playerTimeBlack" paused={isBlackClockPaused(game)} countdownTimerMilliseconds={game.matchData.activeState.blackPlayerTimeRemainingMilliseconds}/>
+      <CountdownTimer className="playerTimeTop" paused={topPaused} countdownTimerMilliseconds={topTime}/>
       <div className='gameInfo'>
         <EventTypeDialog />
         <PlayerInfo connected={game.isWhiteConnected}/>
@@ -357,7 +374,7 @@ export function GameInfoTile() {
         <GameControls />
         <PlayerInfo connected={game.isBlackConnected}/>
       </div>
-      <CountdownTimer className="playerTimeWhite" paused={isWhiteClockPaused(game)} countdownTimerMilliseconds={game.matchData.activeState.whitePlayerTimeRemainingMilliseconds}/>
+      <CountdownTimer className="playerTimeBottom" paused={bottomPaused} countdownTimerMilliseconds={bottomTime}/>
     </div>
   )
 }

@@ -25,8 +25,8 @@ enum ClickAction {
 
 async function clickHandler(
   event: React.MouseEvent,
+  game: gameContext,
   rect: DOMRect | null,
-  flip: boolean,
   promotionActive: boolean,
   promotionSquare: number,
   moves: number[],
@@ -47,16 +47,12 @@ async function clickHandler(
   if (rect === null) {
     throw new Error("Bounding rect for board is not defined")
   }
-  const game = useContext(GameContext)
-  if (!game) {
-    throw new Error("clickHandler must be called from within a GameContext")
-  }
 
   const boardXPosition = Math.floor((event.clientX - rect.left) / (rect.width / 8))
   const boardYPosition = Math.floor((event.clientY - rect.top) / (rect.height / 8))
   let position = boardYPosition * 8 + boardXPosition
 
-  if (flip) {
+  if (game.flip) {
     position = 63 - position
   }
 
@@ -129,7 +125,7 @@ async function clickHandler(
       position = promotionSquare
     }
     // Send current FEN, piece, move, new FEN
-    wsPostMove(position, selectedPiece, promotionString)
+    wsPostMove(position, selectedPiece, promotionString, game)
 
     // Clear cache, clear moves
     setToBare(
@@ -146,7 +142,7 @@ async function clickHandler(
   case ClickAction.showMoves:
   // Fetch moves
   {
-    const data = await fetchPossibleMoves(position)
+    const data = await fetchPossibleMoves(position, game)
 
     // Set Moves
     setMoves(data["moves"] || [])
@@ -178,11 +174,7 @@ function setToBare(
   setPromotionSquare(0)
 }
 
-async function fetchPossibleMoves(position: number) {
-  const game = useContext(GameContext)
-  if (!game) {
-    throw new Error("fetchPossibleMoves must be called from within a GameContext")
-  }
+async function fetchPossibleMoves(position: number, game: gameContext) {
   try {
     const mostRecentMove = game.matchData.stateHistory.at(-1)
     if (!mostRecentMove) {
@@ -216,11 +208,7 @@ async function fetchPossibleMoves(position: number) {
 
 }
 
-function wsPostMove(position: number, piece: number, promotion: string) {
-  const game = useContext(GameContext)
-  if (!game) {
-    throw new Error("wsPostMove must be called from within a GameContext")
-  }
+function wsPostMove(position: number, piece: number, promotion: string, game: gameContext) {
   game?.webSocket?.send(JSON.stringify({
     "messageType": "postMove",
     "body": {
@@ -358,13 +346,6 @@ export function ChessBoard() {
   if (!game) {
     throw new Error('ChessBoard must be used within a GameContext Provider');
   }
-
-  const [flip, setFlip] = useState(false)
-
-  useEffect(() => {
-    setFlip(game.playerColour == PieceColour.Black)
-  }, [game.playerColour])
-  
   
   useEffect(() => {
     const updateRect = () => {
@@ -398,8 +379,8 @@ export function ChessBoard() {
   return (
     <div className='chessboard' onClick={(event) => clickHandler(
       event,
+      game,
       rect,
-      flip,
       promotionActive,
       promotionSquare,
       moves,
@@ -415,11 +396,11 @@ export function ChessBoard() {
       waiting,
       setWaiting
     )} ref={boardRef}>
-      <LastMoveComponent flip={flip}/>
-      <PiecesComponent flip={flip}/>
-      <MovesComponent moves={moves} flip={flip}/>
-      <CapturesComponent captures={captures} flip={flip}/>
-      <PromotionComponent promotionSquare={promotionSquare} promotionActive={promotionActive} flip={flip}/>
+      <LastMoveComponent flip={game.flip}/>
+      <PiecesComponent flip={game.flip}/>
+      <MovesComponent moves={moves} flip={game.flip}/>
+      <CapturesComponent captures={captures} flip={game.flip}/>
+      <PromotionComponent promotionSquare={promotionSquare} promotionActive={promotionActive} flip={game.flip}/>
       <GameOverComponent />
     </div>
   )

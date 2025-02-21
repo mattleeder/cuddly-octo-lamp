@@ -38,6 +38,8 @@ export interface gameContext {
   millisecondsUntilOpponentTimeout: number | null,
   threefoldRepetition: boolean,
   setThreefoldRepetition: React.Dispatch<React.SetStateAction<boolean>>,
+  flip: boolean,
+  setFlip: React.Dispatch<React.SetStateAction<boolean>>,
 }
 
 export const GameContext = createContext<gameContext | null>(null)
@@ -281,6 +283,11 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
   const [millisecondsUntilOpponentTimeout, setMillisecondsUntilOpponentTimeout] = useState<number | null>(null)
   const [opponentEventType, setOpponentEventType] = useState(OpponentEventType.None)
   const [threefoldRepetition, setThreefoldRepetition] = useState(false)
+  const [flip, setFlip] = useState(false)
+
+  useEffect(() => {
+    setFlip(playerColour == PieceColour.Black)
+  }, [playerColour])
   
   useEffect(() => {
     // Connect to websocket for matchroom
@@ -321,7 +328,7 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
   }, [matchData])
   
   return (
-    <GameContext.Provider value={{ matchData, setMatchData, webSocket, playerColour, isWhiteConnected, isBlackConnected, opponentEventType, setOpponentEventType, millisecondsUntilOpponentTimeout, threefoldRepetition, setThreefoldRepetition }}>
+    <GameContext.Provider value={{ matchData, setMatchData, webSocket, playerColour, isWhiteConnected, isBlackConnected, opponentEventType, setOpponentEventType, millisecondsUntilOpponentTimeout, threefoldRepetition, setThreefoldRepetition, flip, setFlip }}>
       {children}
     </GameContext.Provider>
   )
