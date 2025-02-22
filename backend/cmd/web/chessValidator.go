@@ -95,6 +95,8 @@ const (
 	WhiteResigned
 	BlackResigned
 	Abort
+	WhiteDisconnected
+	BlackDisconnected
 )
 
 type pieceType struct {

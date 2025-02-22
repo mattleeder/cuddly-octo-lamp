@@ -38,11 +38,12 @@ const (
 // Bodies
 
 type onConnectBody struct {
-	MatchStateHistory    []MatchStateHistory `json:"matchStateHistory"`
-	GameOverStatusCode   gameOverStatusCode  `json:"gameOverStatus"`
-	ThreefoldRepetition  bool                `json:"threefoldRepetition"`
-	WhitePlayerConnected bool                `json:"whitePlayerConnected"`
-	BlackPlayerConnected bool                `json:"blackPlayerConnected"`
+	MatchStateHistory        []MatchStateHistory `json:"matchStateHistory"`
+	GameOverStatusCode       gameOverStatusCode  `json:"gameOverStatus"`
+	ThreefoldRepetition      bool                `json:"threefoldRepetition"`
+	WhitePlayerConnected     bool                `json:"whitePlayerConnected"`
+	BlackPlayerConnected     bool                `json:"blackPlayerConnected"`
+	MillisecondsUntilTimeout int64               `json:"millisecondsUntilTimeout"`
 }
 
 type onMoveBody struct {
@@ -208,7 +209,11 @@ type MatchRoomHub struct {
 
 	whitePlayerTimeout <-chan time.Time
 
+	whitePlayerTimeoutStarted time.Time
+
 	blackPlayerTimeout <-chan time.Time
+
+	blackPlayerTimeoutStarted time.Time
 
 	whiteCanClaimTimeout bool
 
@@ -525,7 +530,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	return nil
 }
 
-func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection() (jsonStr []byte, err error) {
+func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection(playerIdentifier messageIdentifier) (jsonStr []byte, err error) {
 	var gameState onMoveResponse
 	err = json.Unmarshal(hub.currentGameState, &gameState)
 	if err != nil {
@@ -540,14 +545,22 @@ func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection() (jsonStr []byte,
 		gameState.Body.MatchStateHistory[len(gameState.Body.MatchStateHistory)-1].BlackPlayerTimeRemainingMilliseconds -= time.Since(hub.timeOfLastMove).Milliseconds()
 	}
 
+	var millisecondsUntilTimeout int64 = 0
+	if playerIdentifier == White && !hub.blackPlayerConnected {
+		millisecondsUntilTimeout = pingTimeout.Milliseconds() - time.Since(hub.blackPlayerTimeoutStarted).Milliseconds()
+	} else if playerIdentifier == Black && !hub.whitePlayerConnected {
+		millisecondsUntilTimeout = pingTimeout.Milliseconds() - time.Since(hub.whitePlayerTimeoutStarted).Milliseconds()
+	}
+
 	var response = onConnectResponse{
 		MessageType: onConnect,
 		Body: onConnectBody{
-			MatchStateHistory:    gameState.Body.MatchStateHistory,
-			GameOverStatusCode:   gameState.Body.GameOverStatusCode,
-			ThreefoldRepetition:  gameState.Body.ThreefoldRepetition,
-			WhitePlayerConnected: hub.whitePlayerConnected,
-			BlackPlayerConnected: hub.blackPlayerConnected,
+			MatchStateHistory:        gameState.Body.MatchStateHistory,
+			GameOverStatusCode:       gameState.Body.GameOverStatusCode,
+			ThreefoldRepetition:      gameState.Body.ThreefoldRepetition,
+			WhitePlayerConnected:     hub.whitePlayerConnected,
+			BlackPlayerConnected:     hub.blackPlayerConnected,
+			MillisecondsUntilTimeout: millisecondsUntilTimeout,
 		},
 	}
 
@@ -673,7 +686,7 @@ func (hub *MatchRoomHub) makeNewEventOffer(sender messageIdentifier, event event
 }
 
 func isOneSidedEvent(event eventType) bool {
-	return event == extraTime || event == resign || event == abort
+	return event == extraTime || event == resign || event == abort || event == disconnect
 }
 
 func (hub *MatchRoomHub) oneSidedEvent(sender messageIdentifier, event eventType) {
@@ -685,6 +698,13 @@ func (hub *MatchRoomHub) oneSidedEvent(sender messageIdentifier, event eventType
 			hub.endGame(WhiteResigned)
 		} else {
 			hub.endGame(BlackResigned)
+		}
+		hub.sendMessageToAllClients(hub.currentGameState)
+	case disconnect:
+		if sender == White && hub.whiteCanClaimTimeout {
+			hub.endGame(BlackDisconnected)
+		} else if sender == Black && hub.blackCanClaimTimeout {
+			hub.endGame(WhiteDisconnected)
 		}
 		hub.sendMessageToAllClients(hub.currentGameState)
 	}
@@ -793,6 +813,7 @@ func (hub *MatchRoomHub) setDisconnected(client *MatchRoomHubClient) {
 	if client.playerIdentifier == messageIdentifier(WhitePlayer) {
 		hub.whitePlayerConnected = false
 		hub.whitePlayerTimeout = time.After(pingTimeout)
+		hub.whitePlayerTimeoutStarted = time.Now()
 		pingMessage, err := hub.pingStatusMessage("white", false, pingTimeout.Milliseconds())
 		if err != nil {
 			app.errorLog.Printf("Could not generate pingMessage: %s", err)
@@ -801,6 +822,7 @@ func (hub *MatchRoomHub) setDisconnected(client *MatchRoomHubClient) {
 	} else if client.playerIdentifier == messageIdentifier(BlackPlayer) {
 		hub.blackPlayerConnected = false
 		hub.blackPlayerTimeout = time.After(pingTimeout)
+		hub.blackPlayerTimeoutStarted = time.Now()
 		pingMessage, err := hub.pingStatusMessage("black", false, pingTimeout.Milliseconds())
 		if err != nil {
 			app.errorLog.Printf("Could not generate pingMessage: %s", err)
@@ -818,7 +840,7 @@ func (hub *MatchRoomHub) run() {
 		case client := <-hub.register:
 			hub.clients[client] = true
 			hub.setConnected(client)
-			jsonStr, err := hub.getCurrentMatchStateForNewConnection()
+			jsonStr, err := hub.getCurrentMatchStateForNewConnection(client.playerIdentifier)
 			if err != nil {
 				app.errorLog.Printf("Could not get json for new connection: %v\n", err)
 				continue

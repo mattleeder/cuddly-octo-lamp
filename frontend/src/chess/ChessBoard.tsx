@@ -209,7 +209,7 @@ async function fetchPossibleMoves(position: number, game: gameContext) {
 }
 
 function wsPostMove(position: number, piece: number, promotion: string, game: gameContext) {
-  game?.webSocket?.send(JSON.stringify({
+  game?.webSocket.current?.send(JSON.stringify({
     "messageType": "postMove",
     "body": {
       "piece": piece,
@@ -322,7 +322,7 @@ function GameOverComponent() {
     return <></>
   }
 
-  const gameOverStatusCodes = ["Ongoing", "Stalemate", "Checkmate", "Threefold Repetition", "Insufficient Material", "White Flagged", "Black Flagged", "Draw", "White Resigned", "Black Resigned", "Game Aborted"]
+  const gameOverStatusCodes = ["Ongoing", "Stalemate", "Checkmate", "Threefold Repetition", "Insufficient Material", "White Flagged", "Black Flagged", "Draw", "White Resigned", "Black Resigned", "Game Aborted", "White Disconnected", "Black Disconnected"]
   const gameOverText = gameOverStatusCodes[game?.matchData.gameOverStatus || 0]
 
   return <div style={{ transform: `translate(${0}px, ${180}px)`, color: "black" }}>{gameOverText}</div>

@@ -29,7 +29,8 @@ export interface matchData {
 export interface gameContext {
   matchData: matchData,
   setMatchData: React.Dispatch<React.SetStateAction<matchData>>,
-  webSocket: WebSocket | null,
+  // webSocket: WebSocket | null,
+  webSocket: React.RefObject<WebSocket | null>,
   playerColour: PieceColour,
   isWhiteConnected: boolean,
   isBlackConnected: boolean,
@@ -139,7 +140,8 @@ function connectionStatusHandler(
     // Should always be opponent
     setMillisecondsUntilOpponentTimeout(null)
   } else {
-    setOpponentEventType(OpponentEventType.Disconnect)
+    setMillisecondsUntilOpponentTimeout(body["millisecondsUntilTimeout"])
+    // setOpponentEventType(OpponentEventType.Disconnect)
   }
 }
 
@@ -275,8 +277,10 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
       activeMove: 0,
       gameOverStatus: 0,
     })
-  const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
-  const shouldReconnect = useRef(true)
+  // const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
+  const webSocket = useRef<WebSocket | null>(null)
+  const webSocketReconnectTimeout = useRef(1000)
+  // const shouldReconnect = useRef(true)
   const [playerColour, setPlayerColour] = useState(PieceColour.Spectator)
   const [isWhiteConnected, setIsWhiteConnected] = useState(false)
   const [isBlackConnected, setIsBlackConnected] = useState(false)
@@ -288,37 +292,25 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
   useEffect(() => {
     setFlip(playerColour == PieceColour.Black)
   }, [playerColour])
-  
+
   useEffect(() => {
-    // Connect to websocket for matchroom
-    console.log("Connecting to ws")
-    shouldReconnect.current = true
-    const connectToWebSocket = () => {
-
-      const ws = new WebSocket(import.meta.env.VITE_API_MATCHROOM_URL + matchID + '/ws')
-      ws.onopen = () => console.log("Websocket connected")
-      ws.onmessage = (event) => readMessage(event.data, setPlayerColour, setIsWhiteConnected, setIsBlackConnected, setMillisecondsUntilOpponentTimeout, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition)
-      ws.onerror = (event) => console.error(event)
-      ws.onclose = () => {
-        console.log("Websocket closed")
-        console.log(shouldReconnect.current)
-        if (shouldReconnect.current) {
-          console.log("Attempting reconnect in 1 second")
-          setTimeout( function() {
-            setWebSocket(connectToWebSocket())
-          }, 1000
-          )
-        }      
+    const webSocketConnect = () => {
+      webSocket.current = new WebSocket(import.meta.env.VITE_API_MATCHROOM_URL + matchID + '/ws')
+      webSocket.current.onopen = () => console.log("Websocket connected")
+      webSocket.current.onmessage = (event) => readMessage(event.data, setPlayerColour, setIsWhiteConnected, setIsBlackConnected, setMillisecondsUntilOpponentTimeout, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition)
+      webSocket.current.onerror = (event) => console.error(event)
+      webSocket.current.onclose = () => {
+        console.log(`WebSocket closed, attempting reconnect in ${Math.floor(webSocketReconnectTimeout.current / 1000)}s`)
+        webSocketConnect()
       }
-      return ws
     }
-
-    const ws = connectToWebSocket()
-    setWebSocket(ws)
+    webSocketConnect()
     return () => {
-      // Disconnect
-      shouldReconnect.current = false
-      ws?.close()
+      if (webSocket.current == null) {
+        return
+      }
+      webSocket.current.onclose = () => console.log("Closing WebSocket")
+      webSocket.current.close()
     }
   }, [matchID])
   

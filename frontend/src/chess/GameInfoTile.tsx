@@ -19,13 +19,13 @@ function isWhiteClockPaused(game: gameContext) {
   return isClockPaused(game, PieceColour.White)
 }
   
-function sendDrawEvent(websocket: WebSocket | null) {
+function sendDrawEvent(websocket: React.RefObject<WebSocket | null>) {
   if (!websocket) {
     console.error("Websocket is null")
     return
   }
   
-  websocket.send(JSON.stringify({
+  websocket.current?.send(JSON.stringify({
     "messageType": "playerEvent",
     "body": {
       "eventType": OpponentEventType.Draw,
@@ -33,13 +33,13 @@ function sendDrawEvent(websocket: WebSocket | null) {
   }))
 }
   
-function sendResignEvent(websocket: WebSocket | null) {
+function sendResignEvent(websocket: React.RefObject<WebSocket | null>) {
   if (!websocket) {
     console.error("Websocket is null")
     return
   }
   
-  websocket.send(JSON.stringify({
+  websocket.current?.send(JSON.stringify({
     "messageType": "playerEvent",
     "body": {
       "eventType": OpponentEventType.Resign,
@@ -53,7 +53,7 @@ function acceptEvent(game: gameContext, eventType: OpponentEventType) {
     return
   }
   
-  game.webSocket.send(JSON.stringify({
+  game.webSocket.current?.send(JSON.stringify({
     "messageType": "playerEvent",
     "body": {
       "eventType": eventType,
@@ -75,7 +75,7 @@ function declineEvent(game: gameContext, isThreefold = false) {
     return
   }
   
-  game.webSocket.send(JSON.stringify({
+  game.webSocket.current?.send(JSON.stringify({
     "messageType": "playerEvent",
     "body": {
       "eventType": OpponentEventType.Decline,
@@ -231,13 +231,48 @@ function Moves() {
   )
   
 }
-
   
 function EventTypeDialog() {
   const game = useContext(GameContext)
   if (!game) {
     throw new Error("EventTypeDialog must be used within a gameContext")
   }
+
+  const [timeoutCountdown, setTimeoutCountdown] = useState<null | number>(null)
+
+  // Handle disconnect timeout timer
+  useEffect(() => {
+    const timeoutArray: NodeJS.Timeout[] = []
+    const updateTime = (start: number) => {
+      if (game.millisecondsUntilOpponentTimeout === null) {
+        return
+      }
+      const deltaTime = Date.now() - start
+      const timeRemainingMs = Math.max(game.millisecondsUntilOpponentTimeout - deltaTime, 0)
+      setTimeoutCountdown(timeRemainingMs)
+      if (timeRemainingMs == 0) {
+        return
+      }
+      const timeoutID = setTimeout(() => {
+        updateTime(start)
+      }, 1000)
+      timeoutArray.push(timeoutID)
+    }
+    if (game.millisecondsUntilOpponentTimeout != null) {
+      const start = Date.now()
+      const timeoutID = setTimeout(() => {
+        updateTime(start)
+      }, 1000)
+      timeoutArray.push(timeoutID)
+    }
+
+    return () => {
+      setTimeoutCountdown(null)
+      for (const ID of timeoutArray) {
+        clearTimeout(ID)
+      }
+    }
+  }, [game.millisecondsUntilOpponentTimeout])
 
   console.log(`Threefold Repetition? ${game.threefoldRepetition}`)
 
@@ -248,6 +283,28 @@ function EventTypeDialog() {
         <div>
           <button onClick={() => acceptEvent(game, OpponentEventType.ThreefoldRepetition)}>Accept</button>
           <button onClick={() => declineEvent(game, true)}>Decline</button>
+        </div>
+      </div>
+    )
+  }
+
+  const isOpponentConnected = game.playerColour == PieceColour.White ? game.isBlackConnected : game.isWhiteConnected
+
+  if (!isOpponentConnected && timeoutCountdown != null && timeoutCountdown <= 10_000) {
+
+    if (timeoutCountdown > 0 ){
+      return (
+        <div className="eventTypeDialog">
+          <span>Opponent has disconnected, can claim victory in {formatDuration(timeoutCountdown)}s</span>
+        </div>
+      )
+    }
+
+    return (
+      <div className="eventTypeDialog">
+        <span>Opponent has disconnected</span>
+        <div>
+          <button onClick={() => acceptEvent(game, OpponentEventType.Disconnect)}>Claim Victory</button>
         </div>
       </div>
     )
