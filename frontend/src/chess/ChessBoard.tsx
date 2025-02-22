@@ -23,10 +23,17 @@ enum ClickAction {
   choosePromotion,
 }
 
+interface Rect {
+  top: number,
+  left: number,
+  width: number,
+  height: number,
+}
+
 async function clickHandler(
   event: React.MouseEvent,
   game: gameContext,
-  rect: DOMRect | null,
+  rect: React.RefObject<Rect | null>,
   promotionActive: boolean,
   promotionSquare: number,
   moves: number[],
@@ -44,13 +51,16 @@ async function clickHandler(
 ) {
   console.log(`${event.clientX}, ${event.clientY}`)
   // Calculate board position
-  if (rect === null) {
+  if (rect === null || rect.current === null) {
     throw new Error("Bounding rect for board is not defined")
   }
 
-  const boardXPosition = Math.floor((event.clientX - rect.left) / (rect.width / 8))
-  const boardYPosition = Math.floor((event.clientY - rect.top) / (rect.height / 8))
+  const boardXPosition = Math.floor((event.clientX - rect.current.left) / (rect.current.width / 8))
+  const boardYPosition = Math.floor((event.clientY - rect.current.top) / (rect.current.height / 8))
   let position = boardYPosition * 8 + boardXPosition
+
+  console.log(`Clicked on ${event.clientX}x, ${event.clientY}y which is position ${position}`)
+  console.log(`Clicked on ${event.clientX - rect.current.left}x, ${event.clientY - rect.current.top}y which is position ${position}`)
 
   if (game.flip) {
     position = 63 - position
@@ -328,9 +338,18 @@ function GameOverComponent() {
   return <div style={{ transform: `translate(${0}px, ${180}px)`, color: "black" }}>{gameOverText}</div>
 }
 
+function getRect(top: number, left: number, width: number, height: number): Rect {
+  return {
+    top: top,
+    left: left,
+    width: width,
+    height: height,
+  }
+}
+
 export function ChessBoard() {
   const boardRef = useRef<HTMLDivElement | null>(null)
-  const [rect, setRect] = useState<DOMRect | null>(null)
+  const rect = useRef<Rect | null>(null)
   
   const [waiting, setWaiting] = useState(false)
   
@@ -346,23 +365,54 @@ export function ChessBoard() {
   if (!game) {
     throw new Error('ChessBoard must be used within a GameContext Provider');
   }
-  
+
   useEffect(() => {
-    const updateRect = () => {
+    const resizeObserver = new ResizeObserver((entries) => {
+      console.log("RESIZE")
+      for (const entry of entries) {
+        const boundingRect = entry.target.getBoundingClientRect()
+        rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
+      }
+    })
+    if (boardRef.current) {
+      resizeObserver.observe(boardRef.current)
+    }
+
+    window.addEventListener('scroll', () => {
+      console.log("RESIZE")
       if (boardRef.current) {
         const boundingRect = boardRef.current.getBoundingClientRect()
-        setRect(boundingRect)
+        rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
       }
-    }
-  
-    updateRect()
-  
-    window.addEventListener('resize', updateRect)
-  
+    })
+
+    window.addEventListener('resize', () => {
+      console.log("RESIZE")
+      if (boardRef.current) {
+        const boundingRect = boardRef.current.getBoundingClientRect()
+        rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
+      }
+    })
+
     return () => {
-      window.removeEventListener('resize', updateRect)
+      resizeObserver.disconnect()
+      window.removeEventListener('scroll', () => {
+        console.log("RESIZE")
+        if (boardRef.current) {
+          const boundingRect = boardRef.current.getBoundingClientRect()
+          rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
+        }
+      })
+      window.removeEventListener('resize', () => {
+        console.log("RESIZE")
+        if (boardRef.current) {
+          const boundingRect = boardRef.current.getBoundingClientRect()
+          rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
+        }
+      })
+
     }
-  }, [])
+  }, [boardRef])
   
   // Clear board when changing active move
   useEffect(() => {

@@ -128,7 +128,6 @@ function connectionStatusHandler(
   setIsWhiteConnected: React.Dispatch<React.SetStateAction<boolean>>, 
   setIsBlackConnected: React.Dispatch<React.SetStateAction<boolean>>,
   setMillisecondsUntilOpponentTimeout: React.Dispatch<React.SetStateAction<number | null>>,
-  setOpponentEventType: React.Dispatch<React.SetStateAction<OpponentEventType>>,
 ) {
   if (body["playerColour"] == "white") {
     setIsWhiteConnected(body["isConnected"])
@@ -141,7 +140,6 @@ function connectionStatusHandler(
     setMillisecondsUntilOpponentTimeout(null)
   } else {
     setMillisecondsUntilOpponentTimeout(body["millisecondsUntilTimeout"])
-    // setOpponentEventType(OpponentEventType.Disconnect)
   }
 }
 
@@ -241,7 +239,7 @@ function readMessage(
       onConnectHandler(parsedMsg["body"] as OnConnectMessage, setIsWhiteConnected, setIsBlackConnected, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition)
       break;
     case "connectionStatus":
-      connectionStatusHandler(parsedMsg["body"] as ConnectionStatusMessage, setIsWhiteConnected, setIsBlackConnected, setMillisecondsUntilOpponentTimeout, setOpponentEventType)
+      connectionStatusHandler(parsedMsg["body"] as ConnectionStatusMessage, setIsWhiteConnected, setIsBlackConnected, setMillisecondsUntilOpponentTimeout)
       break;
     case "onMove":
       onMoveHandler(parsedMsg["body"] as OnMoveMessage, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition)
@@ -277,10 +275,8 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
       activeMove: 0,
       gameOverStatus: 0,
     })
-  // const [webSocket, setWebSocket] = useState<WebSocket | null>(null)
   const webSocket = useRef<WebSocket | null>(null)
   const webSocketReconnectTimeout = useRef(1000)
-  // const shouldReconnect = useRef(true)
   const [playerColour, setPlayerColour] = useState(PieceColour.Spectator)
   const [isWhiteConnected, setIsWhiteConnected] = useState(false)
   const [isBlackConnected, setIsBlackConnected] = useState(false)
@@ -300,6 +296,7 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
       webSocket.current.onmessage = (event) => readMessage(event.data, setPlayerColour, setIsWhiteConnected, setIsBlackConnected, setMillisecondsUntilOpponentTimeout, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition)
       webSocket.current.onerror = (event) => console.error(event)
       webSocket.current.onclose = () => {
+        // Should be exponential backoff but server not hanling match not found properly
         console.log(`WebSocket closed, attempting reconnect in ${Math.floor(webSocketReconnectTimeout.current / 1000)}s`)
         webSocketConnect()
       }
