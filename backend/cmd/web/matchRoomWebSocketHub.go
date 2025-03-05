@@ -633,6 +633,7 @@ func (hub *MatchRoomHub) acceptEventOffer(event eventType) {
 
 func (hub *MatchRoomHub) endGame(reason gameOverStatusCode) error {
 	// Updates game state and updates DB. Does not send response
+	app.infoLog.Println("Ending Match")
 	hub.flagTimer = nil
 	var gameState onMoveResponse
 	err := json.Unmarshal(hub.currentGameState, &gameState)

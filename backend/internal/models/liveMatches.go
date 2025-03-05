@@ -29,17 +29,32 @@ type LiveMatchModel struct {
 func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64, gameHistory []byte) (int64, error) {
 	defer m.LogAll()
 	app.infoLog.Printf("Inserting new match with: %v, %v\n", timeFormatInMilliseconds, incrementInMilliseconds)
-	sqlStmt := `
-	insert or ignore into live_matches (white_player_id, black_player_id, time_format_in_milliseconds, increment_in_milliseconds, white_player_time_remaining_in_milliseconds, black_player_time_remaining_in_milliseconds, game_history_json_string, unix_ms_time_of_last_move) VALUES(?, ?, ?, ?, ?, ?, ?, ?);
-	`
 	var result sql.Result
 	var err error
+	var matchID int64
+
+	// Get ID for match
+	sqlStmt := `
+	select coalesce(max(match_id), 0) from past_matches
+	`
+	row := m.DB.QueryRow(sqlStmt)
+	err = row.Scan(&matchID)
+	if err != nil {
+		app.errorLog.Printf("Error getting new matchID %s", err.Error())
+		return 0, err
+	}
+
+	matchID += 1
+
+	sqlStmt = `
+	insert or ignore into live_matches (match_id, white_player_id, black_player_id, time_format_in_milliseconds, increment_in_milliseconds, white_player_time_remaining_in_milliseconds, black_player_time_remaining_in_milliseconds, game_history_json_string, unix_ms_time_of_last_move) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?);
+	`
 	// Set white and black remaining time equal to the time format
 	for {
 		if playerOneIsWhite {
-			result, err = m.DB.Exec(sqlStmt, playerOneID, playerTwoID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()))
+			result, err = m.DB.Exec(sqlStmt, matchID, playerOneID, playerTwoID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()))
 		} else {
-			result, err = m.DB.Exec(sqlStmt, playerTwoID, playerOneID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()))
+			result, err = m.DB.Exec(sqlStmt, matchID, playerTwoID, playerOneID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()))
 		}
 
 		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
