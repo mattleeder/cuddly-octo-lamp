@@ -166,9 +166,9 @@ function QueueButton({ queueState, nameOfQueue, queueType }: { queueState: Queue
   return (
     <>
       {loading ?
-        <button onClick={() => toggleQueue(queueState, nameOfQueue)}><LoaderCircle className="loaderSpin"/></button>
+        <button onClick={() => toggleQueue(queueState, nameOfQueue)} className="queueButton"><LoaderCircle className="loaderSpin"/></button>
         :
-        <button onClick={() => toggleQueue(queueState, nameOfQueue)}><span>{nameOfQueue}<br />{queueType}</span></button>
+        <button onClick={() => toggleQueue(queueState, nameOfQueue)} className="queueButton"><span>{nameOfQueue}<br />{queueType}</span></button>
       }
     </>
   )
