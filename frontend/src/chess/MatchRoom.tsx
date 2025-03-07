@@ -14,7 +14,7 @@ export function MatchRoom() {
     <GameWrapper matchID={matchid as string} timeFormatInMilliseconds={parsedTimeFormatInMilliseconds}>
       <div className='chessMatch'>
         <GameInfoTile />
-        <ChessBoard />
+        <ChessBoard resizeable={true} defaultWidth={800} enableClicking={true}/>
       </div>
     </GameWrapper>
   )

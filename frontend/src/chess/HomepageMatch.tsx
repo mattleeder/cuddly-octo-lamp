@@ -81,7 +81,7 @@ export function HomepageMatch() {
     <GameWrapper matchID={matchID as string} timeFormatInMilliseconds={parsedTimeFormatInMilliseconds}>
       <div className='chessMatch'>
         <GameOverListener callbackFunction={onMatchEnd} />
-        <ChessBoard />
+        <ChessBoard resizeable={false} defaultWidth={300} chessboardContainerStyles={{transform: "translate(-800px, 200px)"}} enableClicking={false}/>
       </div>
     </GameWrapper>
   )

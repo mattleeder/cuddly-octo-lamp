@@ -282,6 +282,8 @@ function MovesComponent({ moves, flip, squareWidth }: { moves: number[], flip: b
           className='potential-move' 
           style={{ 
             transform: `translate(${col * squareWidth}px, ${row * squareWidth}px)`,
+            width: `${squareWidth}px`,
+            height: `${squareWidth}px`,
             backgroundSize: `${squareWidth}px`,
           }} 
         />
@@ -299,6 +301,8 @@ function CapturesComponent({ captures, flip, squareWidth }: { captures: number[]
           className='potential-capture' 
           style={{ 
             transform: `translate(${col * squareWidth}px, ${row * squareWidth}px)`,
+            width: `${squareWidth}px`,
+            height: `${squareWidth}px`,
             backgroundSize: `${squareWidth}px`,
           }} 
         />
@@ -323,6 +327,8 @@ function LastMoveComponent({ flip, squareWidth }: { flip: boolean, squareWidth: 
           className='last-move' 
           style={{ 
             transform: `translate(${col * squareWidth}px, ${row * squareWidth}px)`,
+            width: `${squareWidth}px`,
+            height: `${squareWidth}px`,
             backgroundSize: `${squareWidth}px`,
           }} 
         />
@@ -350,6 +356,8 @@ function PromotionComponent({ promotionSquare, promotionActive, flip, squareWidt
         className={`${promotionColour}-queen promotion`} 
         style={{ 
           transform: `translate(${col * squareWidth}px, ${0 * squareWidth}px)`,
+          width: `${squareWidth}px`,
+          height: `${squareWidth}px`,
           backgroundSize: `${squareWidth}px`,
         }} 
       />
@@ -358,6 +366,8 @@ function PromotionComponent({ promotionSquare, promotionActive, flip, squareWidt
         className={`${promotionColour}-knight promotion`} 
         style={{ 
           transform: `translate(${col * squareWidth}px, ${1 * squareWidth}px)`,
+          width: `${squareWidth}px`,
+          height: `${squareWidth}px`,
           backgroundSize: `${squareWidth}px`,
         }} 
       />
@@ -366,6 +376,8 @@ function PromotionComponent({ promotionSquare, promotionActive, flip, squareWidt
         className={`${promotionColour}-rook promotion`} 
         style={{ 
           transform: `translate(${col * squareWidth}px, ${2 * squareWidth}px)`,
+          width: `${squareWidth}px`,
+          height: `${squareWidth}px`,
           backgroundSize: `${squareWidth}px`,
         }} 
       />
@@ -374,6 +386,8 @@ function PromotionComponent({ promotionSquare, promotionActive, flip, squareWidt
         className={`${promotionColour}-bishop promotion`} 
         style={{ 
           transform: `translate(${col * squareWidth}px, ${3 * squareWidth}px)`,
+          width: `${squareWidth}px`,
+          height: `${squareWidth}px`,
           backgroundSize: `${squareWidth}px`,
         }} 
       />
@@ -406,7 +420,7 @@ function getRect(top: number, left: number, width: number, height: number): Rect
   }
 }
 
-export function ChessBoard() {
+export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles, enableClicking }: { resizeable: boolean, defaultWidth: number, chessboardContainerStyles?: React.CSSProperties, enableClicking: boolean }) {
   const boardRef = useRef<HTMLDivElement | null>(null)
   const rect = useRef<Rect | null>(null)
   
@@ -419,7 +433,7 @@ export function ChessBoard() {
   const [promotionNextMove, setPromotionNextMove] = useState(false)
   const [promotionActive, setPromotionActive] = useState(false)
   const [promotionSquare, setPromotionSquare] = useState(0)
-  const [boardWidth, setBoardWidth] = useState(800)
+  const [boardWidth, setBoardWidth] = useState(defaultWidth)
   
   const game = useContext(GameContext)
   if (!game) {
@@ -494,9 +508,17 @@ export function ChessBoard() {
   }, [game.matchData.activeMove])
 
   const squareWidth = boardWidth / 8
+
+  const chessboardContainerStyle = {...chessboardContainerStyles}
+  chessboardContainerStyle["width"] = `${boardWidth}px`
+  chessboardContainerStyle["height"] = `${boardWidth}px`
+  if (resizeable) {
+    chessboardContainerStyle["resize"] = "both"
+    chessboardContainerStyle["overflow"] = "auto"
+  }
   
   return (
-    <div className="chessboard-container" style={{width: `${boardWidth}px`, height: `${boardWidth}px`}} ref={boardRef}>
+    <div className="chessboard-container" style={chessboardContainerStyle} ref={boardRef}>
       <div 
         className='chessboard' 
         style={{
@@ -504,25 +526,27 @@ export function ChessBoard() {
           height: `${boardWidth}px`,
           backgroundSize: `${boardWidth}px`,
         }} 
-        onClick={(event) => clickHandler(
-          event,
-          game,
-          rect,
-          promotionActive,
-          promotionSquare,
-          moves,
-          setMoves,
-          captures,
-          setCaptures,
-          selectedPiece,
-          setSelectedPiece,
-          promotionNextMove,
-          setPromotionNextMove,
-          setPromotionActive,
-          setPromotionSquare,
-          waiting,
-          setWaiting
-        )}
+        onClick={(event) => {
+          if (enableClicking) {
+            clickHandler(
+              event,
+              game,
+              rect,
+              promotionActive,
+              promotionSquare,
+              moves,
+              setMoves,
+              captures,
+              setCaptures,
+              selectedPiece,
+              setSelectedPiece,
+              promotionNextMove,
+              setPromotionNextMove,
+              setPromotionActive,
+              setPromotionSquare,
+              waiting,
+              setWaiting
+            )}}}
       >
         <LastMoveComponent flip={game.flip} squareWidth={squareWidth}/>
         <PiecesComponent flip={game.flip} squareWidth={squareWidth}/>
