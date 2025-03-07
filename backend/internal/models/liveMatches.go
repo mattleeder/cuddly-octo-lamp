@@ -20,13 +20,14 @@ type LiveMatch struct {
 	BlackPlayerTimeRemainingMilliseconds int64         `json:"blackPlayerTimeRemainingMilliseconds"`
 	GameHistoryJSONString                []byte        `json:"gameHistoryJSONstring"` // []MatchStateHistory{}
 	UnixMsTimeOfLastMove                 int64         `json:"unixTimeOfLastMove"`
+	AverageElo                           float64       `json:"averageElo"`
 }
 
 type LiveMatchModel struct {
 	DB *sql.DB
 }
 
-func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64, gameHistory []byte) (int64, error) {
+func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64, gameHistory []byte, averageElo float64) (int64, error) {
 	defer m.LogAll()
 	app.infoLog.Printf("Inserting new match with: %v, %v\n", timeFormatInMilliseconds, incrementInMilliseconds)
 	var result sql.Result
@@ -47,14 +48,14 @@ func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerO
 	matchID += 1
 
 	sqlStmt = `
-	insert or ignore into live_matches (match_id, white_player_id, black_player_id, time_format_in_milliseconds, increment_in_milliseconds, white_player_time_remaining_in_milliseconds, black_player_time_remaining_in_milliseconds, game_history_json_string, unix_ms_time_of_last_move) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?);
+	insert or ignore into live_matches (match_id, white_player_id, black_player_id, time_format_in_milliseconds, increment_in_milliseconds, white_player_time_remaining_in_milliseconds, black_player_time_remaining_in_milliseconds, game_history_json_string, unix_ms_time_of_last_move, average_elo) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 	`
 	// Set white and black remaining time equal to the time format
 	for {
 		if playerOneIsWhite {
-			result, err = m.DB.Exec(sqlStmt, matchID, playerOneID, playerTwoID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()))
+			result, err = m.DB.Exec(sqlStmt, matchID, playerOneID, playerTwoID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()), averageElo)
 		} else {
-			result, err = m.DB.Exec(sqlStmt, matchID, playerTwoID, playerOneID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()))
+			result, err = m.DB.Exec(sqlStmt, matchID, playerTwoID, playerOneID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()), averageElo)
 		}
 
 		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
@@ -74,9 +75,9 @@ func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerO
 	return result.LastInsertId()
 }
 
-func (m *LiveMatchModel) EnQueueReturnInsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64, gameHistory []byte) (int64, error) {
+func (m *LiveMatchModel) EnQueueReturnInsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64, gameHistory []byte, averageElo float64) (int64, error) {
 	result, err := DBTaskQueue.EnQueueReturn(func() (any, error) {
-		return m.InsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, gameHistory)
+		return m.InsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, gameHistory, averageElo)
 	})
 	if err != nil {
 		return 0, err
@@ -89,9 +90,9 @@ func (m *LiveMatchModel) EnQueueReturnInsertNew(playerOneID int64, playerTwoID i
 	return coercedResult, nil
 }
 
-func (m *LiveMatchModel) EnQueueInsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64, gameHistory []byte) {
+func (m *LiveMatchModel) EnQueueInsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64, gameHistory []byte, averageElo float64) {
 	DBTaskQueue.EnQueue(func() (any, error) {
-		return m.InsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, gameHistory)
+		return m.InsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, gameHistory, averageElo)
 	})
 }
 
@@ -110,8 +111,9 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 	var blackPlayerTimeRemainingMilliseconds int64
 	var gameHistoryJSONString []byte
 	var unixMsTimeOfLastMove int64
+	var averageElo float64
 
-	err := row.Scan(&_matchID, &whitePlayerID, &blackPlayerID, &lastMovePiece, &lastMoveMove, &currentFEN, &timeFormatInMilliseconds, &incrementInMilliseconds, &whitePlayerTimeRemainingMilliseconds, &blackPlayerTimeRemainingMilliseconds, &gameHistoryJSONString, &unixMsTimeOfLastMove)
+	err := row.Scan(&_matchID, &whitePlayerID, &blackPlayerID, &lastMovePiece, &lastMoveMove, &currentFEN, &timeFormatInMilliseconds, &incrementInMilliseconds, &whitePlayerTimeRemainingMilliseconds, &blackPlayerTimeRemainingMilliseconds, &gameHistoryJSONString, &unixMsTimeOfLastMove, &averageElo)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +245,8 @@ func (m *LiveMatchModel) MoveMatchToPastMatches(matchID int64, outcome int) erro
 		increment_in_milliseconds,
 		game_history_json_string,
 		white_player_points,
-		black_player_points
+		black_player_points,
+		average_elo
 		)
 
 	SELECT match_id,
@@ -256,7 +259,8 @@ func (m *LiveMatchModel) MoveMatchToPastMatches(matchID int64, outcome int) erro
            increment_in_milliseconds,
            game_history_json_string,
 		   ?,
-		   ?
+		   ?,
+		   average_elo
 	  FROM live_matches
 	 WHERE match_id = ?;`
 
@@ -327,4 +331,32 @@ func (m *LiveMatchModel) EnQueueMoveMatchToPastMatches(matchID int64, outcome in
 	DBTaskQueue.EnQueueErrorOnlyTask(func() error {
 		return m.MoveMatchToPastMatches(matchID, outcome)
 	})
+}
+
+func (m *LiveMatchModel) GetHighestEloMatch() (matchID int64, err error) {
+
+	var matchIDorNull sql.NullInt64
+
+	sqlStmt := `
+	SELECT match_id
+	  FROM live_matches
+	 ORDER by average_elo DESC
+	 LIMIT 1
+	`
+
+	row := m.DB.QueryRow(sqlStmt)
+	err = row.Scan(&matchIDorNull)
+	if err != nil {
+		app.errorLog.Printf("Error getting matchID: %s", err.Error())
+		return 0, err
+	}
+
+	if !matchIDorNull.Valid {
+		app.errorLog.Println("MatchID is null")
+		return 0, errors.New("MatchID is null")
+	}
+
+	matchID = matchIDorNull.Int64
+
+	return matchID, nil
 }

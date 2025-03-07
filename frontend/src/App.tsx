@@ -7,6 +7,7 @@ import {
   Routes,
   Route,
 } from "react-router-dom";
+import { HomepageMatch } from './chess/HomepageMatch.tsx';
 
 function App() {
   console.log(import.meta.env.VITE_API_URL)
@@ -27,6 +28,7 @@ function Home() {
   return (
     <>
       <QueueTiles />
+      <HomepageMatch />
     </>
   )
 }

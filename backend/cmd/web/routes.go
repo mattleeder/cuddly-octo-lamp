@@ -14,6 +14,7 @@ func (app *application) routes() *http.ServeMux {
 	mux.HandleFunc("/joinQueue", joinQueueHandler)
 	mux.HandleFunc("/listenformatch", matchFoundSSEHandler)
 	mux.HandleFunc("/matchroom/{matchID}/ws", serveMatchroomWs)
+	mux.HandleFunc("/getHighestEloMatch", getHighestEloMatchHandler)
 
 	// Add the pprof routes
 	mux.HandleFunc("/debug/pprof/", pprof.Index)

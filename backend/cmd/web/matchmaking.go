@@ -203,8 +203,10 @@ func createMatch(playerOneID int64, playerTwoID int64, timeFormatInMilliseconds 
 		return err
 	}
 
+	var averageElo float64 = 1500.0
+
 	var matchID int64
-	matchID, err = app.liveMatches.EnQueueReturnInsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, startingHistory)
+	matchID, err = app.liveMatches.EnQueueReturnInsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, startingHistory, averageElo)
 	if err != nil {
 		app.errorLog.Printf("Error inserting new match: %v\n", err)
 		return err

@@ -54,6 +54,10 @@ type joinQueueRequest struct {
 	Action                   string `json:"action"`
 }
 
+type getHighestEloMatchResponse struct {
+	MatchID int64 `json:"matchID"`
+}
+
 func generateNewPlayerId() int64 {
 	return rand.Int63()
 }
@@ -236,4 +240,31 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 			w.(http.Flusher).Flush()
 		}
 	}
+}
+
+func getHighestEloMatchHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() { app.perfLog.Printf("getChessMovesHandler took: %s\n", time.Since(start)) }()
+
+	if r.Method != "GET" {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+
+	matchID, err := app.liveMatches.GetHighestEloMatch()
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	data := getHighestEloMatchResponse{MatchID: matchID}
+	jsonStr, err := json.Marshal(data)
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	w.Write(jsonStr)
 }

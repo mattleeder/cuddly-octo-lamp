@@ -757,7 +757,7 @@ func (hub *MatchRoomHub) handleMessage(message []byte) {
 			return
 		}
 
-		hub.sendMessageToAllPlayers(hub.currentGameState)
+		hub.sendMessageToAllClients(hub.currentGameState)
 		return
 
 	case playerEvent:

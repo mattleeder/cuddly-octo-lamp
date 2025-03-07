@@ -13,7 +13,8 @@ CREATE TABLE live_matches (
     white_player_time_remaining_in_milliseconds INTEGER NOT NULL,
     black_player_time_remaining_in_milliseconds INTEGER NOT NULL,
     game_history_json_string BLOB NOT NULL,
-    unix_ms_time_of_last_move INTEGER NOT NULL
+    unix_ms_time_of_last_move INTEGER NOT NULL,
+    average_elo REAL NOT NULL
 );
 
 CREATE TABLE past_matches (
@@ -27,5 +28,6 @@ CREATE TABLE past_matches (
     increment_in_milliseconds INTEGER NOT NULL,
     game_history_json_string BLOB NOT NULL,
     white_player_points REAL NOT NULL,
-    black_player_points REAL NOT NULL
+    black_player_points REAL NOT NULL,
+    average_elo REAL NOT NULL
 )
