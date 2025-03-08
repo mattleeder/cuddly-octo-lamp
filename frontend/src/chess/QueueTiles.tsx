@@ -218,18 +218,21 @@ export function QueueTiles() {
   }, [])
   
   return (
-    <div className="queueTilesContainer">
-      <QueueButton queueState={queueState} nameOfQueue="1 + 0" queueType="Bullet"/>
-      <QueueButton queueState={queueState} nameOfQueue="2 + 1" queueType="Bullet"/>
-      <QueueButton queueState={queueState} nameOfQueue="3 + 0" queueType="Blitz"/>
+    <>
+      <div><span className="queueTilesTitle">Select Time Format</span></div>
+      <div className="queueTilesContainer">
+        <QueueButton queueState={queueState} nameOfQueue="1 + 0" queueType="Bullet"/>
+        <QueueButton queueState={queueState} nameOfQueue="2 + 1" queueType="Bullet"/>
+        <QueueButton queueState={queueState} nameOfQueue="3 + 0" queueType="Blitz"/>
 
-      <QueueButton queueState={queueState} nameOfQueue="3 + 2" queueType="Blitz"/>
-      <QueueButton queueState={queueState} nameOfQueue="5 + 0" queueType="Blitz"/>
-      <QueueButton queueState={queueState} nameOfQueue="5 + 3" queueType="Blitz"/>
+        <QueueButton queueState={queueState} nameOfQueue="3 + 2" queueType="Blitz"/>
+        <QueueButton queueState={queueState} nameOfQueue="5 + 0" queueType="Blitz"/>
+        <QueueButton queueState={queueState} nameOfQueue="5 + 3" queueType="Blitz"/>
 
-      <QueueButton queueState={queueState} nameOfQueue="10 + 0" queueType="Rapid"/>
-      <QueueButton queueState={queueState} nameOfQueue="10 + 5" queueType="Rapid"/>
-      <QueueButton queueState={queueState} nameOfQueue="15 + 10" queueType="Rapid"/>
-    </div>
+        <QueueButton queueState={queueState} nameOfQueue="10 + 0" queueType="Rapid"/>
+        <QueueButton queueState={queueState} nameOfQueue="10 + 5" queueType="Rapid"/>
+        <QueueButton queueState={queueState} nameOfQueue="15 + 10" queueType="Rapid"/>
+      </div>
+    </>
   )
 }

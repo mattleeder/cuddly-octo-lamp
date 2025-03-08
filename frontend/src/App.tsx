@@ -2,6 +2,7 @@ import React from 'react';
 import './App.css'
 import { MatchRoom } from './chess/MatchRoom.tsx'
 import { QueueTiles } from './chess/QueueTiles.tsx';
+import { TopNavBar } from './TopNavBar.tsx'
 import {
   BrowserRouter as Router,
   Routes,
@@ -14,12 +15,15 @@ function App() {
   console.log(`React Version: ${React.version}`)
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/matchroom/:matchid" element={<MatchRoom />} />
-      </Routes>
-    </Router>
+    <>
+      <TopNavBar />
+      <Router>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/matchroom/:matchid" element={<MatchRoom />} />
+        </Routes>
+      </Router>
+    </>
   )
 }
 
