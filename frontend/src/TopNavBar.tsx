@@ -1,5 +1,7 @@
 import React from 'react';
 import { Dropdown, DropdownItem } from "./Dropdown.tsx"
+import { ToggleDropdown, ToggleDropdownItem } from './ToggleDropdown.tsx';
+import { Settings } from 'lucide-react';
 
 export function TopNavBar() {
   return (
@@ -23,7 +25,9 @@ export function TopNavBar() {
       <div className='navBarContainer right'>
         <a href='#'>Search</a>
         <a href='#'>Sign In</a>
-        <a href='#'>Settings</a>
+        <ToggleDropdown title={<Settings />} titleHref='#'>
+          <ToggleDropdownItem href='#'>Settings</ToggleDropdownItem>
+        </ToggleDropdown>
       </div>
     </nav>
   )
