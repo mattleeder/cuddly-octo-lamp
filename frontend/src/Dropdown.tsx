@@ -18,7 +18,7 @@ export function DropdownTitle({ children, href, active }: { children: React.Reac
   }
   
   return (
-    <li className={className}><a href={href}><span>{children}</span></a></li>
+    <a className={className} href={href}><span>{children}</span></a>
   )
 }
 
@@ -39,10 +39,12 @@ export function Dropdown({ title, titleHref, children }: { title: string, titleH
 
   return (
     <div className="dropdownContainer" onMouseOver={() => setDropdownActive(true)} onMouseOut={() => setDropdownActive(false)}>
-      <ul className="dropdownMenu">
-        <DropdownTitle active={dropdownActive} href={titleHref}>{title}</DropdownTitle>
-        {dropdownActive ? children : <></>}
-      </ul>
+      <DropdownTitle active={dropdownActive} href={titleHref}>{title}</DropdownTitle>
+      <div className="dropdownContent">
+        <ul>
+          {dropdownActive ? children : <></>}
+        </ul>
+      </div>
     </div>
   )
 }

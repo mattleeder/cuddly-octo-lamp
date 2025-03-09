@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 // On hovering dropdown buttons, style changes
 // When hover ends, revert styles and destroy dropdown
 
-export function ToggleDropdownTitle({ children, href, active, onClick }: { children: React.ReactNode, href: string, active: boolean, onClick: () => void }) {
+export function ToggleDropdownTitle({ children, active, onClick }: { children: React.ReactNode, active: boolean, onClick: () => void }) {
   const count = React.Children.count(children);
 
   if (count !== 1) {
@@ -18,7 +18,7 @@ export function ToggleDropdownTitle({ children, href, active, onClick }: { child
   }
   
   return (
-    <li className={className} onClick={() => onClick()}><a href={href}><span>{children}</span></a></li>
+    <button className={className} onClick={() => onClick()}><span>{children}</span></button>
   )
 }
 
@@ -34,7 +34,7 @@ export function ToggleDropdownItem({ children, href }: { children: React.ReactNo
   )
 }
 
-export function ToggleDropdown({ title, titleHref, children }: { title: React.ReactNode, titleHref: string, children: React.ReactNode }) {
+export function ToggleDropdown({ title, children }: { title: React.ReactNode, children: React.ReactNode }) {
   const [dropdownActive, setDropdownActive] = useState(false)
   const mouseOver = useRef(false)
 
@@ -60,10 +60,12 @@ export function ToggleDropdown({ title, titleHref, children }: { title: React.Re
       onMouseOver={() => {mouseOver.current = true}} 
       onMouseOut={() => {mouseOver.current = false}}
     >
-      <ul className="dropdownMenu">
-        <ToggleDropdownTitle active={dropdownActive} href={titleHref} onClick={() => {setDropdownActive(!dropdownActive)}}>{title}</ToggleDropdownTitle>
-        {dropdownActive ? children : <></>}
-      </ul>
+      <ToggleDropdownTitle active={dropdownActive} onClick={() => {setDropdownActive(!dropdownActive)}}>{title}</ToggleDropdownTitle>
+      <div className="dropdownContent">
+        <ul>
+          {dropdownActive ? children : <></>}
+        </ul>
+      </div>
     </div>
   )
 }
