@@ -5,7 +5,7 @@ function NavbarSearchInput({ active, ref }: { active: boolean, ref: React.RefObj
   return (
     <input 
       className="navbarSearchInput"
-      style={{width: `${active ? "100%" : "0%"}`}}
+      style={{width: `${active ? "80%" : "0%"}`}}
       ref={ref}
       placeholder='Search'
     ></input>

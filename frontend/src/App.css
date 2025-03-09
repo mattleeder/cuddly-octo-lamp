@@ -416,7 +416,7 @@ NAVBAR
 }
 
 .navbarSearchInput {
-  transition: width 1s;
+  transition: width 150ms;
   border: 0;
   background: transparent;
   border: none;
