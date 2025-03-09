@@ -27,8 +27,8 @@ export function TopNavBar() {
         <NavbarSearch />
 
         <a href='#'>Sign In</a>
-        
-        <ToggleDropdown title={<Settings />} titleHref='#'>
+
+        <ToggleDropdown title={<Settings />}>
           <ToggleDropdownItem href='#'>Settings</ToggleDropdownItem>
         </ToggleDropdown>
       </div>
