@@ -408,13 +408,20 @@ NAVBAR
   vertical-align: middle;
 }
 
+.navbarSearchContainer {
+  display: inline-flex;
+  flex-direction: row-reverse;
+  height: 100%;
+  align-items: center;
+}
+
 .navbarSearchInput {
-  transition: width 0.3s ease-in-out;
-  padding: 0;
-  margin: 0;
+  transition: width 1s;
   border: 0;
   background: transparent;
   border: none;
+  outline: none;
+  float: right;
 }
 
 .dropdownContainer {

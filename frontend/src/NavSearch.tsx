@@ -5,7 +5,7 @@ function NavbarSearchInput({ active, ref }: { active: boolean, ref: React.RefObj
   return (
     <input 
       className="navbarSearchInput"
-      style={{width: `${active ? "80%" : "0"}`}}
+      style={{width: `${active ? "100%" : "0%"}`}}
       ref={ref}
       placeholder='Search'
     ></input>
@@ -40,9 +40,9 @@ export function NavbarSearch() {
   }, [searchActive])
 
   return (
-    <div onMouseOver={() => mouseOver.current = true} onMouseOut={() => mouseOver.current = false}>
-      <Search color='black' onClick={() => {setSearchActive(!searchActive)}}/>
+    <div className="navbarSearchContainer" onMouseOver={() => mouseOver.current = true} onMouseOut={() => mouseOver.current = false}>
       <NavbarSearchInput active={searchActive} ref={inputRef}/>
+      <Search color='black' onClick={() => {setSearchActive(!searchActive)}}/>
     </div>
   )
 }
