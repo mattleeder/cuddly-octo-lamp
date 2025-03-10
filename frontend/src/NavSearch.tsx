@@ -1,6 +1,6 @@
 import { Search } from 'lucide-react';
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { PlayerInfoTileContext } from './PlayerInfoTile';
+import { PlayerInfoTileContext, PlayerInfoTileContextInterface } from './PlayerInfoTile.tsx';
 
 interface navbarSearchResult {
   displayName: string
@@ -39,7 +39,7 @@ function NavbarSearchInput({ ref, setLoading, setSearchResults, setSearchValue }
 }
 
 function NavbarSearchResults({ active, loading, searchResults, searchValue }: { active: boolean, loading: boolean, searchResults: navbarSearchResult[], searchValue: string }) {
-  const playerInfoTile = useContext(PlayerInfoTileContext)
+  const playerInfoTile = useContext<PlayerInfoTileContextInterface>(PlayerInfoTileContext)
 
   if (loading || !active || searchValue == "") {
     return (

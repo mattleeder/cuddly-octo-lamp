@@ -549,6 +549,8 @@ NAVBAR SEARCH
 
 .playerInfoTile {
   position: absolute;
+  top: 0;
+  left: 0;
   background-color: #e77a06;
   width: 100px;
   height: 100px;

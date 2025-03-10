@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState } from 'react';
+import React, { createContext, useEffect, useRef, useState } from 'react';
 
 // Display Ping Status
 // Player Name
@@ -27,13 +27,15 @@ interface PlayerInfoTileData {
   joinDate: string
 }
 
-interface PlayerInfoTileContextInterface {
+export interface PlayerInfoTileContextInterface {
   spawnPlayerInfoTile: (arg0: number, arg1: PlayerInfoTilePosition) => void
   lightFusePlayerInfoTile: (arg0: number, arg1: PlayerInfoTilePosition) => void
 }
 
 export const PlayerInfoTileContext = createContext<PlayerInfoTileContextInterface>({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   spawnPlayerInfoTile: (_arg0, _arg1) => {return},
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   lightFusePlayerInfoTile: (_arg0, _arg1) => {return},
 })
 
@@ -88,20 +90,20 @@ function makePlayerInfoTile(
   // setPlayerData(playerData)
   setPosition(position)
   setActive(true)
-  console.log("Set active")
+  console.log(`Set active, newPlayerID: ${playerID}, newPosition.x: ${position.x}, newPosition.y: ${position.y}`)
 }
 
 function queuePlayerInfoTile(
-  setQueuedPlayerID: React.Dispatch<React.SetStateAction<number | null>>,
-  setQueuedPlayerData: React.Dispatch<React.SetStateAction<PlayerInfoTileData | null>>,
-  setQueuedPosition: React.Dispatch<React.SetStateAction<PlayerInfoTilePosition>>,
+  queuedPlayerID: React.RefObject<number | null>,
+  queuedPlayerData: React.RefObject<PlayerInfoTileData | null>,
+  queuedPosition: React.RefObject<PlayerInfoTilePosition>,
   playerID: number,
   position: PlayerInfoTilePosition,
 ) {
   // const playerData = await fetchPlayerTileData(playerID)
-  setQueuedPlayerID(playerID)
-  // setQueuedPlayerData(playerData)
-  setQueuedPosition(position)
+  queuedPlayerID.current = playerID
+  // queuedPlayerData.current = playerData
+  queuedPosition.current = position
 }
 
 function spawnHandler(
@@ -148,30 +150,32 @@ export function spawnPlayerInfoTile(
 
 function fuseHandler(
   setFuseActive: React.Dispatch<React.SetStateAction<boolean>>,
-  setQueuedPlayerID: React.Dispatch<React.SetStateAction<number | null>>,
-  setQueuedPlayerData: React.Dispatch<React.SetStateAction<PlayerInfoTileData | null>>,
+  queuedPlayerID: React.RefObject<number | null>,
+  queuedPlayerData: React.RefObject<PlayerInfoTileData | null>,
   active: boolean,
   activePlayerID: number | null,
   activePosition: PlayerInfoTilePosition,
   newPlayerID: number,
   newPosition: PlayerInfoTilePosition,
 ) {
-  console.log("In fuse handler")
-  console.log(`Active: ${active}`)
   // If none active do nothing
   if (!active) {
     return
   }
 
+  console.log(`activePlayerID: ${activePlayerID}, activePosition.x: ${activePosition.x}, activePosition.y:${activePosition.y}`)
+
   // If active check if playerID && position are same, if so light fuse
   if (newPlayerID == activePlayerID && newPosition.x == activePosition.x && newPosition.y == activePosition.y) {
+    console.log("Light fuse")
     setFuseActive(true)
     return
   }
 
   // Else clear queue
-  setQueuedPlayerID(null)
-  setQueuedPlayerData(null)
+  console.log("Clear queue")
+  queuedPlayerID.current = null
+  queuedPlayerData.current = null
 }
 
 export function lightFusePlayerInfoTile(
@@ -189,27 +193,27 @@ function updatePlayerData(playerID: number, setPlayerData: React.Dispatch<React.
 }
 
 function clearPlayerData(setPlayerID: React.Dispatch<React.SetStateAction<number | null>>, setPlayerData: React.Dispatch<React.SetStateAction<PlayerInfoTileData | null>>) {
-  setPlayerID(null)
+  // setPlayerID(null)
   setPlayerData(null)
 }
 
 function destroyTile(
   makePlayerInfoTile: (playerID: number, playerData: PlayerInfoTileData | null, position: PlayerInfoTilePosition) => void,
   setActive: React.Dispatch<React.SetStateAction<boolean>>,
-  setQueuedPlayerID: React.Dispatch<React.SetStateAction<number | null>>,
-  setQueuedPosition: React.Dispatch<React.SetStateAction<PlayerInfoTilePosition>>,
-  setQueuedPlayerData: React.Dispatch<React.SetStateAction<PlayerInfoTileData | null>>,
-  queuedPlayerID: number | null,
-  queuedPosition: PlayerInfoTilePosition,
+  setFuseActive: React.Dispatch<React.SetStateAction<boolean>>,
+  queuedPlayerID: React.RefObject<number | null>,
+  queuedPosition: React.RefObject<PlayerInfoTilePosition>,
+  queuedPlayerData: React.RefObject<PlayerInfoTileData | null>,
 ) {
   console.log("Destroying")
   setActive(false)
-  if (queuedPlayerID != null) {
-    makePlayerInfoTile(queuedPlayerID, null, queuedPosition)
+  setFuseActive(false)
+  if (queuedPlayerID.current != null) {
+    makePlayerInfoTile(queuedPlayerID.current, null, queuedPosition.current)
 
-    setQueuedPlayerID(null)
-    setQueuedPosition({x: 0, y: 0})
-    setQueuedPlayerData(null)
+    queuedPlayerID.current = null
+    queuedPosition.current = {x: 0, y: 0}
+    queuedPlayerData.current = null
   }
 }
 
@@ -220,9 +224,9 @@ export function PlayerInfoTile({ children }: { children: React.ReactNode }) {
   const [playerData, setPlayerData] = useState<PlayerInfoTileData | null>(null)
   const [position, setPosition] = useState<PlayerInfoTilePosition>({x: 0, y: 0})
 
-  const [queuedPlayerID, setQueuedPlayerID] = useState<number | null>(null)
-  const [queuedPlayerData, setQueuedPlayerData] = useState<PlayerInfoTileData | null>(null)
-  const [queuedPosition, setQueuedPosition] = useState<PlayerInfoTilePosition>({x: 0, y: 0})
+  const queuedPlayerID = useRef<number | null>(null)
+  const queuedPlayerData = useRef<PlayerInfoTileData | null>(null)
+  const queuedPosition = useRef<PlayerInfoTilePosition>({x: 0, y: 0})
 
 
   const FUSE_TIMER_MS = 500
@@ -232,50 +236,39 @@ export function PlayerInfoTile({ children }: { children: React.ReactNode }) {
   }
 
   const queuePlayerInfoClosure = (newPlayerID: number, newPosition: PlayerInfoTilePosition) => {
-    queuePlayerInfoTile(setQueuedPlayerID, setQueuedPlayerData, setQueuedPosition, newPlayerID, newPosition)
+    queuePlayerInfoTile(queuedPlayerID, queuedPlayerData, queuedPosition, newPlayerID, newPosition)
   }
 
   const spawnHandlerClosure = (newPlayerID: number, newPosition: PlayerInfoTilePosition) => {
-    console.log("In spawn handler closure")
-    console.log(`Active: ${active}`)
     spawnHandler(makePlayerInfoClosure, queuePlayerInfoClosure, setFuseActive, active, playerID, position, newPlayerID, newPosition)
   }
 
   const fuseHandlerClosure = (newPlayerID: number, newPosition: PlayerInfoTilePosition) => {
-    console.log("In fuse handler closure")
-    fuseHandler(setFuseActive, setQueuedPlayerID, setQueuedPlayerData, active, playerID, position, newPlayerID, newPosition)
+    fuseHandler(setFuseActive, queuedPlayerID, queuedPlayerData, active, playerID, position, newPlayerID, newPosition)
   }
 
-  // const spawnPlayerInfoTile = (playerID: number, position: PlayerInfoTilePosition) => {
-  //   console.log("Spawn info tile")
-  //   console.log(`Active: ${active}`)
-  //   spawnHandlerClosure(playerID, position)
-  // }
-
-  const spawnPlayerInfoTile = (playerID: number, position: PlayerInfoTilePosition) => {
-    console.log("Spawn info tile")
-    console.log(`Active: ${active}`)
-    setActive(true)
+  const spawnPlayerInfoTile = (newPlayerID: number, newPosition: PlayerInfoTilePosition) => {
+    console.log(`Spawn info tile, active: ${active}, newPlayerID: ${newPlayerID}, position.x:${newPosition.x}, position.y:${newPosition.y}`)
+    spawnHandlerClosure(newPlayerID, newPosition)
   }
 
-  // const lightFusePlayerInfoTile = (playerID: number, position: PlayerInfoTilePosition) => {
-  //   fuseHandlerClosure(playerID, position)
-  // }
-
-  const lightFusePlayerInfoTile = (playerID: number, position: PlayerInfoTilePosition) => {
-    console.log("Fuse info tile")
-    console.log(`Active: ${active}`)
-    setActive(false)
+  const lightFusePlayerInfoTile = (newPlayerID: number, newPosition: PlayerInfoTilePosition) => {
+    console.log(`Light tile fuse, active: ${active}, newPlayerID: ${newPlayerID}, position:${newPosition.x}, position.y:${newPosition.y}`)
+    fuseHandlerClosure(newPlayerID, newPosition)
   }
 
+  const destroyTileClosure = () => {
+    destroyTile(makePlayerInfoClosure, setActive, setFuseActive, queuedPlayerID, queuedPosition, queuedPlayerData)
+  }
 
-  const [tileContext, _setTileContext] = useState<PlayerInfoTileContextInterface>({
+  const [tileContext, setTileContext] = useState<PlayerInfoTileContextInterface>({
     spawnPlayerInfoTile,
     lightFusePlayerInfoTile,
   })
 
   useEffect(() => {
-    if (playerID) {
+    console.log(`useEffect [playerID]: ${playerID}`)
+    if (playerID != null) {
       updatePlayerData(playerID, setPlayerData)
     } else {
       clearPlayerData(setPlayerID, setPlayerData)
@@ -289,7 +282,7 @@ export function PlayerInfoTile({ children }: { children: React.ReactNode }) {
     let timeout = null
     if (fuseActive) {
       timeout = setTimeout(() => {
-        destroyTile(makePlayerInfoClosure, setActive, setQueuedPlayerID, setQueuedPosition, setQueuedPlayerData, queuedPlayerID, queuedPosition)
+        destroyTileClosure()
       }, FUSE_TIMER_MS)
     }
     return () => {
@@ -303,31 +296,38 @@ export function PlayerInfoTile({ children }: { children: React.ReactNode }) {
     console.log(`useEffect: ${active}`)
   }, [active])
 
-  if (active == false) {
-    return (
-      <PlayerInfoTileContext.Provider value={tileContext}>
-        {children}
-      </PlayerInfoTileContext.Provider>
-    )
-  }
+  useEffect(() => {
+    console.log("Updating context")
+    setTileContext({
+      spawnPlayerInfoTile: spawnPlayerInfoTile,
+      lightFusePlayerInfoTile: lightFusePlayerInfoTile,
+    })
+  }, [active, playerID, fuseActive, playerData, position, queuedPlayerID, queuedPlayerData, queuedPosition])
 
   return (
     <PlayerInfoTileContext.Provider value={tileContext}>
       {children}
+      {active ?
       
-      <div className="playerInfoTile" style={{transform: `translate(${position.x}px, ${position.y}px);`}}>
-        <div className="Name&Ping">
-          {`Player Name: ${playerData?.displayName}`}
+        <div className="playerInfoTile" style={{transform: `translate(${position.x}px, ${position.y}px)`}}>
+          <div className="Name&Ping">
+            {`Player Name: ${playerData?.displayName}`}
+            {`Player ID: ${playerID}`}
+          </div>
+
+          <div className="Ratings">
+
+          </div>
+
+          <div className="Games&JoinDate">
+
+          </div>
         </div>
 
-        <div className="Ratings">
+        :
 
-        </div>
-
-        <div className="Games&JoinDate">
-
-        </div>
-      </div>
+        <></>
+      }
     </PlayerInfoTileContext.Provider>
   )
 }
