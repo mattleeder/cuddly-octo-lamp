@@ -1,5 +1,6 @@
 import { Search } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
+import { PlayerInfoTileContext } from './PlayerInfoTile';
 
 interface navbarSearchResult {
   displayName: string
@@ -38,6 +39,8 @@ function NavbarSearchInput({ ref, setLoading, setSearchResults, setSearchValue }
 }
 
 function NavbarSearchResults({ active, loading, searchResults, searchValue }: { active: boolean, loading: boolean, searchResults: navbarSearchResult[], searchValue: string }) {
+  const playerInfoTile = useContext(PlayerInfoTileContext)
+
   if (loading || !active || searchValue == "") {
     return (
       <></>
@@ -53,7 +56,14 @@ function NavbarSearchResults({ active, loading, searchResults, searchValue }: { 
   return (
     searchResults.map((searchResult) => {
       return (
-        <li className="navbarSearchResultItem" key={searchResult.playerID}><a href={`#${searchResult.playerID}`}><span>{searchResult.displayName}</span></a></li>
+        <li 
+          className="navbarSearchResultItem" 
+          key={searchResult.playerID} 
+          onMouseEnter={() => playerInfoTile?.spawnPlayerInfoTile(searchResult.playerID, {x: 100, y: 100})
+          }
+          onMouseLeave={() => playerInfoTile?.lightFusePlayerInfoTile(searchResult.playerID, {x: 100, y: 100})
+          }
+        ><a href={`#${searchResult.playerID}`}><span>{searchResult.displayName}</span></a></li>
       )
     })
   )

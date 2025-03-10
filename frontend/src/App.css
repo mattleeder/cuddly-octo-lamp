@@ -546,3 +546,10 @@ NAVBAR SEARCH
   text-align: center;
   font-style: italic;
 }
+
+.playerInfoTile {
+  position: absolute;
+  background-color: #e77a06;
+  width: 100px;
+  height: 100px;
+}
