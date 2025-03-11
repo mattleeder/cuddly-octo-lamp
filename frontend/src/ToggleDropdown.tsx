@@ -6,7 +6,10 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 // On hovering dropdown buttons, style changes
 // When hover ends, revert styles and destroy dropdown
 
-const DropdownMenuParentContext = createContext<{ parentActive: boolean, setParentActive: (arg0: boolean) => void }>({
+const DropdownMenuParentContext = createContext<{ menuActive: boolean, setMenuActive: (arg0: boolean) => void, parentActive: boolean, setParentActive: (arg0: boolean) => void }>({
+  menuActive: false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  setMenuActive: (_arg0: boolean) => {return},
   parentActive: false,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   setParentActive: (_arg0: boolean) => {return}
@@ -47,20 +50,20 @@ export function ToggleDropdownSubmenu({ title, children }: { title: string, chil
   const [submenuActive, setSubmenuActive] = useState(false)
   const parentContext = useContext(DropdownMenuParentContext)
 
+  // Reset state on menu close
   useEffect(() => {
-    console.log(`submenuActive: ${submenuActive}`)
-  }, [submenuActive])
+    if(!parentContext.menuActive) {
+      setSubmenuActive(false)
+    }
+  }, [parentContext.menuActive])
 
-  useEffect(() => {
-    console.log(`parentActive: ${submenuActive}`)
-  }, [parentContext.parentActive])
 
-  if (submenuActive) {
+  if (parentContext.menuActive && submenuActive) {
     return (
       <li>
         <div>
           <ToggleDropdownSubmenuTitle title={title} setSubmenuActive={setSubmenuActive} />
-          <DropdownMenuParentContext.Provider value={{parentActive: submenuActive, setParentActive: setSubmenuActive}}>
+          <DropdownMenuParentContext.Provider value={{menuActive: parentContext.menuActive, setMenuActive: parentContext.setMenuActive, parentActive: submenuActive, setParentActive: setSubmenuActive}}>
             <ul>
               {children}
             </ul>
@@ -70,7 +73,7 @@ export function ToggleDropdownSubmenu({ title, children }: { title: string, chil
     )
   }
   
-  if (parentContext.parentActive) {
+  if (parentContext.menuActive && parentContext.parentActive) {
     return (
       <li 
         className='dropdownItem' 
@@ -84,7 +87,7 @@ export function ToggleDropdownSubmenu({ title, children }: { title: string, chil
   }
 
   return (
-    <DropdownMenuParentContext.Provider value={{parentActive: submenuActive, setParentActive: setSubmenuActive}}>
+    <DropdownMenuParentContext.Provider value={{menuActive: parentContext.menuActive, setMenuActive: parentContext.setMenuActive, parentActive: submenuActive, setParentActive: setSubmenuActive}}>
       <ul>
         {children}
       </ul>
@@ -100,19 +103,20 @@ export function ToggleDropdownItem({ children, href }: { children: React.ReactNo
     throw new Error('DropdownItem expects exactly one child.');
   }
   // Should setParentActive to false so everything closes
-  if (!parentContext.parentActive) {
+  if (!parentContext.parentActive || !parentContext.menuActive) {
     return (
       <></>
     )
   }
 
   return (
-    <li className='dropdownItem' onClick={() => parentContext.setParentActive(false)}><a href={href}><span>{children}</span></a></li>
+    <li className='dropdownItem' onClick={() => {parentContext.setMenuActive(false); parentContext.setParentActive(false)}}><a href={href}><span>{children}</span></a></li>
   )
 }
 
 export function ToggleDropdown({ title, children }: { title: React.ReactNode, children: React.ReactNode }) {
   const [dropdownActive, setDropdownActive] = useState(false)
+  const [menuActive, setMenuActive] = useState(false)
   const mouseOver = useRef(false)
 
   // Destroy dropdown if mouse not over
@@ -120,12 +124,14 @@ export function ToggleDropdown({ title, children }: { title: React.ReactNode, ch
     window.addEventListener("click", () => {
       if (mouseOver.current != true) {
         setDropdownActive(false)
+        setMenuActive(false)
       }
     })
     return () => {
       window.removeEventListener("click", () => {
         if (!mouseOver.current != true) {
           setDropdownActive(false)
+          setMenuActive(false)
         }
       })
     }
@@ -137,9 +143,9 @@ export function ToggleDropdown({ title, children }: { title: React.ReactNode, ch
       onMouseOver={() => {mouseOver.current = true}} 
       onMouseOut={() => {mouseOver.current = false}}
     >
-      <ToggleDropdownTitle active={dropdownActive} onClick={() => {setDropdownActive(!dropdownActive)}}>{title}</ToggleDropdownTitle>
+      <ToggleDropdownTitle active={menuActive} onClick={() => {setDropdownActive(!dropdownActive); setMenuActive(!menuActive)}}>{title}</ToggleDropdownTitle>
 
-      <DropdownMenuParentContext.Provider value={{parentActive: dropdownActive, setParentActive: setDropdownActive}}>
+      <DropdownMenuParentContext.Provider value={{menuActive, setMenuActive, parentActive: dropdownActive, setParentActive: setDropdownActive}}>
         <div className="dropdownContent">
           <ul>
             {children}
