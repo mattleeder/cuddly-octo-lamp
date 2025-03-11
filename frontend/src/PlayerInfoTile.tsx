@@ -1,3 +1,4 @@
+import { Flame, Rabbit, TrainFront, Turtle } from 'lucide-react';
 import React, { createContext, useEffect, useRef, useState } from 'react';
 
 // Display Ping Status
@@ -28,8 +29,8 @@ interface PlayerInfoTileData {
 }
 
 export interface PlayerInfoTileContextInterface {
-  spawnPlayerInfoTile: (arg0: number, arg1: PlayerInfoTilePosition) => void
-  lightFusePlayerInfoTile: (arg0: number, arg1: PlayerInfoTilePosition) => void
+  spawnPlayerInfoTile: (arg0: number, arg1: React.MouseEvent<HTMLElement, MouseEvent>) => void
+  lightFusePlayerInfoTile: (arg0: number, arg1: React.MouseEvent<HTMLElement, MouseEvent>) => void
 }
 
 export const PlayerInfoTileContext = createContext<PlayerInfoTileContextInterface>({
@@ -121,7 +122,8 @@ function spawnHandler(
   // If none active, make new immediately
   if (active == false) {
     console.log("Making")
-    makePlayerInfoTile(newPlayerID, null, newPosition)
+    queuePlayerInfoTile(newPlayerID, newPosition)
+    setFuseActive(true)
     return
   }
 
@@ -135,6 +137,7 @@ function spawnHandler(
   // If different, set queued playerID, queued Position and fuse
   console.log("Queuing")
   queuePlayerInfoTile(newPlayerID, newPosition)
+  setFuseActive(true)
 }
 
 export function spawnPlayerInfoTile(
@@ -217,6 +220,16 @@ function destroyTile(
   }
 }
 
+function getPositionFromMouseEvent(event: React.MouseEvent<HTMLElement, MouseEvent>): PlayerInfoTilePosition {
+  const element = event.target
+  const rect = element.getBoundingClientRect()
+
+  return {
+    x: rect.left,
+    y: rect.top + rect.height,
+  }
+}
+
 export function PlayerInfoTile({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState(false)
   const [fuseActive, setFuseActive] = useState(false)
@@ -247,12 +260,14 @@ export function PlayerInfoTile({ children }: { children: React.ReactNode }) {
     fuseHandler(setFuseActive, queuedPlayerID, queuedPlayerData, active, playerID, position, newPlayerID, newPosition)
   }
 
-  const spawnPlayerInfoTile = (newPlayerID: number, newPosition: PlayerInfoTilePosition) => {
+  const spawnPlayerInfoTile = (newPlayerID: number, event: React.MouseEvent) => {
+    const newPosition = getPositionFromMouseEvent(event)
     console.log(`Spawn info tile, active: ${active}, newPlayerID: ${newPlayerID}, position.x:${newPosition.x}, position.y:${newPosition.y}`)
     spawnHandlerClosure(newPlayerID, newPosition)
   }
 
-  const lightFusePlayerInfoTile = (newPlayerID: number, newPosition: PlayerInfoTilePosition) => {
+  const lightFusePlayerInfoTile = (newPlayerID: number, event: React.MouseEvent) => {
+    const newPosition = getPositionFromMouseEvent(event)
     console.log(`Light tile fuse, active: ${active}, newPlayerID: ${newPlayerID}, position:${newPosition.x}, position.y:${newPosition.y}`)
     fuseHandlerClosure(newPlayerID, newPosition)
   }
@@ -309,18 +324,45 @@ export function PlayerInfoTile({ children }: { children: React.ReactNode }) {
       {children}
       {active ?
       
-        <div className="playerInfoTile" style={{transform: `translate(${position.x}px, ${position.y}px)`}}>
+        <div 
+          className="playerInfoTile" 
+          style={{transform: `translate(${position.x}px, ${position.y}px)`}}
+          onMouseEnter={() => setFuseActive(false)}
+          onMouseLeave={() => setFuseActive(true)}
+        >
           <div className="Name&Ping">
             {`Player Name: ${playerData?.displayName}`}
-            {`Player ID: ${playerID}`}
           </div>
 
-          <div className="Ratings">
+          <div className="playerInfoTileRatings">
+            <div>
+              <TrainFront />
+              {playerData?.ratings.bullet}
+            </div>
 
+            <div>
+              <Flame />
+              {playerData?.ratings.blitz}
+            </div>
+
+            <div>
+              <Rabbit />
+              {playerData?.ratings.rapid}
+            </div>
+
+            <div>
+              <Turtle />
+              {playerData?.ratings.classical}
+            </div>
           </div>
 
           <div className="Games&JoinDate">
-
+            <div style={{float:"left"}}>
+              {"100 Games"}
+            </div>
+            <div style={{float:"right"}}>
+              {"Joined This Long Ago"}
+            </div>
           </div>
         </div>
 

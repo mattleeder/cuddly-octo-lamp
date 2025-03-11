@@ -547,11 +547,24 @@ NAVBAR SEARCH
   font-style: italic;
 }
 
+/*********
+PLAYER INFO TILE
+**********/
+
 .playerInfoTile {
   position: absolute;
   top: 0;
   left: 0;
-  background-color: #e77a06;
-  width: 100px;
+  width: 300px;
   height: 100px;
+  background-color: #898988;
+  border-radius: 4px;
+  box-shadow: 2px 2px 2px 2px black;
+  display: grid
+}
+
+.playerInfoTileRatings {
+  display: inline-grid;
+  width: 100%;
+  grid-template-columns: repeat(4, 1fr);
 }
