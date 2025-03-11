@@ -124,7 +124,7 @@ export function ToggleDropdownItem({ children, href, onClick }: { children: Reac
   )
 }
 
-export function ToggleDropdown({ title, children }: { title: React.ReactNode, children: React.ReactNode }) {
+export function ToggleDropdown({ title, children, style }: { title: React.ReactNode, children: React.ReactNode, style: React.CSSProperties }) {
   const [dropdownActive, setDropdownActive] = useState(false)
   const [menuActive, setMenuActive] = useState(false)
   const mouseOver = useRef(false)
@@ -152,6 +152,7 @@ export function ToggleDropdown({ title, children }: { title: React.ReactNode, ch
       className="dropdownContainer" 
       onMouseOver={() => {mouseOver.current = true}} 
       onMouseOut={() => {mouseOver.current = false}}
+      style={style}
     >
       <ToggleDropdownTitle active={menuActive} onClick={() => {setDropdownActive(!dropdownActive); setMenuActive(!menuActive)}}>{title}</ToggleDropdownTitle>
 

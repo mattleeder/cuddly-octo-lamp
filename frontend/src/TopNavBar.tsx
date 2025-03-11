@@ -29,7 +29,7 @@ export function TopNavBar() {
 
         <a href='#'>Sign In</a>
 
-        <ToggleDropdown title={<Settings />}>
+        <ToggleDropdown title={<Settings />} style={{minWidth: "200px"}}>
           <ToggleDropdownSubmenu title="Theme">
             <ToggleDropdownItem href="#">ThemeOne</ToggleDropdownItem>
             <ToggleDropdownItem href="#">ThemeTwo</ToggleDropdownItem>

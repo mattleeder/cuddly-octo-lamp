@@ -5,7 +5,27 @@ function fetchUserPing() {
 }
 
 function fetchServerLatency() {
-  return 50
+  return 20
+}
+
+function SVGBars({ numberOfBars } : { numberOfBars: number }) {
+
+  const colourArray = ["red", "orange", "green", "green"]
+  const colour = colourArray[Math.max(Math.min(numberOfBars, 1), colourArray.length) - 1]
+  const heightOne = numberOfBars >= 1 ? "25" : "0"
+  const heightTwo = numberOfBars >= 2 ? "50" : "0"
+  const heightThree = numberOfBars >= 3 ? "75" : "0"
+  const heightFour = numberOfBars >= 4 ? "100" : "0"
+
+  return (
+    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" viewBox='0 0 100 100'>
+      <rect width="24" height={heightOne} x="0" y="75" fill={colour} />
+      <rect width="24" height={heightTwo} x="25" y="50" fill={colour} />
+      <rect width="24" height={heightThree} x="50" y="25" fill={colour} />
+      <rect width="24" height={heightFour} x="75" y="0" fill={colour} />
+      Sorry, your browser does not support inline SVG.
+    </svg>
+  )
 }
 
 
@@ -19,27 +39,10 @@ function LatencyBars({ userPing, serverLatency }: { userPing: number, serverLate
     }
   }
 
-  switch (pingLevel) {
-  case 0:
-    return (
-      <div>0</div>
-    )
+  return (
+    <SVGBars numberOfBars={4 - pingLevel}/>
+  )
 
-  case 1:
-    return (
-      <div>1</div>
-    )
-
-  case 2:
-    return (
-      <div>2</div>
-    )
-
-  case 3:
-    return (
-      <div>3</div>
-    )
-  }
 }
 
 export function LatencyDisplay() {
@@ -52,17 +55,17 @@ export function LatencyDisplay() {
   }, [])
 
   return (
-    <div>
-      <div>
+    <div className='latencyContainer'>
+      <div className='latencyText'>
         <div>
-          Ping: {userPing == null ? "?" : userPing}
+          Ping: {userPing == null ? "?" : userPing + "ms"}
         </div>
         <div>
-          Server: {serverLatency == null ? "?" : serverLatency}
+          Server: {serverLatency == null ? "?" : serverLatency + "ms"}
         </div>
       </div>
 
-      <div>
+      <div className='latencyBars'>
         <LatencyBars userPing={userPing == null ? 0 : userPing} serverLatency={serverLatency == null ? 0 : serverLatency}/>
       </div>
     </div>
