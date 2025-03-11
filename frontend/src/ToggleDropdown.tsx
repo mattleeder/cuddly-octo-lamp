@@ -1,9 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { ChevronLeft } from 'lucide-react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 // Has Top level button that is clickable
 // On hover, top level button style changes and dropdown opens
 // On hovering dropdown buttons, style changes
 // When hover ends, revert styles and destroy dropdown
+
+const DropdownMenuParentContext = createContext<{ parentActive: boolean, setParentActive: (arg0: boolean) => void }>({
+  parentActive: false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  setParentActive: (_arg0: boolean) => {return}
+})
 
 export function ToggleDropdownTitle({ children, active, onClick }: { children: React.ReactNode, active: boolean, onClick: () => void }) {
   const count = React.Children.count(children);
@@ -22,15 +29,85 @@ export function ToggleDropdownTitle({ children, active, onClick }: { children: R
   )
 }
 
+function ToggleDropdownSubmenuTitle({ title, setSubmenuActive }: { title: string, setSubmenuActive: React.Dispatch<React.SetStateAction<boolean>> }) {
+  const parentContext = useContext(DropdownMenuParentContext)
+  
+  return (
+    <div onClick={() => {
+      setSubmenuActive(false)
+      parentContext.setParentActive(true)
+    }}>
+      <ChevronLeft />
+      {title}
+    </div>
+  )
+}
+
+export function ToggleDropdownSubmenu({ title, children }: { title: string, children: React.ReactNode }) {
+  const [submenuActive, setSubmenuActive] = useState(false)
+  const parentContext = useContext(DropdownMenuParentContext)
+
+  useEffect(() => {
+    console.log(`submenuActive: ${submenuActive}`)
+  }, [submenuActive])
+
+  useEffect(() => {
+    console.log(`parentActive: ${submenuActive}`)
+  }, [parentContext.parentActive])
+
+  if (submenuActive) {
+    return (
+      <li>
+        <div>
+          <ToggleDropdownSubmenuTitle title={title} setSubmenuActive={setSubmenuActive} />
+          <DropdownMenuParentContext.Provider value={{parentActive: submenuActive, setParentActive: setSubmenuActive}}>
+            <ul>
+              {children}
+            </ul>
+          </DropdownMenuParentContext.Provider>
+        </div>
+      </li>
+    )
+  }
+  
+  if (parentContext.parentActive) {
+    return (
+      <li 
+        className='dropdownItem' 
+        onClick={() => {
+          console.log("Item clicked")
+          parentContext.setParentActive(false)
+          setSubmenuActive(true)
+        }}
+      >{title}</li>
+    )
+  }
+
+  return (
+    <DropdownMenuParentContext.Provider value={{parentActive: submenuActive, setParentActive: setSubmenuActive}}>
+      <ul>
+        {children}
+      </ul>
+    </DropdownMenuParentContext.Provider>
+  )
+}
+
 export function ToggleDropdownItem({ children, href }: { children: React.ReactNode, href: string }) {
   const count = React.Children.count(children);
+  const parentContext = useContext(DropdownMenuParentContext)
 
   if (count !== 1) {
     throw new Error('DropdownItem expects exactly one child.');
   }
+  // Should setParentActive to false so everything closes
+  if (!parentContext.parentActive) {
+    return (
+      <></>
+    )
+  }
 
   return (
-    <li className='dropdownItem'><a href={href}><span>{children}</span></a></li>
+    <li className='dropdownItem' onClick={() => parentContext.setParentActive(false)}><a href={href}><span>{children}</span></a></li>
   )
 }
 
@@ -61,11 +138,14 @@ export function ToggleDropdown({ title, children }: { title: React.ReactNode, ch
       onMouseOut={() => {mouseOver.current = false}}
     >
       <ToggleDropdownTitle active={dropdownActive} onClick={() => {setDropdownActive(!dropdownActive)}}>{title}</ToggleDropdownTitle>
-      <div className="dropdownContent">
-        <ul>
-          {dropdownActive ? children : <></>}
-        </ul>
-      </div>
+
+      <DropdownMenuParentContext.Provider value={{parentActive: dropdownActive, setParentActive: setDropdownActive}}>
+        <div className="dropdownContent">
+          <ul>
+            {children}
+          </ul>
+        </div>
+      </DropdownMenuParentContext.Provider>
     </div>
   )
 }

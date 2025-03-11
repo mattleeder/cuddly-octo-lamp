@@ -1,6 +1,6 @@
 import React from 'react';
 import { Dropdown, DropdownItem } from "./Dropdown.tsx"
-import { ToggleDropdown, ToggleDropdownItem } from './ToggleDropdown.tsx';
+import { ToggleDropdown, ToggleDropdownItem, ToggleDropdownSubmenu } from './ToggleDropdown.tsx';
 import { Settings } from 'lucide-react';
 import { NavbarSearch } from './NavSearch.tsx';
 
@@ -29,7 +29,14 @@ export function TopNavBar() {
         <a href='#'>Sign In</a>
 
         <ToggleDropdown title={<Settings />}>
-          <ToggleDropdownItem href='#'>Settings</ToggleDropdownItem>
+          <ToggleDropdownSubmenu title="Theme">
+            <ToggleDropdownItem href="#">ThemeOne</ToggleDropdownItem>
+            <ToggleDropdownItem href="#">ThemeTwo</ToggleDropdownItem>
+          </ToggleDropdownSubmenu>
+          <ToggleDropdownSubmenu title="Language">
+            <ToggleDropdownItem href="#">English</ToggleDropdownItem>
+            <ToggleDropdownItem href="#">中文</ToggleDropdownItem>
+          </ToggleDropdownSubmenu>
         </ToggleDropdown>
       </div>
     </nav>
