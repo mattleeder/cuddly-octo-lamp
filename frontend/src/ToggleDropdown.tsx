@@ -95,7 +95,7 @@ export function ToggleDropdownSubmenu({ title, children }: { title: string, chil
   )
 }
 
-export function ToggleDropdownItem({ children, href }: { children: React.ReactNode, href: string }) {
+export function ToggleDropdownItem({ children, href, onClick }: { children: React.ReactNode, href: string, onClick?: () => void }) {
   const count = React.Children.count(children);
   const parentContext = useContext(DropdownMenuParentContext)
 
@@ -110,7 +110,17 @@ export function ToggleDropdownItem({ children, href }: { children: React.ReactNo
   }
 
   return (
-    <li className='dropdownItem' onClick={() => {parentContext.setMenuActive(false); parentContext.setParentActive(false)}}><a href={href}><span>{children}</span></a></li>
+    <li 
+      className='dropdownItem' 
+      onClick={() => {
+        if (onClick != null) {
+          onClick()
+        }
+        parentContext.setMenuActive(false)
+        parentContext.setParentActive(false)}}
+    >
+      <a href={href}><span>{children}</span></a>
+    </li>
   )
 }
 

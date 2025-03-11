@@ -3,6 +3,7 @@ import { Dropdown, DropdownItem } from "./Dropdown.tsx"
 import { ToggleDropdown, ToggleDropdownItem, ToggleDropdownSubmenu } from './ToggleDropdown.tsx';
 import { Settings } from 'lucide-react';
 import { NavbarSearch } from './NavSearch.tsx';
+import { LatencyDisplay } from './LatencyDisplay.tsx';
 
 export function TopNavBar() {
   return (
@@ -37,6 +38,7 @@ export function TopNavBar() {
             <ToggleDropdownItem href="#">English</ToggleDropdownItem>
             <ToggleDropdownItem href="#">中文</ToggleDropdownItem>
           </ToggleDropdownSubmenu>
+          <ToggleDropdownItem href="#"><LatencyDisplay /></ToggleDropdownItem>
         </ToggleDropdown>
       </div>
     </nav>
