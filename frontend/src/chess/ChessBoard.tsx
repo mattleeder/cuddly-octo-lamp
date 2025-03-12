@@ -30,10 +30,24 @@ interface Rect {
   height: number,
 }
 
+function getSquareIdxFromClick(x: number, y: number, rect: React.RefObject<Rect | null>) {
+  if (rect === null || rect.current === null) {
+    throw new Error("Bounding rect for board is not defined")
+  }
+
+  const squareWidth = rect.current.width / 8
+
+  const boardXPosition = Math.floor((x - rect.current.left) / squareWidth)
+  const boardYPosition = Math.floor((y - rect.current.top) / squareWidth)
+  const position =  boardYPosition * 8 + boardXPosition
+  console.log(`Clicked on ${x}x, ${y}y which is position ${position}`)
+  console.log(`Clicked on ${x- rect.current.left}x, ${y - rect.current.top}y which is position ${position}`)
+  return position
+}
+
 async function clickHandler(
-  event: React.MouseEvent,
+  position: number,
   game: gameContext,
-  rect: React.RefObject<Rect | null>,
   promotionActive: boolean,
   promotionSquare: number,
   moves: number[],
@@ -49,21 +63,6 @@ async function clickHandler(
   waiting: boolean,
   setWaiting: React.Dispatch<React.SetStateAction<boolean>>,
 ) {
-  console.log(`${event.clientX}, ${event.clientY}`)
-  // Calculate board position
-  if (rect === null || rect.current === null) {
-    throw new Error("Bounding rect for board is not defined")
-  }
-
-  const squareWidth = rect.current.width / 8
-
-  const boardXPosition = Math.floor((event.clientX - rect.current.left) / squareWidth)
-  const boardYPosition = Math.floor((event.clientY - rect.current.top) / squareWidth)
-  let position = boardYPosition * 8 + boardXPosition
-
-  console.log(`Clicked on ${event.clientX}x, ${event.clientY}y which is position ${position}`)
-  console.log(`Clicked on ${event.clientX - rect.current.left}x, ${event.clientY - rect.current.top}y which is position ${position}`)
-
   if (game.flip) {
     position = 63 - position
   }
@@ -242,7 +241,7 @@ function getRowAndColFromBoardIndex(idx: number, flip: boolean): [number, number
   return [row, col]
 }
 
-function PiecesComponent({ flip, squareWidth }: { flip: boolean, squareWidth: number }) {
+function PiecesComponent({ flip, squareWidth, onDragEnd, rect }: { flip: boolean, squareWidth: number, onDragEnd: (startIdx: number, endIdx: number) => void, rect: React.RefObject<Rect | null> }) {
   const game = useContext(GameContext)
   if (!game) {
     throw new Error("PiecesComponent must be called from within a GameContext")
@@ -254,12 +253,22 @@ function PiecesComponent({ flip, squareWidth }: { flip: boolean, squareWidth: nu
       if (colour === null || variant === null) {
         return <React.Fragment key={idx} />
       }
+
+      // TODO: dragging
+      // On mousedown record position
+      // On mouseup record position
+      // If squares are different, try to post that move
       
       const [row, col] = getRowAndColFromBoardIndex(idx, flip)
       return (
         <div 
           key={idx}
           draggable={true}
+          onDragEnd={(event) => {
+            console.log(`onDragEnd ${event.clientX}, ${event.clientY}`)
+            const endPosition = getSquareIdxFromClick(event.clientX, event.clientY, rect)
+            onDragEnd(idx, endPosition)
+          }}
           className={`${colourToString.get(colour)}-${variantToString.get(variant)}`} 
           style={{ 
             transform: `translate(${col * squareWidth}px, ${row * squareWidth}px)`,
@@ -435,7 +444,7 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
   const [promotionActive, setPromotionActive] = useState(false)
   const [promotionSquare, setPromotionSquare] = useState(0)
   const [boardWidth, setBoardWidth] = useState(defaultWidth)
-  
+
   const game = useContext(GameContext)
   if (!game) {
     throw new Error('ChessBoard must be used within a GameContext Provider');
@@ -527,12 +536,12 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
           height: `${boardWidth}px`,
           backgroundSize: `${boardWidth}px`,
         }} 
-        onClick={(event) => {
+        onMouseDown={(event) => {
+          const position = getSquareIdxFromClick(event.clientX, event.clientY, rect)
           if (enableClicking) {
             clickHandler(
-              event,
+              position,
               game,
-              rect,
               promotionActive,
               promotionSquare,
               moves,
@@ -550,7 +559,30 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
             )}}}
       >
         <LastMoveComponent flip={game.flip} squareWidth={squareWidth}/>
-        <PiecesComponent flip={game.flip} squareWidth={squareWidth}/>
+        <PiecesComponent flip={game.flip} squareWidth={squareWidth} rect={rect} onDragEnd={
+          (startIdx, endIdx) => {
+            if (startIdx != endIdx) {
+              clickHandler(
+                endIdx,
+                game,
+                promotionActive,
+                promotionSquare,
+                moves,
+                setMoves,
+                captures,
+                setCaptures,
+                selectedPiece,
+                setSelectedPiece,
+                promotionNextMove,
+                setPromotionNextMove,
+                setPromotionActive,
+                setPromotionSquare,
+                waiting,
+                setWaiting
+              )
+            }
+          }
+        }/>
         <MovesComponent moves={moves} flip={game.flip} squareWidth={squareWidth}/>
         <CapturesComponent captures={captures} flip={game.flip} squareWidth={squareWidth}/>
         <PromotionComponent promotionSquare={promotionSquare} promotionActive={promotionActive} flip={game.flip} squareWidth={squareWidth}/>
