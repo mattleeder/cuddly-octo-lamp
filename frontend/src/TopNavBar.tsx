@@ -31,12 +31,12 @@ export function TopNavBar() {
 
         <ToggleDropdown title={<Settings />} >
           <ToggleDropdownSubmenu title="Theme">
-            <ToggleDropdownItem href="#">ThemeOne</ToggleDropdownItem>
-            <ToggleDropdownItem href="#">ThemeTwo</ToggleDropdownItem>
+            <ToggleDropdownItem href="#" onClick={() => console.log("Setting Theme: ThemeOne")}>ThemeOne</ToggleDropdownItem>
+            <ToggleDropdownItem href="#" onClick={() => console.log("Setting Theme: ThemeOne")}>ThemeTwo</ToggleDropdownItem>
           </ToggleDropdownSubmenu>
           <ToggleDropdownSubmenu title="Language">
-            <ToggleDropdownItem href="#">English</ToggleDropdownItem>
-            <ToggleDropdownItem href="#">中文</ToggleDropdownItem>
+            <ToggleDropdownItem href="#" onClick={() => console.log("Setting Language: English")}>English</ToggleDropdownItem>
+            <ToggleDropdownItem href="#" onClick={() => console.log("Setting Language: 中文")}>中文</ToggleDropdownItem>
           </ToggleDropdownSubmenu>
           <ToggleDropdownItem href="#"><LatencyDisplay /></ToggleDropdownItem>
         </ToggleDropdown>

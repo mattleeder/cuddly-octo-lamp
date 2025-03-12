@@ -2,6 +2,7 @@ import React from 'react';
 import './App.css';
 import { MatchRoom } from './chess/MatchRoom.tsx';
 import { QueueTiles } from './chess/QueueTiles.tsx';
+import { LoginPage } from './auth/LoginPage.tsx';
 import { TopNavBar } from './TopNavBar.tsx';
 import {
   BrowserRouter as Router,
@@ -23,6 +24,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/matchroom/:matchid" element={<MatchRoom />} />
+            <Route path="/login" element={<LoginPage />}/>
           </Routes>
         </Router>
       </PlayerInfoTile>
