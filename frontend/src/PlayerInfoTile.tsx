@@ -163,6 +163,7 @@ function fuseHandler(
 ) {
   // If none active do nothing
   if (!active) {
+    setFuseActive(false)
     return
   }
 
@@ -177,6 +178,7 @@ function fuseHandler(
 
   // Else clear queue
   console.log("Clear queue")
+  setFuseActive(false)
   queuedPlayerID.current = null
   queuedPlayerData.current = null
 }

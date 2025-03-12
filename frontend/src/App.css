@@ -636,3 +636,7 @@ LOGIN TILE
   margin-bottom: 0.5em;
   cursor: pointer;
 }
+
+input:invalid {
+  border: 2px solid red;
+}

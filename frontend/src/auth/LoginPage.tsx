@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
 
-function submitForm() {
-
-}
-
 // When redirected to login can use ?referrer=/somePage to redirect after successful login attempt
 
 function LoginForm() {
@@ -15,11 +11,11 @@ function LoginForm() {
     <form method="post" action="/login#post">
       <div className='formGroup'>
         <label htmlFor="username">Username</label>
-        <input name="username" type="text" value={username} onChange={(event) => setUsername(event.target.value)}/>
+        <input name="username" type="text" required={true} value={username} onChange={(event) => setUsername(event.target.value)}/>
       </div>
       <div className='formGroup'>
         <label htmlFor="password">Password</label>
-        <input name="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)}/>
+        <input name="password" type="password" required={true} value={password} onChange={(event) => setPassword(event.target.value)}/>
       </div>
       <button className='signInButton'>SIGN IN</button>
       <label>
