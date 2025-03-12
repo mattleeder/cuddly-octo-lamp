@@ -258,7 +258,8 @@ function PiecesComponent({ flip, squareWidth }: { flip: boolean, squareWidth: nu
       const [row, col] = getRowAndColFromBoardIndex(idx, flip)
       return (
         <div 
-          key={idx} 
+          key={idx}
+          draggable={true}
           className={`${colourToString.get(colour)}-${variantToString.get(variant)}`} 
           style={{ 
             transform: `translate(${col * squareWidth}px, ${row * squareWidth}px)`,

@@ -613,6 +613,17 @@ LOGIN TILE
   border-radius: 4px;
 }
 
+.registerTile {
+  display: block;
+  width: 18em;
+  height: 35em;
+  background-color: #343232;
+  padding: 3em;
+  color: #ffffff;
+  text-align: left;
+  border-radius: 4px;
+}
+
 .loginOptions {
   display: flex;
   margin-top: 1em;
