@@ -29,7 +29,7 @@ export function TopNavBar() {
 
         <a href='#'>Sign In</a>
 
-        <ToggleDropdown title={<Settings />} >
+        <ToggleDropdown title={<Settings className='settingsCog'/>} >
           <ToggleDropdownSubmenu title="Theme">
             <ToggleDropdownItem href="#" onClick={() => console.log("Setting Theme: ThemeOne")}>ThemeOne</ToggleDropdownItem>
             <ToggleDropdownItem href="#" onClick={() => console.log("Setting Theme: ThemeOne")}>ThemeTwo</ToggleDropdownItem>
