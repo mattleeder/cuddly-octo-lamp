@@ -1,17 +1,31 @@
-import React from 'react';
+import React, { useState } from 'react';
+
+function submitForm() {
+
+}
+
+// When redirected to login can use ?referrer=/somePage to redirect after successful login attempt
 
 function LoginForm() {
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [remember, setRemember] = useState(false)
+  
   return (
-    <form>
+    <form method="post" action="/login#post">
       <div className='formGroup'>
         <label htmlFor="username">Username</label>
-        <input name="username" type="text"/>
+        <input name="username" type="text" value={username} onChange={(event) => setUsername(event.target.value)}/>
       </div>
       <div className='formGroup'>
         <label htmlFor="password">Password</label>
-        <input name="password" type="text"/>
+        <input name="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)}/>
       </div>
       <button className='signInButton'>SIGN IN</button>
+      <label>
+        <input type="checkbox" style={{marginLeft: "0"}} checked={remember} onChange={() => setRemember(!remember)}/>
+        Keep me logged in
+      </label>
     </form>
   )
 }
@@ -19,10 +33,6 @@ function LoginForm() {
 function LoginOptions() {
   return (
     <div>
-      <label>
-        <input type="checkbox" style={{marginLeft: "0"}}/>
-        Keep me logged in
-      </label>
       <div className="loginOptions">
         <a href="#register">Register</a>
         <a href="#resetPassword" style={{marginLeft: "auto"}}>Password Reset</a>

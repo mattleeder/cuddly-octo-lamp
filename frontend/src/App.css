@@ -634,4 +634,5 @@ LOGIN TILE
   color: #ffffff;
   border-radius: 4px;
   margin-bottom: 0.5em;
+  cursor: pointer;
 }
