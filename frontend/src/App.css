@@ -491,6 +491,11 @@ button.dropdownTitle {
   cursor: pointer;
 }
 
+.siteName:hover {
+  color: #ffffff;
+  cursor: pointer;
+}
+
 /***************
 NAVBAR SEARCH
 ****************/

@@ -9,18 +9,18 @@ export function TopNavBar() {
   return (
     <nav className='topNavBar'>
       <div className='navBarContainer left'>
-        <a href='#'>BurrChess</a>
+        <a href='/' className="siteName">BurrChess</a>
 
-        <Dropdown title='Play' titleHref='#'>
+        <Dropdown title='Play' titleHref='/play'>
           <DropdownItem href="#">Test</DropdownItem>
         </Dropdown>
 
-        <Dropdown title='Watch' titleHref='#'>
-          <DropdownItem href="#">All</DropdownItem>
-          <DropdownItem href="#">Bullet</DropdownItem>
-          <DropdownItem href="#">Blitz</DropdownItem>
-          <DropdownItem href="#">Rapid</DropdownItem>
-          <DropdownItem href="#">Classical</DropdownItem>
+        <Dropdown title='Watch' titleHref='/watch'>
+          <DropdownItem href="/watch">All</DropdownItem>
+          <DropdownItem href="/watch?timeFormat=bullet">Bullet</DropdownItem>
+          <DropdownItem href="/watch?timeFormat=blitz">Blitz</DropdownItem>
+          <DropdownItem href="/watch?timeFormat=rapid">Rapid</DropdownItem>
+          <DropdownItem href="/watch?timeFormat=classical">Classical</DropdownItem>
         </Dropdown>
       </div>
 
