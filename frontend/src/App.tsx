@@ -11,6 +11,7 @@ import {
 } from "react-router-dom";
 import { HomepageMatch } from './chess/HomepageMatch.tsx';
 import { PlayerInfoTile } from './PlayerInfoTile.tsx';
+import { PageNotFound } from './PageNotFound.tsx';
 
 function App() {
   console.log(import.meta.env.VITE_API_URL)
@@ -19,12 +20,13 @@ function App() {
   return (
     <>
       <PlayerInfoTile>
-        <TopNavBar />
         <Router>
+          <TopNavBar />
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/matchroom/:matchid" element={<MatchRoom />} />
             <Route path="/login" element={<LoginPage />}/>
+            <Route path="*" element={<PageNotFound />}/>
           </Routes>
         </Router>
       </PlayerInfoTile>

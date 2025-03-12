@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 // When redirected to login can use ?referrer=/somePage to redirect after successful login attempt
 
@@ -30,8 +31,8 @@ function LoginOptions() {
   return (
     <div>
       <div className="loginOptions">
-        <a href="#register">Register</a>
-        <a href="#resetPassword" style={{marginLeft: "auto"}}>Password Reset</a>
+        <Link to="/register">Register</Link>
+        <Link to="/resetPassword" style={{marginLeft: "auto"}}>Password Reset</Link>
       </div>
     </div>
   )

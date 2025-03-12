@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 // Has Top level button that is clickable
 // On hover, top level button style changes and dropdown opens
@@ -101,7 +102,7 @@ export function ToggleDropdownSubmenu({ title, children }: { title: string, chil
   )
 }
 
-export function ToggleDropdownItem({ children, href, onClick }: { children: React.ReactNode, href: string, onClick?: () => void }) {
+export function ToggleDropdownItem({ children, to, onClick }: { children: React.ReactNode, to: string, onClick?: () => void }) {
   const count = React.Children.count(children);
   const parentContext = useContext(DropdownMenuParentContext)
 
@@ -125,7 +126,7 @@ export function ToggleDropdownItem({ children, href, onClick }: { children: Reac
         parentContext.setMenuActive(false)
         parentContext.setParentActive(false)}}
     >
-      <a href={href}><span>{children}</span></a>
+      <Link to={to}><span>{children}</span></Link>
     </li>
   )
 }

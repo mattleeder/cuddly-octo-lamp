@@ -1,6 +1,7 @@
 import { Search } from 'lucide-react';
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { PlayerInfoTileContext, PlayerInfoTileContextInterface } from './PlayerInfoTile.tsx';
+import { Link } from 'react-router-dom';
 
 interface navbarSearchResult {
   displayName: string
@@ -61,7 +62,7 @@ function NavbarSearchResults({ active, loading, searchResults, searchValue }: { 
           key={searchResult.playerID}
           onMouseEnter={(event) => playerInfoTile?.spawnPlayerInfoTile(searchResult.playerID, event)}
           onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(searchResult.playerID, event)}
-        ><a href={`#${searchResult.playerID}`}><span>{searchResult.displayName}</span></a></li>
+        ><Link to={`#${searchResult.playerID}`}><span>{searchResult.displayName}</span></Link></li>
       )
     })
   )
