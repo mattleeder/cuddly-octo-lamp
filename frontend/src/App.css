@@ -483,6 +483,7 @@ button.dropdownTitle {
 
 .dropdownItem:hover {
   background-color: #3487d5;
+  cursor: pointer;
 }
 
 /***************

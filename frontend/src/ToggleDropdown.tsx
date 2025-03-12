@@ -1,4 +1,4 @@
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 // Has Top level button that is clickable
@@ -36,10 +36,11 @@ function ToggleDropdownSubmenuTitle({ title, setSubmenuActive }: { title: string
   const parentContext = useContext(DropdownMenuParentContext)
   
   return (
-    <div onClick={() => {
-      setSubmenuActive(false)
-      parentContext.setParentActive(true)
-    }}>
+    <div style={{display: "flex"}} className='dropdownItem'
+      onClick={() => {
+        setSubmenuActive(false)
+        parentContext.setParentActive(true)
+      }}>
       <ChevronLeft />
       {title}
     </div>
@@ -75,14 +76,19 @@ export function ToggleDropdownSubmenu({ title, children }: { title: string, chil
   
   if (parentContext.menuActive && parentContext.parentActive) {
     return (
-      <li 
-        className='dropdownItem' 
+      <div style={{display: "flex"}}
         onClick={() => {
-          console.log("Item clicked")
           parentContext.setParentActive(false)
           setSubmenuActive(true)
         }}
-      >{title}</li>
+        className='dropdownItem' 
+      >
+        
+        <li 
+
+        >{title}</li>
+        <ChevronRight style={{marginLeft: "auto"}}/>
+      </div>
     )
   }
 
@@ -124,7 +130,7 @@ export function ToggleDropdownItem({ children, href, onClick }: { children: Reac
   )
 }
 
-export function ToggleDropdown({ title, children, style }: { title: React.ReactNode, children: React.ReactNode, style: React.CSSProperties }) {
+export function ToggleDropdown({ title, children, style }: { title: React.ReactNode, children: React.ReactNode, style?: React.CSSProperties }) {
   const [dropdownActive, setDropdownActive] = useState(false)
   const [menuActive, setMenuActive] = useState(false)
   const mouseOver = useRef(false)
@@ -157,7 +163,7 @@ export function ToggleDropdown({ title, children, style }: { title: React.ReactN
       <ToggleDropdownTitle active={menuActive} onClick={() => {setDropdownActive(!dropdownActive); setMenuActive(!menuActive)}}>{title}</ToggleDropdownTitle>
 
       <DropdownMenuParentContext.Provider value={{menuActive, setMenuActive, parentActive: dropdownActive, setParentActive: setDropdownActive}}>
-        <div className="dropdownContent">
+        <div className="dropdownContent" style={{minWidth: "200px"}}>
           <ul>
             {children}
           </ul>
