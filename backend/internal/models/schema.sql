@@ -1,6 +1,16 @@
+DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS live_matches;
 DROP TABLE IF EXISTS past_matches;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS user_ratings;
+
+CREATE TABLE sessions (
+    token TEXT PRIMARY KEY,
+    data BLOB NOT NULL,
+    expiry REAL NOT NULL
+);
+
+CREATE INDEX sessions_expiry_idx ON sessions (expiry);
 
 CREATE TABLE live_matches (
     match_id INTEGER PRIMARY KEY NOT NULL, 

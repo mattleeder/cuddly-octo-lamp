@@ -28,6 +28,17 @@ type NewUserOptions struct {
 	email *string
 }
 
+type NewUserInfo struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
+}
+
+type UserLoginInfo struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
 type UserModel struct {
 	DB *sql.DB
 }
@@ -57,6 +68,14 @@ func hashPassword(password string) (string, error) {
 func doesPasswordMatch(plaintextPassword string, hashedPassword string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(plaintextPassword))
 	return err == nil
+}
+
+func CreateNewUserOptions(newUser NewUserInfo) (options NewUserOptions) {
+	if newUser.Email != "" {
+		options.email = &newUser.Email
+	}
+
+	return options
 }
 
 func (m *UserModel) InsertNew(username string, password string, options *NewUserOptions) error {

@@ -3,18 +3,26 @@ package main
 import (
 	"net/http"
 	"net/http/pprof"
+
+	"github.com/alexedwards/scs/v2"
 )
+
+func wrapWithSessionManager(sm *scs.SessionManager, handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sm.LoadAndSave(handler).ServeHTTP(w, r)
+	}
+}
 
 func (app *application) routes() *http.ServeMux {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", rootHandler)
-	mux.HandleFunc("/getMoves", getChessMovesHandler)
-	mux.HandleFunc("/joinQueue", joinQueueHandler)
-	mux.HandleFunc("/listenformatch", matchFoundSSEHandler)
-	mux.HandleFunc("/matchroom/{matchID}/ws", serveMatchroomWs)
-	mux.HandleFunc("/getHighestEloMatch", getHighestEloMatchHandler)
+	mux.HandleFunc("/", wrapWithSessionManager(app.sessionManager, rootHandler))
+	mux.HandleFunc("/getMoves", wrapWithSessionManager(app.sessionManager, getChessMovesHandler))
+	mux.HandleFunc("/joinQueue", wrapWithSessionManager(app.sessionManager, joinQueueHandler))
+	mux.HandleFunc("/listenformatch", wrapWithSessionManager(app.sessionManager, matchFoundSSEHandler))
+	mux.HandleFunc("/matchroom/{matchID}/ws", wrapWithSessionManager(app.sessionManager, serveMatchroomWs))
+	mux.HandleFunc("/getHighestEloMatch", wrapWithSessionManager(app.sessionManager, getHighestEloMatchHandler))
 
 	// Add the pprof routes
 	mux.HandleFunc("/debug/pprof/", pprof.Index)

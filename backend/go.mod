@@ -8,6 +8,8 @@ require (
 )
 
 require (
+	github.com/alexedwards/scs/sqlite3store v0.0.0-20250212122300-421ef1d8611c // indirect
+	github.com/alexedwards/scs/v2 v2.8.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

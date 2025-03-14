@@ -7,17 +7,24 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
+
+	"github.com/alexedwards/scs/sqlite3store" //Sqlite3 ?
+	"github.com/alexedwards/scs/v2"
 )
 
 type application struct {
-	errorLog    *log.Logger
-	infoLog     *log.Logger
-	perfLog     *log.Logger
-	debugLog    *log.Logger
-	secretKey   []byte
-	liveMatches *models.LiveMatchModel
-	pastMatches *models.PastMatchModel
-	dbTaskQueue *models.TaskQueue
+	errorLog       *log.Logger
+	infoLog        *log.Logger
+	perfLog        *log.Logger
+	debugLog       *log.Logger
+	secretKey      []byte
+	liveMatches    *models.LiveMatchModel
+	pastMatches    *models.PastMatchModel
+	users          *models.UserModel
+	userRatings    *models.UserRatingsModel
+	dbTaskQueue    *models.TaskQueue
+	sessionManager *scs.SessionManager
 }
 
 var app *application
@@ -41,15 +48,31 @@ func main() {
 		errorLog.Fatal(err)
 	}
 
+	sessionManager := scs.New()
+	sessionManager.Store = sqlite3store.New(db)
+	sessionManager.Lifetime = 12 * time.Hour
+	sessionManager.IdleTimeout = 1 * time.Hour
+	sessionManager.HashTokenInStore = true
+	sessionManager.Cookie = scs.SessionCookie{
+		Name:     "id",
+		HttpOnly: true,
+		Persist:  false,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   true,
+	}
+
 	app = &application{
-		errorLog:    errorLog,
-		infoLog:     infoLog,
-		perfLog:     perfLog,
-		debugLog:    debugLog,
-		secretKey:   []byte("}\xa4\xc3\x85D\x89\xb75\xf0\xe6\xcf\xcaZ\x00k\x88\xe4\x8f\xd0\xd6\x95\x0e\xa6\xf9\xc2;!\xa2\xc4[\xca\x91"),
-		liveMatches: &models.LiveMatchModel{DB: db},
-		pastMatches: &models.PastMatchModel{DB: db},
-		dbTaskQueue: models.DBTaskQueue,
+		errorLog:       errorLog,
+		infoLog:        infoLog,
+		perfLog:        perfLog,
+		debugLog:       debugLog,
+		secretKey:      []byte("}\xa4\xc3\x85D\x89\xb75\xf0\xe6\xcf\xcaZ\x00k\x88\xe4\x8f\xd0\xd6\x95\x0e\xa6\xf9\xc2;!\xa2\xc4[\xca\x91"),
+		liveMatches:    &models.LiveMatchModel{DB: db},
+		pastMatches:    &models.PastMatchModel{DB: db},
+		users:          &models.UserModel{DB: db},
+		userRatings:    &models.UserRatingsModel{DB: db},
+		dbTaskQueue:    models.DBTaskQueue,
+		sessionManager: sessionManager,
 	}
 
 	srv := &http.Server{

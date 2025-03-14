@@ -1,6 +1,7 @@
 package main
 
 import (
+	"burrchess/internal/models"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -267,4 +268,60 @@ func getHighestEloMatchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write(jsonStr)
+}
+
+func registerUserHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() { app.perfLog.Printf("registerUserHandler took: %s\n", time.Since(start)) }()
+
+	if r.Method != "POST" {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+
+	var newUser models.NewUserInfo
+
+	err := json.NewDecoder(r.Body).Decode(&newUser)
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	newUserOptions := models.CreateNewUserOptions(newUser)
+
+	err = app.users.InsertNew(newUser.Username, newUser.Password, &newUserOptions)
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() { app.perfLog.Printf("loginHandler took: %s\n", time.Since(start)) }()
+
+	if r.Method != "POST" {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+
+	var loginInfo models.UserLoginInfo
+
+	err := json.NewDecoder(r.Body).Decode(&loginInfo)
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	isPasswordCorrect := app.users.IsCorrectPassword(loginInfo.Username, loginInfo.Password)
+	if !isPasswordCorrect {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 }
