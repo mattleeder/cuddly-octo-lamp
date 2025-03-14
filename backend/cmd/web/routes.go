@@ -13,7 +13,7 @@ func wrapWithSessionManager(sm *scs.SessionManager, handler http.HandlerFunc) ht
 	}
 }
 
-func (app *application) routes() *http.ServeMux {
+func (app *application) routes() http.Handler {
 
 	mux := http.NewServeMux()
 
@@ -36,5 +36,5 @@ func (app *application) routes() *http.ServeMux {
 	mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
 	mux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
 
-	return mux
+	return app.logRequest(secureWithCors(mux))
 }

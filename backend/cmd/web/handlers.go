@@ -64,6 +64,7 @@ func generateNewPlayerId() int64 {
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Strict-Transport-Security", "max-age=63072000")
 	app.clientError(w, http.StatusNotFound)
 }
 
