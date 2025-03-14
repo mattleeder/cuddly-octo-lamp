@@ -20,7 +20,7 @@ function RegisterForm() {
         <input name="password" type="password" required={true} value={password} onChange={(event) => setPassword(event.target.value)}/>
       </div>
       <div className='formGroup'>
-        <label htmlFor="email">Email (Optional)</label>
+        <label htmlFor="email">Email (Optional - For password reset)</label>
         <input name="email" type="email" required={false} value={email} onChange={(event) => setEmail(event.target.value)}/>
       </div>
       <button className='signInButton'>REGISTER</button>
