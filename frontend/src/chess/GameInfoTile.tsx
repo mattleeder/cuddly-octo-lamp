@@ -1,7 +1,8 @@
 import React, { useContext, useRef, useEffect, useState } from "react";
 import { CornerUpLeft, Handshake, Flag, Microscope, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, AlignJustify } from "lucide-react";
-import { PieceColour, parseGameStateFromFEN } from "./ChessLogic";
+import { PieceColour, PieceVariant, parseGameStateFromFEN } from "./ChessLogic";
 import { GameContext, OpponentEventType, gameContext, boardHistory } from "./GameContext";
+import { variantToString } from "./ChessBoard";
 
 
 function isClockPaused(game: gameContext, colour: PieceColour) {
@@ -396,6 +397,23 @@ function CountdownTimer({ countdownTimerMilliseconds, paused, className } : { co
   )
 }
 
+function PlayerPieceCounts({ pieceCount, colour }: { pieceCount: Map<PieceVariant, number>, colour: PieceColour }) {
+  // Pawns, Knights, Bishops, Rooks, Queens
+  const keys = [PieceVariant.Pawn, PieceVariant.Knight, PieceVariant.Bishop, PieceVariant.Rook, PieceVariant.Queen]
+  const colourMultiplier = colour == PieceColour.White ? 1 : -1
+  return (
+    <div className="pieceCount">
+      {
+        keys.map((value) => {
+          for (let i = 0; i < (pieceCount.get(value) || 0) * colourMultiplier; i++) {
+            return <div className={`grey-${variantToString.get(value)}`}></div>
+          }
+        })
+      }
+    </div>
+  )
+}
+
 export function GameInfoTile() {
 
   const game = useContext(GameContext)
@@ -419,6 +437,20 @@ export function GameInfoTile() {
     bottomTime = game.matchData.activeState.whitePlayerTimeRemainingMilliseconds
     bottomPaused = isWhiteClockPaused(game)
   }
+
+  const playerPieceCount = new Map<PieceVariant, number>()
+
+  for (const [colour, variant] of game.matchData.activeState.board) {
+    if (variant == null || colour == null) {
+      continue
+    }
+    let count = playerPieceCount.get(variant) || 0
+    if (colour == PieceColour.White) {
+      count += 1
+    } else {
+      count -= 1
+    }
+  }
   
   return (
     <div>
@@ -426,9 +458,11 @@ export function GameInfoTile() {
       <div className='gameInfo'>
         <EventTypeDialog />
         <PlayerInfo connected={game.isWhiteConnected}/>
+        <PlayerPieceCounts pieceCount={playerPieceCount} colour={PieceColour.White}/>
         <MoveHistoryControls />
         <Moves />
         <GameControls />
+        <PlayerPieceCounts pieceCount={playerPieceCount} colour={PieceColour.White}/>
         <PlayerInfo connected={game.isBlackConnected}/>
       </div>
       <CountdownTimer className="playerTimeBottom" paused={bottomPaused} countdownTimerMilliseconds={bottomTime}/>

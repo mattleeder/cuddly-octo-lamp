@@ -7,7 +7,7 @@ const colourToString = new Map<PieceColour, string>()
 colourToString.set(PieceColour.White, 'white')
 colourToString.set(PieceColour.Black, 'black')
 
-const variantToString = new Map<PieceVariant, string>()
+export const variantToString = new Map<PieceVariant, string>()
 
 variantToString.set(PieceVariant.Pawn, 'pawn')
 variantToString.set(PieceVariant.Knight, 'knight')

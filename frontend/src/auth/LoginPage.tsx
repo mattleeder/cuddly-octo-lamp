@@ -11,7 +11,7 @@ interface LoginFormValidationErrors {
 
 async function handleFormSubmit(formData: FormData, navigate: NavigateFunction, setLoading: React.Dispatch<React.SetStateAction<boolean>>, setValidationErrors: React.Dispatch<React.SetStateAction<LoginFormValidationErrors>>) {
   setLoading(true)
-  const url = import.meta.env.VITE_API_REGISTER_URL
+  const url = import.meta.env.VITE_API_LOGIN_URL
   const redirectUrl = formData.get("referrer") as string || "/"
 
   try {
