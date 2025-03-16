@@ -82,6 +82,16 @@ func (m *UserModel) InsertNew(username string, password string, options *NewUser
 	defer m.LogAll()
 	app.infoLog.Printf("Inserting new user: %v\n", username)
 
+	if username == "" {
+		app.errorLog.Printf("Username not given")
+		return errors.New("username not given")
+	}
+
+	if username == "" {
+		app.errorLog.Printf("Username not given")
+		return errors.New("password not given")
+	}
+
 	var playerID = rand.Int63()
 	hashedPassword, err := hashPassword(password)
 	password = "" // Overwrite password to avoid accidental usage
@@ -95,10 +105,10 @@ func (m *UserModel) InsertNew(username string, password string, options *NewUser
 	}
 
 	stepOne := `
-	insert into users (player_id, username, password, email) (?, ?, ?, ?)
+	insert into users (player_id, username, password, email) VALUES (?, ?, ?, ?);
 	`
 	stepTwo := `
-	insert into user_ratings (player_id, username) (?, ?)
+	insert into user_ratings (player_id, username) VALUES (?, ?);
 	`
 	var stmtOne, stmtTwo *sql.Stmt
 
@@ -124,9 +134,9 @@ func (m *UserModel) InsertNew(username string, password string, options *NewUser
 
 	_, err = stmtOne.Exec(playerID, username, hashedPassword, email)
 	if err != nil {
-		app.errorLog.Printf("Error generating inserting new user: %v\n", err.Error())
+		app.errorLog.Printf("Error inserting new user: %s\n", err.Error())
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			app.errorLog.Printf("insert users: unable to rollback: %v", rollbackErr)
+			app.errorLog.Printf("insert users: unable to rollback: %s", rollbackErr)
 		}
 		return err
 	}

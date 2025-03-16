@@ -142,4 +142,14 @@ func InitDatabase(driverName string, dataSourceName string) {
 	if err != nil {
 		app.errorLog.Fatalf("%q: %s\n", err, sqlStmt)
 	}
+
+	var sqliteVersion string
+	row := db.QueryRow("SELECT sqlite_version();")
+	err = row.Scan(&sqliteVersion)
+
+	if err != nil {
+		app.errorLog.Fatalf("%q: %s\n", err, "SELECT sqlite_version();")
+	}
+
+	app.infoLog.Printf("SQLITE VERSION: %v", sqliteVersion)
 }

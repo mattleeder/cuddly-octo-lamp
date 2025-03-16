@@ -23,6 +23,7 @@ func (app *application) routes() http.Handler {
 	mux.HandleFunc("/listenformatch", wrapWithSessionManager(app.sessionManager, matchFoundSSEHandler))
 	mux.HandleFunc("/matchroom/{matchID}/ws", wrapWithSessionManager(app.sessionManager, serveMatchroomWs))
 	mux.HandleFunc("/getHighestEloMatch", wrapWithSessionManager(app.sessionManager, getHighestEloMatchHandler))
+	mux.HandleFunc("/register", wrapWithSessionManager(app.sessionManager, registerUserHandler))
 
 	// Add the pprof routes
 	mux.HandleFunc("/debug/pprof/", pprof.Index)

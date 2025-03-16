@@ -45,18 +45,22 @@ CREATE TABLE past_matches (
 
 CREATE TABLE users (
     player_id INTEGER PRIMARY KEY NOT NULL,
-    username TEXT NOT NULL,
+    username TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
     email TEXT,
-    join_date INTEGER DEFAULT unixepoch('now'),
-    last_seen INTEGER DEFAULT unixepoch('now')
+    join_date INTEGER DEFAULT (strftime('%s', 'now')),
+    last_seen INTEGER DEFAULT (strftime('%s', 'now'))
 );
+
+CREATE UNIQUE INDEX users_username_idx ON users (username);
 
 CREATE TABLE user_ratings (
     player_id INTEGER PRIMARY KEY NOT NULL,
-    username TEXT NOT NULL,
-    bullet_rating INTEGER NOT NULL DEFAULT 1500,
-    blitz_rating INTEGER NOT NULL DEFAULT 1500,
-    rapid_rating INTEGER NOT NULL DEFAULT 1500,
-    classical_rating INTEGER NOT NULL DEFAULT 1500
+    username TEXT UNIQUE NOT NULL,
+    bullet_rating INTEGER DEFAULT 1500,
+    blitz_rating INTEGER DEFAULT 1500,
+    rapid_rating INTEGER DEFAULT 1500,
+    classical_rating INTEGER DEFAULT 1500
 );
+
+CREATE UNIQUE INDEX user_ratings_username_idx ON user_ratings (username);

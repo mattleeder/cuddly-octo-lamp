@@ -292,9 +292,22 @@ func registerUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	newUserOptions := models.CreateNewUserOptions(newUser)
 
+	var registerUserValidationErrors models.NewUserInfo
+
 	err = app.users.InsertNew(newUser.Username, newUser.Password, &newUserOptions)
 	if err != nil {
-		app.serverError(w, err)
+		app.errorLog.Printf("DB Error: %s\n", err.Error())
+		if err.Error() == "constraint failed: UNIQUE constraint failed: users.username (2067)" {
+			registerUserValidationErrors.Username = "Username already exists."
+		}
+		jsonStr, jsonErr := json.Marshal(registerUserValidationErrors)
+		if jsonErr != nil {
+			app.errorLog.Printf("Error marshalling json: %s\n", jsonErr.Error())
+			app.serverError(w, err)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write(jsonStr)
+		}
 		return
 	}
 

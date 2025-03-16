@@ -7,13 +7,14 @@ function sleep(delayMs: number){
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
-async function setHighestEloMatchID(setMatchID: (matchID: string) => void) {
+async function fetchHighestEloMatchID(signal: AbortSignal) {
   let initialRetryDelayMs = 1000
 
   while (true) {
 
     try {
       const response = await fetch(import.meta.env.VITE_API_FETCH_HIGHEST_ELO_MATCH_URL, {
+        signal,
         "method": "GET",
         "mode": "cors",
       })
@@ -25,12 +26,15 @@ async function setHighestEloMatchID(setMatchID: (matchID: string) => void) {
       }
       
       const data = await response.json()
-      setMatchID(data["matchID"])
-      return
+      return data["matchID"]
     }
       
     catch (error: unknown) {
       if (error instanceof Error) {
+        if (error.name == "AbortError") {
+          console.log("Request was aborted")
+          return
+        }
         console.error(error.message)
       } else {
         console.error(error)
@@ -57,21 +61,24 @@ function GameOverListener({ callbackFunction }: { callbackFunction: () => void }
 
 export function HomepageMatch() {
   const [matchID, setMatchID] = useState<undefined | string>(undefined)
-  const [loading, setLoading] = useState(true)
   const parsedTimeFormatInMilliseconds = 0
 
   const onMatchEnd = () => {
-    setLoading(true)
+    setMatchID(undefined)
   }
 
   useEffect(() => {
-    if (matchID !== undefined) {
-      setLoading(false)
+    const controller = new AbortController()
+    const signal = controller.signal
+    if (matchID === undefined) {
+      fetchHighestEloMatchID(signal).then((data) => setMatchID(data))
+    }
+    return () => {
+      controller.abort()
     }
   }, [matchID])
 
-  if (loading) {
-    setHighestEloMatchID(setMatchID)
+  if (matchID === undefined) {
     return (
       <div className='chessboard' />
     )
