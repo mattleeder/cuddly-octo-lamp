@@ -88,14 +88,22 @@ function declineEvent(game: gameContext, isThreefold = false) {
     
 }
 
+function PingStatus({ connected }: { connected: boolean }) {
+  const fill = connected ? "#52f407" : "#bbb"
+  return (
+    <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="10" cy="10" r="10" fill={fill} />
+      Sorry, your browser does not support inline SVG.
+    </svg> 
+  )
+}
+
 function PlayerInfo({ connected }: { connected: boolean }) {
-  let classname = "playerPingStatus"
-  if (connected) {
-    classname += " connected"
-  }
   return (
     <div className='playerInfo'>
-      <div className={classname}></div>
+      <div className="playerPingStatus">
+        <PingStatus connected={connected} />
+      </div>
       <div className='playerName'>Player</div>
     </div>
   )

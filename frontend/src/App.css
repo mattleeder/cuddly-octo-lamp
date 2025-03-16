@@ -397,12 +397,13 @@ CHESSMATCH
 }
 
 .playerPingStatus {
-  width: 10%;
-  height: 40%;
-  background-color: rgba(0, 0, 0, 0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 7%;
+  height: 100%;
   margin: auto;
-  border: 2px solid #bbb;
-  border-radius: 50%;
+  padding-left: 4px;
 }
 
 .playerPingStatus.connected {
