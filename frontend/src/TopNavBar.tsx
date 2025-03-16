@@ -28,7 +28,7 @@ export function TopNavBar() {
       <div className='navBarContainer right'>
         <NavbarSearch />
 
-        <Link to='/login'>Sign In</Link>
+        <Link to={{pathname: '/login', search: `?referrer=${window.location.pathname}`}}>Sign In</Link>
 
         <ToggleDropdown title={<Settings className='settingsCog'/>} >
           <ToggleDropdownSubmenu title="Theme">

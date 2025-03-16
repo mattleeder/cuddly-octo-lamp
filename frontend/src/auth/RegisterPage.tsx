@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useParams, useNavigate, NavigateFunction } from 'react-router-dom';
+import { useNavigate, NavigateFunction, useSearchParams } from 'react-router-dom';
 import { FormError } from '../FormError';
 
 // When redirected to login can use ?referrer=/somePage to redirect after successful login attempt
@@ -44,7 +44,7 @@ function RegisterForm() {
   const [password, setPassword] = useState("")
   const [email, setEmail] = useState("")
   const [remember, setRemember] = useState(false)
-  const params = useParams()
+  const [searchParams, _setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [validationErrors, setValidationErrors] = useState({
     username: "",
@@ -72,19 +72,8 @@ function RegisterForm() {
         <input type="checkbox" style={{marginLeft: "0"}} checked={remember} onChange={() => setRemember(!remember)}/>
         Keep me logged in
       </label>
-      <input className="hidden" name="referrer" type="text" required={false} value={params.referrer}/>
+      <input className="hidden" name="referrer" type="text" required={false} value={searchParams.get("referrer") || ""}/>
     </form>
-  )
-}
-
-function LoginOptions() {
-  return (
-    <div>
-      <div className="loginOptions">
-        <Link to="/register">Register</Link>
-        <Link to="/resetPassword" style={{marginLeft: "auto"}}>Password Reset</Link>
-      </div>
-    </div>
   )
 }
 
@@ -93,7 +82,6 @@ export function RegisterPage() {
     <div className="registerTile">
       <h1>Register</h1>
       <RegisterForm />
-      <LoginOptions />
     </div>
   )
 }
