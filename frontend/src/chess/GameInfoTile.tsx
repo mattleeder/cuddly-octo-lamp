@@ -155,13 +155,13 @@ function GameControls() {
     <div className='gameControlsContainer'>
       <div className='spacer' />
       <div className='gameControlsButton'>
-        <CornerUpLeft size={12} color='#000000' />
+        <CornerUpLeft color='#000000' />
       </div>
       <div className='gameControlsButton'>
-        <Handshake onClick={() => sendDrawEvent(game.webSocket)} size={12} color='#000000' />
+        <Handshake onClick={() => sendDrawEvent(game.webSocket)} color='#000000' />
       </div>
       <div className='gameControlsButton'>
-        <Flag onClick={() => sendResignEvent(game.webSocket)} size={12} color='#000000' />
+        <Flag onClick={() => sendResignEvent(game.webSocket)} color='#000000' />
       </div>
       <div className='spacer' />
     </div>
@@ -342,22 +342,22 @@ function MoveHistoryControls() {
   return (
     <div className='moveHistoryControlsContainer'>
       <div className='moveHistoryControlsButton'>
-        <Microscope size={12} />
+        <Microscope/>
       </ div>
       <div onClick={() => updateActiveState(0, game)} className='moveHistoryControlsButton'>
-        <ChevronFirst size={12} />
+        <ChevronFirst/>
       </ div>
       <div onClick={() => updateActiveState(game?.matchData.activeMove - 1, game)} className='moveHistoryControlsButton'>
-        <ChevronLeft size={12} />
+        <ChevronLeft/>
       </ div>
       <div className='moveHistoryControlsButton'>
-        <ChevronRight onClick={() => updateActiveState(game?.matchData.activeMove + 1, game)} size={12} />
+        <ChevronRight onClick={() => updateActiveState(game?.matchData.activeMove + 1, game)}/>
       </ div>
       <div onClick={() => updateActiveState(game?.matchData.stateHistory.length - 1, game)} className={latestMoveButtonClassName}>
-        <ChevronLast size={12} />
+        <ChevronLast/>
       </ div>
       <div className='moveHistoryControlsButton'>
-        <AlignJustify size={12} />
+        <AlignJustify/>
       </ div>
     </div>
   )
@@ -453,7 +453,7 @@ export function GameInfoTile() {
   }
   
   return (
-    <div>
+    <div className="gameInfoContainer">
       <CountdownTimer className="playerTimeTop" paused={topPaused} countdownTimerMilliseconds={topTime}/>
       <div className='gameInfo'>
         <EventTypeDialog />
