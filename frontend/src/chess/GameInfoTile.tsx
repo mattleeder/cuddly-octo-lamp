@@ -405,7 +405,35 @@ function CountdownTimer({ countdownTimerMilliseconds, paused, className } : { co
   )
 }
 
-function PlayerPieceCounts({ pieceCount, colour }: { pieceCount: Map<PieceVariant, number>, colour: PieceColour }) {
+function PlayerPieceCounts({ colour }: { colour: PieceColour }) {
+  const game = useContext(GameContext)
+  if (!game) {
+    throw new Error('GameInfoTile must be used within a GameContext Provider');
+  }
+
+  const [pieceCount, setPieceCount] = useState<Map<PieceVariant, number>>(new Map<PieceVariant, number>())
+
+  useEffect(() => {
+    const newPieceCount = new Map<PieceVariant, number>()
+
+    for (const [colour, variant] of game.matchData.activeState.board) {
+      if (variant == null || colour == null) {
+        continue
+      }
+      let count = newPieceCount.get(variant) || 0
+      if (colour == PieceColour.White) {
+        count += 1
+      } else {
+        count -= 1
+      }
+      newPieceCount.set(variant, count)
+    }
+
+    console.log(newPieceCount)
+
+    setPieceCount(newPieceCount)
+  }, [game.matchData.activeState.board])
+
   // Pawns, Knights, Bishops, Rooks, Queens
   const keys = [PieceVariant.Pawn, PieceVariant.Knight, PieceVariant.Bishop, PieceVariant.Rook, PieceVariant.Queen]
   const colourMultiplier = colour == PieceColour.White ? 1 : -1
@@ -413,9 +441,21 @@ function PlayerPieceCounts({ pieceCount, colour }: { pieceCount: Map<PieceVarian
     <div className="pieceCount">
       {
         keys.map((value) => {
-          for (let i = 0; i < (pieceCount.get(value) || 0) * colourMultiplier; i++) {
-            return <div className={`grey-${variantToString.get(value)}`}></div>
-          }
+          const items = Array.from({ length: Math.max(0, pieceCount.get(value) as number ) * colourMultiplier }, (_, i) => (
+            <div 
+              key={`pieceCount-${value}-${i}`}
+              className={`grey-${variantToString.get(value)}`}
+              style={{ 
+                position: "relative",
+                display: "inline-block",
+                width: `${1.2}em`,
+                backgroundSize: `${2}em`,
+                backgroundPosition: "center",
+                margin: "0",
+              }} 
+            />
+          ));
+          return items
         })
       }
     </div>
@@ -445,35 +485,21 @@ export function GameInfoTile() {
     bottomTime = game.matchData.activeState.whitePlayerTimeRemainingMilliseconds
     bottomPaused = isWhiteClockPaused(game)
   }
-
-  const playerPieceCount = new Map<PieceVariant, number>()
-
-  for (const [colour, variant] of game.matchData.activeState.board) {
-    if (variant == null || colour == null) {
-      continue
-    }
-    let count = playerPieceCount.get(variant) || 0
-    if (colour == PieceColour.White) {
-      count += 1
-    } else {
-      count -= 1
-    }
-  }
   
   return (
     <div className="gameInfoContainer">
+      <PlayerPieceCounts colour={PieceColour.White}/>
       <CountdownTimer className="playerTimeTop" paused={topPaused} countdownTimerMilliseconds={topTime}/>
       <div className='gameInfo'>
         <EventTypeDialog />
         <PlayerInfo connected={game.isWhiteConnected}/>
-        <PlayerPieceCounts pieceCount={playerPieceCount} colour={PieceColour.White}/>
         <MoveHistoryControls />
         <Moves />
         <GameControls />
-        <PlayerPieceCounts pieceCount={playerPieceCount} colour={PieceColour.White}/>
         <PlayerInfo connected={game.isBlackConnected}/>
       </div>
       <CountdownTimer className="playerTimeBottom" paused={bottomPaused} countdownTimerMilliseconds={bottomTime}/>
+      <PlayerPieceCounts colour={PieceColour.Black}/>
     </div>
   )
 }

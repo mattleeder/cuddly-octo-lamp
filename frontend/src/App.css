@@ -81,6 +81,14 @@ CHESSMATCH
   font-size: large;
 }
 
+.pieceCount {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 10vh;
+  margin-left: 10px;
+}
+
 .playerTimeBottom {
   display: flex;
   align-items: center;
@@ -93,6 +101,7 @@ CHESSMATCH
   border-top: 10px solid #161512;
   box-shadow: 2px 2px #131313;
   font-family: Arial, Helvetica, sans-serif;
+  border-bottom-right-radius: 4px;
 }
 
 .playerTimeTop {
@@ -107,6 +116,7 @@ CHESSMATCH
   border-bottom: 10px solid #161512;
   box-shadow: 2px 2px #131313;
   font-family: Arial, Helvetica, sans-serif;
+  border-top-right-radius: 4px;
 }
 
 .playerInfo {
@@ -233,6 +243,7 @@ CHESSMATCH
   position: relative;
 	background-image: url("data:image/svg+xml,%3Csvg width='800' height='800' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100' height='100' x='0' y='0' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='100' y='0' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='200' y='0' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='300' y='0' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='400' y='0' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='500' y='0' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='600' y='0' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='700' y='0' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='0' y='100' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='100' y='100' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='200' y='100' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='300' y='100' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='400' y='100' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='500' y='100' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='600' y='100' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='700' y='100' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='0' y='200' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='100' y='200' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='200' y='200' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='300' y='200' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='400' y='200' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='500' y='200' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='600' y='200' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='700' y='200' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='0' y='300' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='100' y='300' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='200' y='300' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='300' y='300' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='400' y='300' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='500' y='300' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='600' y='300' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='700' y='300' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='0' y='400' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='100' y='400' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='200' y='400' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='300' y='400' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='400' y='400' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='500' y='400' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='600' y='400' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='700' y='400' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='0' y='500' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='100' y='500' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='200' y='500' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='300' y='500' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='400' y='500' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='500' y='500' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='600' y='500' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='700' y='500' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='0' y='600' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='100' y='600' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='200' y='600' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='300' y='600' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='400' y='600' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='500' y='600' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='600' y='600' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='700' y='600' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='0' y='700' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='100' y='700' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='200' y='700' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='300' y='700' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='400' y='700' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='500' y='700' style='fill:%23f0d9b5' /%3E%3Crect width='100' height='100' x='600' y='700' style='fill:%23b58863' /%3E%3Crect width='100' height='100' x='700' y='700' style='fill:%23f0d9b5' /%3E%3C/svg%3E");
   z-index: 1;
+  border-radius: 4px;
 }
 
 .white-pawn {
