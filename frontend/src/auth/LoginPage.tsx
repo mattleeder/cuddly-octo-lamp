@@ -1,40 +1,30 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { Link, useNavigate, NavigateFunction, useSearchParams } from 'react-router-dom';
 import { FormError } from '../FormError';
+import { AuthContext, AuthContextType, LoginFormValidationErrors } from './AuthContext';
 
 // When redirected to login can use ?referrer=/somePage to redirect after successful login attempt
 
-interface LoginFormValidationErrors {
-  username: string
-  password: string
-}
-
-async function handleFormSubmit(formData: FormData, navigate: NavigateFunction, setLoading: React.Dispatch<React.SetStateAction<boolean>>, setValidationErrors: React.Dispatch<React.SetStateAction<LoginFormValidationErrors>>) {
+async function handleFormSubmit(auth: AuthContextType, formData: FormData, navigate: NavigateFunction, setLoading: React.Dispatch<React.SetStateAction<boolean>>, setValidationErrors: React.Dispatch<React.SetStateAction<LoginFormValidationErrors>>) {
   setLoading(true)
-  const url = import.meta.env.VITE_API_LOGIN_URL
   const redirectUrl = formData.get("referrer") as string || "/"
+  const loginData = {
+    username: formData.get("username") as string,
+    password: formData.get("password") as string,
+  }
 
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      body: JSON.stringify({
-        username: formData.get("username"),
-        password: formData.get("password"),
-        email: formData.get("email"),
-      })
-    })
-
-    if (response.ok) {
+  const loginCallback = (success: boolean, responseData: LoginFormValidationErrors | undefined) => {
+    if (success) {
       navigate(redirectUrl)
     } else {
-      const validationErrors: LoginFormValidationErrors = await response.json()
-      setValidationErrors(validationErrors)
+      if (responseData != undefined) {
+        setValidationErrors(responseData)
+      }
     }
-  } catch (e) {
-    console.error(e)
-  } finally {
-    setLoading(false)
   }
+
+  auth.login(loginData, loginCallback)
+  setLoading(false)
 }
 
 function LoginForm() {
@@ -48,9 +38,10 @@ function LoginForm() {
     username: "",
     password: "",
   })
+  const auth = useContext(AuthContext)
   
   return (
-    <form method="post" action={(formData) => {if (!loading) {handleFormSubmit(formData, navigate, setLoading, setValidationErrors)}}}>
+    <form method="post" action={(formData) => {if (!loading) {handleFormSubmit(auth, formData, navigate, setLoading, setValidationErrors)}}}>
       <div className='formGroup'>
         <label htmlFor="username">Username</label>
         <input name="username" type="text" required={true} value={username} onChange={(event) => setUsername(event.target.value)}/>
