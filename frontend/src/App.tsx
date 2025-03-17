@@ -13,6 +13,7 @@ import { HomepageMatch } from './chess/HomepageMatch.tsx';
 import { PlayerInfoTile } from './PlayerInfoTile.tsx';
 import { PageNotFound } from './PageNotFound.tsx';
 import { RegisterPage } from './auth/RegisterPage.tsx';
+import { AuthProvider } from './auth/AuthContext.tsx';
 
 function App() {
   console.log(import.meta.env.VITE_API_URL)
@@ -20,18 +21,20 @@ function App() {
 
   return (
     <>
-      <PlayerInfoTile>
-        <Router>
-          <TopNavBar />
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/matchroom/:matchid" element={<MatchRoom />} />
-            <Route path="/login" element={<LoginPage />}/>
-            <Route path="/register" element={<RegisterPage/>}/>
-            <Route path="*" element={<PageNotFound />}/>
-          </Routes>
-        </Router>
-      </PlayerInfoTile>
+      <AuthProvider>
+        <PlayerInfoTile>
+          <Router>
+            <TopNavBar />
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/matchroom/:matchid" element={<MatchRoom />} />
+              <Route path="/login" element={<LoginPage />}/>
+              <Route path="/register" element={<RegisterPage/>}/>
+              <Route path="*" element={<PageNotFound />}/>
+            </Routes>
+          </Router>
+        </PlayerInfoTile>
+      </AuthProvider>
     </>
   )
 }
