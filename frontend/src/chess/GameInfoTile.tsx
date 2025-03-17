@@ -441,14 +441,15 @@ function PlayerPieceCounts({ colour }: { colour: PieceColour }) {
     <div className="pieceCount">
       {
         keys.map((value) => {
-          const items = Array.from({ length: Math.max(0, pieceCount.get(value) as number ) * colourMultiplier }, (_, i) => (
+          const items = Array.from({ length: Math.max(0, pieceCount.get(value) as number  * colourMultiplier) }, (_, i) => (
             <div 
               key={`pieceCount-${value}-${i}`}
               className={`grey-${variantToString.get(value)}`}
               style={{ 
                 position: "relative",
                 display: "inline-block",
-                width: `${1.2}em`,
+                width: `${1.7}em`,
+                height: `${1.7}em`,
                 backgroundSize: `${2}em`,
                 backgroundPosition: "center",
                 margin: "0",

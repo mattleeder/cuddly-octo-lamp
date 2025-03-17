@@ -18,9 +18,9 @@ func secureHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 
 		// Should be called on logout
-		w.Header().Set("Clear-Site-Data", "cache")
-		w.Header().Set("Clear-Site-Data", "cookies")
-		w.Header().Set("Clear-Site-Data", "storage")
+		// w.Header().Set("Clear-Site-Data", "cache")
+		// w.Header().Set("Clear-Site-Data", "cookies")
+		// w.Header().Set("Clear-Site-Data", "storage")
 
 		w.Header().Set("Cross-Origin-Embedder-Policy", "require-corp")
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
