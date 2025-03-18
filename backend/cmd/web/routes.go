@@ -9,6 +9,8 @@ import (
 
 func wrapWithSessionManager(sm *scs.SessionManager, handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		sessionID := sm.Token(r.Context())
+		app.infoLog.Println("Session ID:", sessionID)
 		sm.LoadAndSave(handler).ServeHTTP(w, r)
 	}
 }
@@ -17,14 +19,16 @@ func (app *application) routes() http.Handler {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", wrapWithSessionManager(app.sessionManager, rootHandler))
-	mux.HandleFunc("/getMoves", wrapWithSessionManager(app.sessionManager, getChessMovesHandler))
-	mux.HandleFunc("/joinQueue", wrapWithSessionManager(app.sessionManager, joinQueueHandler))
-	mux.HandleFunc("/listenformatch", wrapWithSessionManager(app.sessionManager, matchFoundSSEHandler))
-	mux.HandleFunc("/matchroom/{matchID}/ws", wrapWithSessionManager(app.sessionManager, serveMatchroomWs))
-	mux.HandleFunc("/getHighestEloMatch", wrapWithSessionManager(app.sessionManager, getHighestEloMatchHandler))
-	mux.HandleFunc("/register", wrapWithSessionManager(app.sessionManager, registerUserHandler))
-	mux.HandleFunc("/login", wrapWithSessionManager(app.sessionManager, loginHandler))
+	mux.HandleFunc("/", rootHandler)
+	mux.HandleFunc("/getMoves", getChessMovesHandler)
+	mux.HandleFunc("/joinQueue", joinQueueHandler)
+	mux.HandleFunc("/listenformatch", matchFoundSSEHandler)
+	mux.HandleFunc("/matchroom/{matchID}/ws", serveMatchroomWs)
+	mux.HandleFunc("/getHighestEloMatch", getHighestEloMatchHandler)
+	mux.HandleFunc("/register", registerUserHandler)
+	mux.HandleFunc("/login", loginHandler)
+	mux.HandleFunc("/logout", logoutHandler)
+	mux.HandleFunc("/validateSession", validateSessionHandler)
 
 	// Add the pprof routes
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
@@ -38,5 +42,5 @@ func (app *application) routes() http.Handler {
 	mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
 	mux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
 
-	return app.logRequest(secureWithCors(mux))
+	return app.logRequest(app.sessionManager.LoadAndSave(secureHeaders(corsHeaders(mux))))
 }

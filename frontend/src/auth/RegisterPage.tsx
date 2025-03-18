@@ -16,8 +16,11 @@ async function handleFormSubmit(formData: FormData, navigate: NavigateFunction, 
   const redirectUrl = formData.get("referrer") as string || "/"
 
   try {
+
+    // @TODO, send settings when registering account
     const response = await fetch(url, {
       method: "POST",
+      credentials: "include",
       body: JSON.stringify({
         username: formData.get("username"),
         password: formData.get("password"),

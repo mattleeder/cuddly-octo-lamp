@@ -159,21 +159,27 @@ func (m *UserModel) InsertNew(username string, password string, options *NewUser
 	return nil
 }
 
-func (m *UserModel) IsCorrectPassword(username string, password string) bool {
+func (m *UserModel) Authenticate(username string, password string) (playerID int64, authorized bool) {
 	app.infoLog.Printf("Checking password for user: %v\n", username)
 
 	sqlStmt := `
-	select password from users where username = ?
+	select player_id, password from users where username = ?
 	`
 	row := m.DB.QueryRow(sqlStmt, password)
 	var hashedPassword string
-	err := row.Scan(&hashedPassword)
+	err := row.Scan(&playerID, &hashedPassword)
 	if err != nil {
 		app.errorLog.Printf("Error getting password for user: %v\n", err.Error())
-		return false
+		return 0, false
 	}
 
-	return doesPasswordMatch(password, hashedPassword)
+	authorized = doesPasswordMatch(password, hashedPassword)
+
+	if !authorized {
+		return 0, false
+	}
+
+	return playerID, true
 }
 
 func (m *UserModel) LogAll() {

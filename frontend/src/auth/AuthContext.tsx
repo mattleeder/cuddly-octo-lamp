@@ -37,6 +37,7 @@ async function login(setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean>
     try {
         const response = await fetch(url, {
           method: "POST",
+          credentials: "include",
           body: JSON.stringify({
             username: data.username,
             password: data.password,
@@ -68,6 +69,7 @@ async function logout(setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean
     try {
         const response = await fetch(url, {
           method: "POST",
+          credentials: "include",
         })
     
         if (response.ok) {
@@ -89,6 +91,8 @@ async function setLoginStatus(setIsLoggedIn: React.Dispatch<React.SetStateAction
     try {
         const response = await fetch(url, {
           method: "POST",
+          credentials: "include",
+          signal: AbortSignal.timeout(5000),
         })
     
         if (response.ok) {

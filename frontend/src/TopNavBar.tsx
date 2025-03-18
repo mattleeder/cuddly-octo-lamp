@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Dropdown, DropdownItem } from "./Dropdown.tsx"
 import { ToggleDropdown, ToggleDropdownItem, ToggleDropdownSubmenu } from './ToggleDropdown.tsx';
 import { Settings } from 'lucide-react';
 import { NavbarSearch } from './NavSearch.tsx';
 import { LatencyDisplay } from './LatencyDisplay.tsx';
 import { Link } from "react-router-dom";
+import { AuthContext } from './auth/AuthContext.tsx';
 
 export function TopNavBar() {
+  const auth = useContext(AuthContext)
+
   return (
     <nav className='topNavBar'>
       <div className='navBarContainer left'>
@@ -28,7 +31,7 @@ export function TopNavBar() {
       <div className='navBarContainer right'>
         <NavbarSearch />
 
-        <Link to={{pathname: '/login', search: `?referrer=${window.location.pathname}`}}>Sign In</Link>
+        {auth.isLoggedIn ? auth.authData.username : <Link to={{pathname: '/login', search: `?referrer=${window.location.pathname}`}}>Sign In</Link>}
 
         <ToggleDropdown title={<Settings className='settingsCog'/>} >
           <ToggleDropdownSubmenu title="Theme">

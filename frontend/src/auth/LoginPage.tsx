@@ -43,7 +43,7 @@ function LoginForm() {
   const auth = useContext(AuthContext)
   
   return (
-    <form method="post" action={(formData) => {if (!loading) {handleFormSubmit(auth, formData, navigate, setLoading, setValidationErrors)}}}>
+    <form action={(formData) => {if (!loading) {handleFormSubmit(auth, formData, navigate, setLoading, setValidationErrors)}}}>
       <div className='formGroup'>
         <label htmlFor="username">Username</label>
         <input name="username" type="text" required={true} value={username} onChange={(event) => setUsername(event.target.value)}/>
@@ -58,7 +58,7 @@ function LoginForm() {
         <input type="checkbox" style={{marginLeft: "0"}} checked={remember} onChange={() => setRemember(!remember)}/>
         Keep me logged in
       </label>
-      <input className="hidden" name="referrer" type="text" required={false} value={searchParams.get("referrer") || ""}/>
+      <input className="hidden" name="referrer" type="text" required={false} value={searchParams.get("referrer") || ""} readOnly={true}/>
     </form>
   )
 }

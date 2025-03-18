@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 
@@ -15,8 +14,8 @@ import (
 )
 
 var (
-	ErrValueTooLong = errors.New("Cookie value too long")
-	ErrInvalidValue = errors.New("Invalid cookie value")
+	ErrValueTooLong = errors.New("cookie value too long")
+	ErrInvalidValue = errors.New("invalid cookie value")
 )
 
 type userMoveData struct {
@@ -59,6 +58,10 @@ type getHighestEloMatchResponse struct {
 	MatchID int64 `json:"matchID"`
 }
 
+type authData struct {
+	Username string `json:"username"`
+}
+
 func generateNewPlayerId() int64 {
 	return rand.Int63()
 }
@@ -77,7 +80,6 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
 
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 	w.Header().Set("Content-Type", "application/json")
 
 	var chessMoveData getChessMoveData
@@ -113,9 +115,6 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 		app.clientError(w, http.StatusMethodNotAllowed)
 	}
 
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-	w.Header().Set("Access-Control-Allow-Credentials", "true")
-
 	var joinQueue joinQueueRequest
 
 	app.infoLog.Printf("%v\n", r.Body)
@@ -127,51 +126,25 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.infoLog.Printf("Received body: %+v\n", joinQueue)
-	app.infoLog.Println(r.Cookies())
 
-	// Read cookie
-	playerid, err := ReadSigned(r, app.secretKey, "playerid")
-
-	app.infoLog.Println(err)
-
-	// Generate new cookie if it does not exists
-	if errors.Is(err, http.ErrNoCookie) && joinQueue.Action == "join" {
-		playerid = strconv.FormatInt(generateNewPlayerId(), 10)
-
-		cookie := http.Cookie{
-			Name:     "playerid",
-			Value:    playerid,
-			Domain:   "localhost",
-			HttpOnly: true,
-			SameSite: http.SameSiteNoneMode,
-			Secure:   true,
-		}
-
-		err = WriteSigned(w, cookie, app.secretKey)
-		if err != nil {
-			app.serverError(w, err)
-			return
-		}
-	} else if errors.Is(err, http.ErrNoCookie) && joinQueue.Action == "leave" {
+	// Generate new playerID if it doesnt exist, this is for logged out players
+	if !app.sessionManager.Exists(r.Context(), "playerID") && joinQueue.Action == "join" {
+		var playerID = generateNewPlayerId()
+		app.sessionManager.Put(r.Context(), "playerID", playerID)
+	} else if !app.sessionManager.Exists(r.Context(), "playerID") && joinQueue.Action == "leave" {
 		app.clientError(w, http.StatusBadRequest)
 		return
-	} else if err != nil {
-		app.serverError(w, err)
 	}
 
-	app.infoLog.Printf("Player ID: %v\n", playerid)
-	var playerIDasInt int64
-	playerIDasInt, err = strconv.ParseInt(playerid, 10, 64)
-	if err != nil {
-		app.serverError(w, err)
-		return
-	}
+	var playerID = app.sessionManager.GetInt64(r.Context(), "playerID")
+
+	app.infoLog.Printf("Player ID: %v\n", playerID)
 
 	if joinQueue.Action == "join" {
-		addPlayerToWaitingPool(playerIDasInt, joinQueue.TimeFormatInMilliseconds, joinQueue.IncrementInMilliseconds)
+		addPlayerToWaitingPool(playerID, joinQueue.TimeFormatInMilliseconds, joinQueue.IncrementInMilliseconds)
 	} else {
 		// err = removePlayerFromQueue(playerIDasInt, joinQueue.Time, joinQueue.Increment)
-		removePlayerFromWaitingPool(playerIDasInt, joinQueue.TimeFormatInMilliseconds, joinQueue.IncrementInMilliseconds)
+		removePlayerFromWaitingPool(playerID, joinQueue.TimeFormatInMilliseconds, joinQueue.IncrementInMilliseconds)
 	}
 
 }
@@ -191,30 +164,22 @@ var clients = Clients{
 }
 
 func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-	w.Header().Set("Access-Control-Allow-Credentials", "true")
 
-	playerid, err := ReadSigned(r, app.secretKey, "playerid")
-	if err != nil {
-		app.serverError(w, err)
+	if !app.sessionManager.Exists(r.Context(), "playerID") {
+		app.serverError(w, errors.New("no playerID in session"))
 	}
 
-	var playerIDasInt int64
-
-	playerIDasInt, err = strconv.ParseInt(playerid, 10, 64)
-	if err != nil {
-		app.serverError(w, err)
-		return
-	}
+	var playerID = app.sessionManager.GetInt64(r.Context(), "playerID")
+	app.infoLog.Printf("playerID in session: %v", playerID)
 
 	// Do the channels get properly closed on a leave queue?
 	// Do we send the proper message on a leave queue?
 	clients.mu.Lock()
-	_, ok := clients.clients[playerIDasInt]
+	_, ok := clients.clients[playerID]
 	if !ok {
-		clients.clients[playerIDasInt] = &Client{id: playerIDasInt, channel: make(chan string)}
+		clients.clients[playerID] = &Client{id: playerID, channel: make(chan string)}
 	}
-	clientChannel := clients.clients[playerIDasInt].channel
+	clientChannel := clients.clients[playerID].channel
 	clients.mu.Unlock()
 
 	// Set appropriate headers for SSE
@@ -224,7 +189,7 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		clients.mu.Lock()
-		delete(clients.clients, playerIDasInt)
+		delete(clients.clients, playerID)
 		clients.mu.Unlock()
 	}()
 
@@ -236,6 +201,7 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
+			app.infoLog.Printf("Sending: data: %s\n\n", message)
 			// Send the message to the client in SSE format
 			fmt.Fprintf(w, "data: %s\n\n", message)
 			// Flush the response to send the data to the client
@@ -253,11 +219,13 @@ func getHighestEloMatchHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
 
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-
 	matchID, err := app.liveMatches.GetHighestEloMatch()
 	if err != nil {
-		app.serverError(w, err)
+		if err.Error() == "sql: no rows in result set" {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		} else {
+			app.serverError(w, err)
+		}
 		return
 	}
 
@@ -279,8 +247,6 @@ func registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Allow", "POST")
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
-
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 
 	var newUser models.NewUserInfo
 
@@ -323,8 +289,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
 
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-
 	var loginInfo models.UserLoginInfo
 
 	err := json.NewDecoder(r.Body).Decode(&loginInfo)
@@ -333,9 +297,82 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isPasswordCorrect := app.users.IsCorrectPassword(loginInfo.Username, loginInfo.Password)
-	if !isPasswordCorrect {
+	playerID, authorized := app.users.Authenticate(loginInfo.Username, loginInfo.Password)
+	if !authorized {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+
+	var authData = authData{
+		Username: loginInfo.Username,
+	}
+
+	jsonStr, err := json.Marshal(authData)
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	err = app.sessionManager.RenewToken(r.Context())
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	app.sessionManager.Put(r.Context(), "username", loginInfo.Username)
+	app.sessionManager.Put(r.Context(), "playerID", playerID)
+	w.Write(jsonStr)
+}
+
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() { app.perfLog.Printf("logoutHandler took: %s\n", time.Since(start)) }()
+
+	if r.Method != "POST" {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+
+	if !app.sessionManager.Exists(r.Context(), "username") {
+		app.errorLog.Printf("Not logged in\n")
+		w.WriteHeader(http.StatusBadRequest)
+	}
+
+	err := app.sessionManager.RenewToken(r.Context())
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	app.sessionManager.Destroy(r.Context())
+	w.WriteHeader(http.StatusOK)
+}
+
+func validateSessionHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() { app.perfLog.Printf("validateSessionHandler took: %s\n", time.Since(start)) }()
+
+	if r.Method != "POST" {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+
+	if !app.sessionManager.Exists(r.Context(), "username") {
+		if !app.sessionManager.Exists(r.Context(), "playerID") {
+			app.sessionManager.Put(r.Context(), "playerID", generateNewPlayerId())
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+
+	var authData = authData{
+		Username: app.sessionManager.GetString(r.Context(), "username"),
+	}
+
+	jsonStr, err := json.Marshal(authData)
+	if err != nil {
+		app.serverError(w, err)
+		return
+	}
+
+	w.Write(jsonStr)
 }

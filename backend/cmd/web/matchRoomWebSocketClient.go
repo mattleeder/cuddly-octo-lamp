@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -169,10 +170,8 @@ func (c *MatchRoomHubClient) writePump() {
 
 // serveWs handles websocket requests from the peer.
 func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-	w.Header().Set("Access-Control-Allow-Credentials", "true")
-
 	app.infoLog.Println("WS Request")
+	app.infoLog.Printf("Session token: %s\n", app.sessionManager.Token(r.Context()))
 
 	matchID, err := strconv.ParseInt(r.PathValue("matchID"), 10, 64)
 	if err != nil {
@@ -181,20 +180,12 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var playerid string
-	var rawID int64
-	var playerIDasInt *int64
-
-	playerid, err = ReadSigned(r, app.secretKey, "playerid")
-	if err == nil {
-		rawID, err = strconv.ParseInt(playerid, 10, 64)
-		playerIDasInt = &rawID
-	}
-
-	if err != nil {
-		app.serverError(w, err)
+	if !app.sessionManager.Exists(r.Context(), "playerID") {
+		app.serverError(w, errors.New("no playerID in session"))
 		return
 	}
+
+	var playerID = app.sessionManager.GetInt64(r.Context(), "playerID")
 
 	var conn *websocket.Conn
 
@@ -206,7 +197,7 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 
 	var client *MatchRoomHubClient
 
-	client, err = matchRoomHubManager.registerClientToMatchRoomHub(conn, matchID, playerIDasInt)
+	client, err = matchRoomHubManager.registerClientToMatchRoomHub(conn, matchID, &playerID)
 	if err != nil {
 		app.websocketError(conn, err)
 		return

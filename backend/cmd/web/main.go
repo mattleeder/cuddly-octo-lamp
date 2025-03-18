@@ -57,10 +57,11 @@ func main() {
 	sessionManager.IdleTimeout = 1 * time.Hour
 	sessionManager.HashTokenInStore = true
 	sessionManager.Cookie = scs.SessionCookie{
-		Name:     "id",
+		Name:     "session",
+		Domain:   "localhost",
 		HttpOnly: true,
 		Persist:  false,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteNoneMode,
 		Secure:   true,
 	}
 
