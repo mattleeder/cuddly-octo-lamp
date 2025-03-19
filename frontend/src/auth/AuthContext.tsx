@@ -16,8 +16,8 @@ export interface LoginFormValidationErrors {
 export interface AuthContextType {
     isLoggedIn:  boolean,
     authData: AuthData,
-    login (data: LoginData, callback: (success: boolean, responseData?: LoginFormValidationErrors) => void): void,
-    logout(callback: (success: boolean) => void) :void,
+    login (data: LoginData, callback?: (success: boolean, responseData?: LoginFormValidationErrors) => void): void,
+    logout(callback?: (success: boolean) => void) :void,
 }
 
 const DEFAULT_AUTH_DATA: AuthData = {
@@ -31,7 +31,7 @@ export const AuthContext = createContext<AuthContextType>({
     logout: () => {}
 });
 
-async function login(setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean>>, setAuthData: React.Dispatch<React.SetStateAction<AuthData>>, data: LoginData, callback: (success: boolean, responseData?: any) => void) {
+async function login(setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean>>, setAuthData: React.Dispatch<React.SetStateAction<AuthData>>, data: LoginData, callback?: (success: boolean, responseData?: any) => void) {
     const url = import.meta.env.VITE_API_LOGIN_URL
 
     try {
@@ -48,22 +48,29 @@ async function login(setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean>
           const responseData = await response.json()
           setIsLoggedIn(true)
           setAuthData(responseData)
-          callback(true)
+          if (callback !== undefined) {
+            callback(true)
+          }
           return
         }
 
+        console.log(response)
         const responseData = await response.json()
-        callback(false, responseData)
+        if (callback !== undefined) {
+          callback(false, responseData)
+        }
         return
 
       } catch (e) {
         console.error(e)
       } finally {
-        callback(false)
+        if (callback !== undefined) {
+          callback(false)
+        }
       }
 }
 
-async function logout(setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean>>, setAuthData: React.Dispatch<React.SetStateAction<AuthData>>, callback: (success: boolean) => void) {
+async function logout(setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean>>, setAuthData: React.Dispatch<React.SetStateAction<AuthData>>, callback?: (success: boolean) => void) {
     const url = import.meta.env.VITE_API_LOGOUT_URL
 
     try {
@@ -75,13 +82,17 @@ async function logout(setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean
         if (response.ok) {
           setIsLoggedIn(false)
           setAuthData(DEFAULT_AUTH_DATA)
-          callback(true)
+          if (callback !== undefined) {
+            callback(true)
+          }
           return
         } 
       } catch (e) {
         console.error(e)
       } finally {
-        callback(false)
+        if (callback !== undefined) {
+          callback(false)
+        }
       }
 }
 

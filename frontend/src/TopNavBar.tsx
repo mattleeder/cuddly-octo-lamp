@@ -6,6 +6,7 @@ import { NavbarSearch } from './NavSearch.tsx';
 import { LatencyDisplay } from './LatencyDisplay.tsx';
 import { Link } from "react-router-dom";
 import { AuthContext } from './auth/AuthContext.tsx';
+import { AccountDropdown } from './auth/AccountDropdown.tsx';
 
 export function TopNavBar() {
   const auth = useContext(AuthContext)
@@ -31,9 +32,9 @@ export function TopNavBar() {
       <div className='navBarContainer right'>
         <NavbarSearch />
 
-        {auth.isLoggedIn ? auth.authData.username : <Link to={{pathname: '/login', search: `?referrer=${window.location.pathname}`}}>Sign In</Link>}
+        {auth.isLoggedIn ? <AccountDropdown /> : <Link to={{pathname: '/login', search: `?referrer=${window.location.pathname}`}}>Sign In</Link>}
 
-        <ToggleDropdown title={<Settings className='settingsCog'/>} >
+        <ToggleDropdown title={<Settings className='navbarIcon'/>} >
           <ToggleDropdownSubmenu title="Theme">
             <ToggleDropdownItem to="#" onClick={() => console.log("Setting Theme: ThemeOne")}>ThemeOne</ToggleDropdownItem>
             <ToggleDropdownItem to="#" onClick={() => console.log("Setting Theme: ThemeOne")}>ThemeTwo</ToggleDropdownItem>
