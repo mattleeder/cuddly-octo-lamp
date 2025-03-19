@@ -560,6 +560,10 @@ button.dropdownTitle {
   padding: 0;
 }
 
+.dropdownItem {
+  color: black;
+}
+
 .left .dropdownItem:first-child {
   border-top-right-radius: 4px;
 }

@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Link, useNavigate, NavigateFunction, useSearchParams } from 'react-router-dom';
 import { FormError } from '../FormError';
 import { AuthContext, AuthContextType, LoginFormValidationErrors } from './AuthContext';
@@ -13,7 +13,10 @@ async function handleFormSubmit(auth: AuthContextType, formData: FormData, navig
   const loginData = {
     username: formData.get("username") as string,
     password: formData.get("password") as string,
+    rememberMe: formData.get("rememberMe") == "true" ? true : false,
   }
+
+  console.log(loginData)
 
   const loginCallback = (success: boolean, responseData: LoginFormValidationErrors | undefined) => {
     if (success) {
@@ -55,7 +58,7 @@ function LoginForm() {
       </div>
       <button className='signInButton'>SIGN IN</button>
       <label>
-        <input type="checkbox" style={{marginLeft: "0"}} checked={remember} onChange={() => setRemember(!remember)}/>
+        <input type="checkbox" name="rememberMe" style={{marginLeft: "0"}} value="true" defaultChecked={remember} onChange={(event) => setRemember(event.target.checked)}/>
         Keep me logged in
       </label>
       <input className="hidden" name="referrer" type="text" required={false} value={searchParams.get("referrer") || ""} readOnly={true}/>

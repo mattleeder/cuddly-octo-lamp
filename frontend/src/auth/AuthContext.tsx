@@ -3,6 +3,7 @@ import React, { createContext, useEffect, useState } from "react";
 interface LoginData {
     username: string
     password: string
+    rememberMe: boolean
 }
 interface AuthData {
     username: string
@@ -41,6 +42,7 @@ async function login(setIsLoggedIn: React.Dispatch<React.SetStateAction<boolean>
           body: JSON.stringify({
             username: data.username,
             password: data.password,
+            rememberMe: data.rememberMe,
           })
         })
     

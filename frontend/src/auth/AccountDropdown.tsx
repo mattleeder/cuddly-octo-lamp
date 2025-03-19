@@ -8,8 +8,8 @@ export function AccountDropdown() {
 
     return (
         <ToggleDropdown title={<CircleUserRound className='navbarIcon'/>} >
-          <ToggleDropdownItem to="#myaccount">Profile</ToggleDropdownItem>
-          <ToggleDropdownItem to="#" onClick={() => auth.logout()}><span style={{display: "flex", width: "100%"}}><span>Log Out</span><LogOut style={{marginLeft: "auto"}}/></span></ToggleDropdownItem>
+          <ToggleDropdownItem to={`/account/${auth.authData.username}`}>Profile</ToggleDropdownItem>
+          <ToggleDropdownItem onClick={() => auth.logout()}><span style={{display: "flex", width: "100%"}}><span>Log Out</span><LogOut style={{marginLeft: "auto"}}/></span></ToggleDropdownItem>
         </ToggleDropdown>
     )
 }

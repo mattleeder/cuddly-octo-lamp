@@ -316,6 +316,8 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	var loginInfo models.UserLoginInfo
 
+	var loginValidationErrors models.UserLoginInfo
+
 	err := json.NewDecoder(r.Body).Decode(&loginInfo)
 	if err != nil {
 		app.serverError(w, err, false)
@@ -325,6 +327,13 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	playerID, authorized := app.users.Authenticate(loginInfo.Username, loginInfo.Password)
 	if !authorized {
 		w.WriteHeader(http.StatusUnauthorized)
+		loginValidationErrors.Username = "Username or password invalid."
+		jsonStr, jsonErr := json.Marshal(loginValidationErrors)
+		if jsonErr == nil {
+			w.Write(jsonStr)
+		} else {
+			app.errorLog.Println(jsonErr)
+		}
 		return
 	}
 

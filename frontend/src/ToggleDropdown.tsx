@@ -102,7 +102,7 @@ export function ToggleDropdownSubmenu({ title, children }: { title: string, chil
   )
 }
 
-export function ToggleDropdownItem({ children, to, onClick }: { children: React.ReactNode, to: string, onClick?: () => void }) {
+export function ToggleDropdownItem({ children, to, onClick }: { children: React.ReactNode, to?: string, onClick?: () => void }) {
   const count = React.Children.count(children);
   const parentContext = useContext(DropdownMenuParentContext)
 
@@ -126,7 +126,11 @@ export function ToggleDropdownItem({ children, to, onClick }: { children: React.
         parentContext.setMenuActive(false)
         parentContext.setParentActive(false)}}
     >
-      <Link to={to}><span style={{width: "100%"}}>{children}</span></Link>
+       { to !== undefined ?
+        <Link to={to}><span style={{width: "100%"}}>{children}</span></Link>
+        :
+        <span style={{width: "100%"}}>{children}</span>
+       }
     </li>
   )
 }
