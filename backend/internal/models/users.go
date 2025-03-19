@@ -71,12 +71,13 @@ type Ratings struct {
 }
 
 type UserTileInfo struct {
-	PlayerID   int64   `json:"playerID"`
-	Username   string  `json:"username"`
-	PingStatus bool    `json:"pingStatus"`
-	JoinDate   int64   `json:"joinDate"`
-	LastSeen   int64   `json:"lastSeen"`
-	Ratings    Ratings `json:"ratings"`
+	PlayerID      int64   `json:"playerID"`
+	Username      string  `json:"username"`
+	PingStatus    bool    `json:"pingStatus"`
+	JoinDate      int64   `json:"joinDate"`
+	LastSeen      int64   `json:"lastSeen"`
+	Ratings       Ratings `json:"ratings"`
+	NumberOfGames int64   `json:"numberOfGames"`
 }
 
 func hashPassword(password string) (string, error) {
@@ -456,6 +457,24 @@ func (m *UserModel) GetTileInfoFromUsername(username string) (*UserTileInfo, err
 	err := row.Scan(&playerID, &joinDate, &lastSeen, &bullet_rating, &blitz_rating, &rapid_rating, &classical_rating)
 	if err != nil {
 		app.errorLog.Printf("Error in GetTileInfoFromPlayerID: %s\n", err.Error())
+		return nil, err
+	}
+
+	sqlStmt = `
+	SELECT Count(past_matches.match_id) as number_of_games
+	  FROM users
+	 INNER JOIN past_matches
+	    ON past_matches.white_player_id = users.player_id
+		OR past_matches.black_player_id = users.player_id
+	 WHERE users.username = ?
+	`
+
+	var numberOfGames int64
+
+	row = m.DB.QueryRow(sqlStmt, username)
+	err = row.Scan(&numberOfGames)
+	if err != nil {
+		app.errorLog.Printf("Error in GetTileInfoFromPlayerID gameCount: %s\n", err.Error())
 		return nil, err
 	}
 

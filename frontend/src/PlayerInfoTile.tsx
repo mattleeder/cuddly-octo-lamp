@@ -20,12 +20,13 @@ interface RatingsObject {
 }
 
 interface PlayerInfoTileData {
-  pingStatus: boolean
   playerID: number
   username: string
+  pingStatus: boolean
+  joinDate: string
+  lastSeen: number
   ratings: RatingsObject
   numberOfGames: number
-  joinDate: string
 }
 
 export interface PlayerInfoTileContextInterface {
@@ -380,7 +381,7 @@ export function PlayerInfoTile({ children }: { children: React.ReactNode }) {
 
           <div className="Games&JoinDate">
             <div style={{float:"left"}}>
-              {"100 Games"}
+              {`${playerData?.numberOfGames} games`}
             </div>
             <div style={{float:"right"}}>
               {"Joined This Long Ago"}
