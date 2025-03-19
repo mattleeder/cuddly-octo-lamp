@@ -181,7 +181,7 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !app.sessionManager.Exists(r.Context(), "playerID") {
-		app.serverError(w, errors.New("no playerID in session"))
+		app.serverError(w, errors.New("no playerID in session"), false)
 		return
 	}
 
@@ -191,7 +191,7 @@ func serveMatchroomWs(w http.ResponseWriter, r *http.Request) {
 
 	conn, err = upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		app.serverError(w, err)
+		app.serverError(w, err, false)
 		return
 	}
 

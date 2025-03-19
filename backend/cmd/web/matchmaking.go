@@ -145,7 +145,6 @@ func removePlayerFromWaitingPool(playerID int64, timeFormatInMilliseconds int64,
 		queue.awaitingRemoval.awaitingRemoval[playerID] = true
 	}
 	queue.awaitingRemoval.mu.Unlock()
-	return
 }
 
 func calculateMatchingScore(playerOne *playerMatchmakingData, playerOneIdx int, playerTwo *playerMatchmakingData, playerTwoIdx int) *matchingScore {
@@ -229,8 +228,8 @@ func createMatch(playerOneID int64, playerTwoID int64, timeFormatInMilliseconds 
 	}
 	clients.clients[playerTwoID].channel <- fmt.Sprintf("%v,%v,%v", matchID, timeFormatInMilliseconds, incrementInMilliseconds)
 
-	close(clients.clients[playerOneID].channel)
-	close(clients.clients[playerTwoID].channel)
+	// close(clients.clients[playerOneID].channel)
+	// close(clients.clients[playerTwoID].channel)
 	return nil
 }
 

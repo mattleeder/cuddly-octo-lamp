@@ -18,12 +18,6 @@ var (
 	ErrInvalidValue = errors.New("invalid cookie value")
 )
 
-type userMoveData struct {
-	Fen   string
-	Piece int
-	Move  int
-}
-
 type getChessMoveData struct {
 	Fen   string
 	Piece int
@@ -33,19 +27,6 @@ type getChessMoveDataJSON struct {
 	Moves            []int `json:"moves"`
 	Captures         []int `json:"captures"`
 	TriggerPromotion bool  `json:"triggerPromotion"`
-}
-
-type postChessMove struct {
-	CurrentFEN      string `json:"currentFEN"`
-	Piece           int    `json:"piece"`
-	Move            int    `json:"move"`
-	PromotionString string `json:"promotionString"`
-}
-
-type postChessMoveReply struct {
-	MatchStateHistory   []MatchStateHistory `json:"pastMoves"`
-	GameOverStatus      gameOverStatusCode  `json:"gameOverStatus"`
-	ThreefoldRepetition bool                `json:"threefoldRepetition"`
 }
 
 type joinQueueRequest struct {
@@ -86,7 +67,7 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&chessMoveData)
 	if err != nil {
-		app.serverError(w, err)
+		app.serverError(w, err, false)
 		return
 	}
 
@@ -99,7 +80,7 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 
 	jsonStr, err := json.Marshal(data)
 	if err != nil {
-		app.serverError(w, err)
+		app.serverError(w, err, false)
 		return
 	}
 
@@ -121,7 +102,7 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&joinQueue)
 	if err != nil {
-		app.serverError(w, err)
+		app.serverError(w, err, false)
 		return
 	}
 
@@ -165,8 +146,29 @@ var clients = Clients{
 
 func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 
+	// Set appropriate headers for SSE
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
+	w.Header().Set("Access-Control-Max-Age", "10")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	cookie, _ := r.Cookie("session")
+	app.infoLog.Printf("SessionID from cookie: %s\n", cookie.Value)
+
+	ctx, err := app.sessionManager.Load(r.Context(), cookie.Value)
+	if err != nil {
+		http.Error(w, "Failed to load session", http.StatusInternalServerError)
+		return
+	}
+
+	r = r.WithContext(ctx)
+
 	if !app.sessionManager.Exists(r.Context(), "playerID") {
-		app.serverError(w, errors.New("no playerID in session"))
+		app.serverError(w, errors.New("no playerID in session"), false)
 	}
 
 	var playerID = app.sessionManager.GetInt64(r.Context(), "playerID")
@@ -182,30 +184,53 @@ func matchFoundSSEHandler(w http.ResponseWriter, r *http.Request) {
 	clientChannel := clients.clients[playerID].channel
 	clients.mu.Unlock()
 
-	// Set appropriate headers for SSE
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-
 	defer func() {
 		clients.mu.Lock()
 		delete(clients.clients, playerID)
 		clients.mu.Unlock()
+		app.infoLog.Printf("Closed SSE for playerID: %v\n", playerID)
 	}()
 
 	defer app.liveMatches.EnQueueLogAll()
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		app.infoLog.Println("Streaming not supported")
+		app.serverError(w, errors.New("streaming unsupported"), false)
+		return
+	}
+
+	heartbeat := time.NewTicker(15 * time.Second)
+	defer heartbeat.Stop()
 
 	for {
 		select {
 		case message, ok := <-clientChannel:
 			if !ok {
+				app.infoLog.Printf("SSE: Client Channel Closed")
 				return
 			}
 			app.infoLog.Printf("Sending: data: %s\n\n", message)
+
 			// Send the message to the client in SSE format
-			fmt.Fprintf(w, "data: %s\n\n", message)
-			// Flush the response to send the data to the client
-			w.(http.Flusher).Flush()
+			_, err := fmt.Fprintf(w, "data: %s\n\n", message)
+			if err != nil {
+				app.infoLog.Printf("SSE: Client disconnected unexpectedly: %s\n", err)
+				return
+			}
+			flusher.Flush()
+
+		case <-heartbeat.C:
+			_, err := fmt.Fprintf(w, ": heartbeat\n\n")
+			if err != nil {
+				app.infoLog.Printf("SSE: Client disconnected during heartbeat: %s\n", err)
+				return
+			}
+			flusher.Flush()
+
+		case <-r.Context().Done():
+			app.infoLog.Printf("SSE: Client disconnected: %s\n", r.Context().Err())
+			return
 		}
 	}
 }
@@ -224,7 +249,7 @@ func getHighestEloMatchHandler(w http.ResponseWriter, r *http.Request) {
 		if err.Error() == "sql: no rows in result set" {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		} else {
-			app.serverError(w, err)
+			app.serverError(w, err, true)
 		}
 		return
 	}
@@ -232,7 +257,7 @@ func getHighestEloMatchHandler(w http.ResponseWriter, r *http.Request) {
 	data := getHighestEloMatchResponse{MatchID: matchID}
 	jsonStr, err := json.Marshal(data)
 	if err != nil {
-		app.serverError(w, err)
+		app.serverError(w, err, false)
 		return
 	}
 
@@ -252,7 +277,7 @@ func registerUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&newUser)
 	if err != nil {
-		app.serverError(w, err)
+		app.serverError(w, err, false)
 		return
 	}
 
@@ -269,7 +294,7 @@ func registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		jsonStr, jsonErr := json.Marshal(registerUserValidationErrors)
 		if jsonErr != nil {
 			app.errorLog.Printf("Error marshalling json: %s\n", jsonErr.Error())
-			app.serverError(w, err)
+			app.serverError(w, err, false)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write(jsonStr)
@@ -293,7 +318,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&loginInfo)
 	if err != nil {
-		app.serverError(w, err)
+		app.serverError(w, err, false)
 		return
 	}
 
@@ -309,13 +334,13 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	jsonStr, err := json.Marshal(authData)
 	if err != nil {
-		app.serverError(w, err)
+		app.serverError(w, err, false)
 		return
 	}
 
 	err = app.sessionManager.RenewToken(r.Context())
 	if err != nil {
-		app.serverError(w, err)
+		app.serverError(w, err, false)
 		return
 	}
 
@@ -340,7 +365,7 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := app.sessionManager.RenewToken(r.Context())
 	if err != nil {
-		app.serverError(w, err)
+		app.serverError(w, err, false)
 		return
 	}
 
@@ -370,7 +395,7 @@ func validateSessionHandler(w http.ResponseWriter, r *http.Request) {
 
 	jsonStr, err := json.Marshal(authData)
 	if err != nil {
-		app.serverError(w, err)
+		app.serverError(w, err, false)
 		return
 	}
 

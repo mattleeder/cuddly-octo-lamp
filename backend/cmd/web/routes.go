@@ -7,28 +7,42 @@ import (
 	"github.com/alexedwards/scs/v2"
 )
 
-func wrapWithSessionManager(sm *scs.SessionManager, handler http.HandlerFunc) http.HandlerFunc {
+func wrapWithSessionManager(sm *scs.SessionManager, handler http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sessionID := sm.Token(r.Context())
-		app.infoLog.Println("Session ID:", sessionID)
+		// sessionID := sm.Token(r.Context())
+		// app.infoLog.Println("Session ID:", sessionID)
 		sm.LoadAndSave(handler).ServeHTTP(w, r)
 	}
+}
+
+func withLogSessionSecureCorsChain(handlerFunc http.HandlerFunc) http.Handler {
+	return app.logRequest(app.recoverPanic(wrapWithSessionManager(app.sessionManager, secureHeaders(corsHeaders(http.HandlerFunc(handlerFunc))))))
+}
+
+func withSSELogSessionSecureCorsChain(handlerFunc http.HandlerFunc) http.Handler {
+	return app.logRequest(sseHeaders(app.recoverPanic(wrapWithSessionManager(app.sessionManager, secureHeaders(corsHeaders(http.HandlerFunc(handlerFunc)))))))
+}
+
+func withLogSessionCorsChain(handlerFunc http.HandlerFunc) http.Handler {
+	return app.logRequest(app.recoverPanic(wrapWithSessionManager(app.sessionManager, corsHeaders(http.HandlerFunc(handlerFunc)))))
 }
 
 func (app *application) routes() http.Handler {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", rootHandler)
-	mux.HandleFunc("/getMoves", getChessMovesHandler)
-	mux.HandleFunc("/joinQueue", joinQueueHandler)
-	mux.HandleFunc("/listenformatch", matchFoundSSEHandler)
-	mux.HandleFunc("/matchroom/{matchID}/ws", serveMatchroomWs)
-	mux.HandleFunc("/getHighestEloMatch", getHighestEloMatchHandler)
-	mux.HandleFunc("/register", registerUserHandler)
-	mux.HandleFunc("/login", loginHandler)
-	mux.HandleFunc("/logout", logoutHandler)
-	mux.HandleFunc("/validateSession", validateSessionHandler)
+	mux.Handle("/", withLogSessionSecureCorsChain(rootHandler))
+	mux.Handle("/getMoves", withLogSessionSecureCorsChain(getChessMovesHandler))
+	mux.Handle("/joinQueue", withLogSessionSecureCorsChain(joinQueueHandler))
+	mux.Handle("/matchroom/{matchID}/ws", withLogSessionSecureCorsChain(serveMatchroomWs))
+	mux.Handle("/getHighestEloMatch", withLogSessionSecureCorsChain(getHighestEloMatchHandler))
+	mux.Handle("/register", withLogSessionSecureCorsChain(registerUserHandler))
+	mux.Handle("/login", withLogSessionSecureCorsChain(loginHandler))
+	mux.Handle("/logout", withLogSessionSecureCorsChain(logoutHandler))
+	mux.Handle("/validateSession", withLogSessionSecureCorsChain(validateSessionHandler))
+
+	// mux.Handle("/listenformatch", withSSELogSessionSecureCorsChain(matchFoundSSEHandler))
+	mux.Handle("/listenformatch", app.logRequest(app.recoverPanic(http.HandlerFunc(matchFoundSSEHandler))))
 
 	// Add the pprof routes
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
@@ -42,5 +56,5 @@ func (app *application) routes() http.Handler {
 	mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
 	mux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
 
-	return app.logRequest(app.sessionManager.LoadAndSave(secureHeaders(corsHeaders(mux))))
+	return mux
 }

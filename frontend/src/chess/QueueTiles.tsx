@@ -14,9 +14,15 @@ interface QueueState {
     setInQueue: React.Dispatch<React.SetStateAction<boolean>>,
     queueName: string, 
     setQueueName:  React.Dispatch<React.SetStateAction<string>>, 
-    eventSource: EventSource | null, 
-    setEventSource:  React.Dispatch<React.SetStateAction<EventSource | null>>, 
-    navigate: NavigateFunction
+    eventSource: React.RefObject<EventSource | null>,
+    matchFoundState: React.RefObject<MatchFoundState | null>,
+    navigate: NavigateFunction,
+}
+
+interface MatchFoundState {
+  matchRoom: string,
+  timeFormatInMilliseconds: number,
+  incrementInMilliseconds: number,
 }
 
 enum ClickAction {
@@ -46,7 +52,7 @@ addQueueObject(10, 0)
 addQueueObject(10, 5)
 addQueueObject(15, 10)
 
-async function tryJoinQueue(queueName: string, navigate: NavigateFunction, setEventSource: React.Dispatch<React.SetStateAction<EventSource | null>>) {
+async function tryJoinQueue(queueName: string, matchFoundState: React.RefObject<MatchFoundState | null>, eventSource: React.RefObject<EventSource | null>, navigate: NavigateFunction) {
   const queueObject = queueObjectsMap.get(queueName)
   if (queueObject === undefined) {
     throw new Error("Queue object not found")
@@ -68,25 +74,37 @@ async function tryJoinQueue(queueName: string, navigate: NavigateFunction, setEv
   }
 
   // Joined, start listening for events
-  const eventSource = new EventSource(import.meta.env.VITE_API_MATCH_LISTEN_URL, {
+  eventSource.current = new EventSource(import.meta.env.VITE_API_MATCH_LISTEN_URL, {
     withCredentials: true,
   })
-  eventSource.onmessage = (event) => {
+
+  eventSource.current.onmessage = (event) => {
     console.log(`message: ${event.data}`)
+
+    if (event.data == "heartbeat") {
+      return
+    }
+
     const splitData = event.data.split(",")
     const matchRoom = splitData[0]
     const timeFormatInMilliseconds = splitData[1]
     const incrementInMilliseconds = splitData[2]
-    const state = {
+    matchFoundState.current = {
+      matchRoom,
       timeFormatInMilliseconds,
       incrementInMilliseconds,
     }
-    navigate("matchroom/" + matchRoom, { state })
+    navigate("matchroom/" + matchFoundState.current.matchRoom, { state: matchFoundState.current })
   }
-  setEventSource(eventSource)
+
+  eventSource.current.onerror = (event) => {
+    console.error(`SSE Error: ${event}`)
+    console.error(event)
+    eventSource.current?.close()
+  }
 }
 
-async function tryLeaveQueue(queueName: string, eventSource: EventSource | null) {
+async function tryLeaveQueue(queueName: string, eventSource: React.RefObject<EventSource | null>) {
   const queueObject = queueObjectsMap.get(queueName)
   if (queueObject === undefined) {
     throw new Error("Queue object not found")
@@ -106,19 +124,19 @@ async function tryLeaveQueue(queueName: string, eventSource: EventSource | null)
   }
 
   // Left
-  eventSource?.close()
+  eventSource.current?.close()
 }
 
-async function toggleQueue ({
+async function toggleQueue({
   waiting, 
   setWaiting,
   inQueue,
   setInQueue,
   queueName, 
   setQueueName, 
-  eventSource, 
-  setEventSource, 
-  navigate
+  eventSource,
+  matchFoundState,
+  navigate,
 }: QueueState, newQueueName: string) {
   if (waiting) {
     return
@@ -144,12 +162,12 @@ async function toggleQueue ({
   
     case ClickAction.changeQueue:
       await tryLeaveQueue(queueName, eventSource)
-      await tryJoinQueue(newQueueName, navigate, setEventSource)
+      await tryJoinQueue(newQueueName, matchFoundState, eventSource, navigate)
       setQueueName(newQueueName)
       break
         
     case ClickAction.joinQueue:
-      await tryJoinQueue(newQueueName, navigate, setEventSource)
+      await tryJoinQueue(newQueueName, matchFoundState, eventSource, navigate)
       setInQueue(true)
       setQueueName(newQueueName)
     }
@@ -180,8 +198,8 @@ export function QueueTiles() {
   const [inQueue, setInQueue] = useState(false)
   const [queueName, setQueueName] = useState("")
   const queueNameRef = useRef(queueName)
-  const [eventSource, setEventSource] = useState<EventSource | null>(null)
-  const eventSourceRef = useRef(eventSource)
+  const eventSource = useRef<EventSource>(null)
+  const matchFoundState = useRef<MatchFoundState>(null)
   const navigate = useNavigate()
 
   const queueState: QueueState = {
@@ -192,7 +210,7 @@ export function QueueTiles() {
     queueName,
     setQueueName,
     eventSource,
-    setEventSource,
+    matchFoundState,
     navigate,
   }
   
@@ -201,13 +219,16 @@ export function QueueTiles() {
   }, [queueName])
 
   useEffect(() => {
-    eventSourceRef.current = eventSource
-  }, [eventSource])
+    if (matchFoundState.current != null) {
+      console.log(matchFoundState.current)
+      navigate("matchroom/" + matchFoundState.current.matchRoom, { state: matchFoundState.current })
+    }
+  }, [matchFoundState.current])
   
   useEffect(() => {
     const leaveOnUnmount = async () => {
       try {
-        await tryLeaveQueue(queueNameRef.current, eventSourceRef.current)
+        await tryLeaveQueue(queueNameRef.current, eventSource)
       } catch (e) {
         console.error(e)
       }

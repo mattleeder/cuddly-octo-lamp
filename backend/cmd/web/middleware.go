@@ -26,7 +26,7 @@ func secureHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
 		w.Header().Set("Permissions-Policy", "accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(self), usb=(), web-share=(), xr-spatial-tracking=(), clipboard-read=(), clipboard-write=(), gamepad=(), hid=(), idle-detection=(), interest-cohort=(), serial=(), unload=()")
-		w.Header().Set("Cache-Control", "no-store, max-age=0")
+		w.Header().Set("Cache-Control", "no-store, max-age=0") // Not for SSE
 
 		// Remove, most of these should not be needed, should take a look at which ones.
 		w.Header().Del("Server")
@@ -116,6 +116,17 @@ func corsHeaders(next http.Handler) http.Handler {
 	})
 }
 
+func sseHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// SSE
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func secureWithCors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		corsHeaders(secureHeaders(nil))
@@ -136,7 +147,7 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				w.Header().Set("Connection", "close")
-				app.serverError(w, fmt.Errorf("%s", err))
+				app.serverError(w, fmt.Errorf("%s", err), false)
 			}
 		}()
 

@@ -13,7 +13,7 @@ CREATE TABLE sessions (
 CREATE INDEX sessions_expiry_idx ON sessions(expiry);
 
 CREATE TABLE live_matches (
-    match_id INTEGER PRIMARY KEY NOT NULL, 
+    match_id INTEGER PRIMARY KEY AUTOINCREMENT, 
     white_player_id INTEGER NOT NULL, 
     black_player_id INTEGER NOT NULL,
     last_move_piece INTEGER,

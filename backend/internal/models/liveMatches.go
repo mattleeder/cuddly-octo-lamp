@@ -29,33 +29,36 @@ type LiveMatchModel struct {
 
 func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64, gameHistory []byte, averageElo float64) (int64, error) {
 	defer m.LogAll()
-	app.infoLog.Printf("Inserting new match with: %v, %v\n", timeFormatInMilliseconds, incrementInMilliseconds)
+	app.infoLog.Printf("Inserting new match")
 	var result sql.Result
 	var err error
-	var matchID int64
 
-	// Get ID for match
+	// // Get ID for match
+	// sqlStmt := `
+	// select coalesce(max(match_id), 0) from past_matches
+	// `
+	// row := m.DB.QueryRow(sqlStmt)
+	// err = row.Scan(&matchID)
+	// if err != nil {
+	// 	app.errorLog.Printf("Error getting new matchID %s", err.Error())
+	// 	return 0, err
+	// }
+
+	// matchID += 1
+
+	// app.infoLog.Printf("Inserting new match with: matchID: %v, timeFormat: %v, increment: %v\n", matchID, timeFormatInMilliseconds, incrementInMilliseconds)
+
+	app.infoLog.Printf("Inserting new match with: timeFormat: %v, increment: %v\n", timeFormatInMilliseconds, incrementInMilliseconds)
+
 	sqlStmt := `
-	select coalesce(max(match_id), 0) from past_matches
-	`
-	row := m.DB.QueryRow(sqlStmt)
-	err = row.Scan(&matchID)
-	if err != nil {
-		app.errorLog.Printf("Error getting new matchID %s", err.Error())
-		return 0, err
-	}
-
-	matchID += 1
-
-	sqlStmt = `
-	insert or ignore into live_matches (match_id, white_player_id, black_player_id, time_format_in_milliseconds, increment_in_milliseconds, white_player_time_remaining_in_milliseconds, black_player_time_remaining_in_milliseconds, game_history_json_string, unix_ms_time_of_last_move, average_elo) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+	insert into live_matches (white_player_id, black_player_id, time_format_in_milliseconds, increment_in_milliseconds, white_player_time_remaining_in_milliseconds, black_player_time_remaining_in_milliseconds, game_history_json_string, unix_ms_time_of_last_move, average_elo) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?);
 	`
 	// Set white and black remaining time equal to the time format
 	for {
 		if playerOneIsWhite {
-			result, err = m.DB.Exec(sqlStmt, matchID, playerOneID, playerTwoID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()), averageElo)
+			result, err = m.DB.Exec(sqlStmt, playerOneID, playerTwoID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()), averageElo)
 		} else {
-			result, err = m.DB.Exec(sqlStmt, matchID, playerTwoID, playerOneID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()), averageElo)
+			result, err = m.DB.Exec(sqlStmt, playerTwoID, playerOneID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()), averageElo)
 		}
 
 		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
@@ -70,7 +73,12 @@ func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerO
 		break
 	}
 
-	app.infoLog.Println("Succesfully inserted new match")
+	insertID, err := result.LastInsertId()
+	if err != nil {
+		app.errorLog.Printf("Unsuccesfully inserted new match with err: %s", err.Error())
+	} else {
+		app.infoLog.Printf("Succesfully inserted new match with id: %v", insertID)
+	}
 
 	return result.LastInsertId()
 }
@@ -163,6 +171,7 @@ func (m *LiveMatchModel) LogAll() {
 	}
 
 	defer rows.Close()
+	app.rowsLog.Println(rows.Columns())
 	for rows.Next() {
 		app.rowsLog.Printf("%v\n", rows)
 	}
@@ -229,7 +238,7 @@ func (m *LiveMatchModel) MoveMatchToPastMatches(matchID int64, outcome int) erro
 		black_player_points = 1
 	} else {
 		app.errorLog.Printf("Could not understand outcome: %v\n", outcome)
-		return errors.New(fmt.Sprintf("Could not understand outcome: %v\n", outcome))
+		return fmt.Errorf("could not understand outcome: %v", outcome)
 	}
 
 	stepOne := `
