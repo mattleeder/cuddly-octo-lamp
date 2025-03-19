@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/rand"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -60,6 +61,22 @@ type UserClientSide struct {
 	Username string `json:"username"`
 	JoinDate int64  `json:"joinDate"`
 	LastSeen int64  `json:"lastSeen"`
+}
+
+type Ratings struct {
+	BulletRating    int64 `json:"bulletRating"`
+	BlitzRating     int64 `json:"blitzRating"`
+	RapidRating     int64 `json:"rapidRating"`
+	ClassicalRating int64 `json:"classicalRating"`
+}
+
+type UserTileInfo struct {
+	PlayerID   int64   `json:"playerID"`
+	Username   string  `json:"username"`
+	PingStatus bool    `json:"pingStatus"`
+	JoinDate   int64   `json:"joinDate"`
+	LastSeen   int64   `json:"lastSeen"`
+	Ratings    Ratings `json:"ratings"`
 }
 
 func hashPassword(password string) (string, error) {
@@ -158,6 +175,8 @@ func (m *UserModel) InsertNew(username string, password string, options *NewUser
 		app.errorLog.Printf("Error commiting transaction: %v\n", err)
 		return 0, err
 	}
+
+	app.infoLog.Printf("Inserted player_id: %v\n", playerID)
 
 	return playerID, nil
 }
@@ -414,4 +433,48 @@ func (m *UserModel) SearchForUsers(searchString string) ([]UserClientSide, error
 	}
 
 	return output, nil
+}
+
+func (m *UserModel) GetTileInfoFromPlayerID(playerID int64) (*UserTileInfo, error) {
+	sqlStmt := `
+	SELECT users.username, join_date, last_seen, bullet_rating, blitz_rating, rapid_rating, classical_rating
+	  FROM users
+	 INNER JOIN user_ratings
+	    ON users.player_id = user_ratings.player_id  
+	 WHERE users.player_id = ?
+	`
+
+	app.infoLog.Printf("Searching for player_id: %v\n", playerID)
+
+	var username string
+	var joinDate int64
+	var lastSeen int64
+	var bullet_rating int64
+	var blitz_rating string
+	var rapid_rating int64
+	var classical_rating int64
+
+	row := m.DB.QueryRow(sqlStmt, username)
+	err := row.Scan(&username, &joinDate, &lastSeen, &bullet_rating, &blitz_rating, &rapid_rating, &classical_rating)
+	if err != nil {
+		app.errorLog.Printf("Error in GetTileInfoFromPlayerID: %s\n", err.Error())
+		return nil, err
+	}
+
+	pingStatus := time.Since(time.Unix(lastSeen, 0)) < 10*time.Second
+
+	return &UserTileInfo{
+		PlayerID:   playerID,
+		Username:   username,
+		PingStatus: pingStatus,
+		JoinDate:   joinDate,
+		LastSeen:   lastSeen,
+		Ratings: Ratings{
+			BulletRating:    bullet_rating,
+			BlitzRating:     bullet_rating,
+			RapidRating:     rapid_rating,
+			ClassicalRating: classical_rating,
+		},
+	}, nil
+
 }

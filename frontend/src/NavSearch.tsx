@@ -24,7 +24,7 @@ interface navbarSearchResult {
 
 async function fetchSearchResults(searchString: string) {
   console.log(`Search string: ${searchString}`)
-  const url = import.meta.env.VITE_API_VALIDATE_USER_SEARCH_URL + `?search=${searchString}`
+  const url = import.meta.env.VITE_API_USER_SEARCH_URL + `?search=${searchString}`
 
   try {
     const response = await fetch(url, {

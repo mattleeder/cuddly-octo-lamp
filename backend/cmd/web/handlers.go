@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -438,7 +439,7 @@ func validateSessionHandler(w http.ResponseWriter, r *http.Request) {
 
 func userSearchHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	defer func() { app.perfLog.Printf("validateSessionHandler took: %s\n", time.Since(start)) }()
+	defer func() { app.perfLog.Printf("userSearchHandler took: %s\n", time.Since(start)) }()
 
 	if r.Method != "GET" {
 		w.Header().Set("Allow", "GET")
@@ -461,6 +462,46 @@ func userSearchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonStr, err := json.Marshal(userList)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	w.Write(jsonStr)
+}
+
+func getTileInfoHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() { app.perfLog.Printf("getTileInfoHandler took: %s\n", time.Since(start)) }()
+
+	if r.Method != "GET" {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+
+	queryParams := r.URL.Query()
+
+	searchString := queryParams.Get("search")
+
+	if searchString == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	playerID, err := strconv.ParseInt(searchString, 10, 64)
+	if err != nil {
+		app.errorLog.Println("Could not convert searchString to int64")
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	tileInfo, err := app.users.GetTileInfoFromPlayerID(playerID)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	jsonStr, err := json.Marshal(tileInfo)
 	if err != nil {
 		app.serverError(w, err, false)
 		return

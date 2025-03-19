@@ -68,10 +68,29 @@ const playerTileInfoArray = [
   },
 ]
 
-function fetchPlayerTileData(playerID: number): PlayerInfoTileData {
-  console.log(`Fetching tile data: ${playerID}`)
-  playerTileInfoIndex = (playerTileInfoIndex + 1) % playerTileInfoArray.length
-  return playerTileInfoArray[playerTileInfoIndex]
+// function fetchPlayerTileData(playerID: number): PlayerInfoTileData {
+//   console.log(`Fetching tile data: ${playerID}`)
+//   playerTileInfoIndex = (playerTileInfoIndex + 1) % playerTileInfoArray.length
+//   return playerTileInfoArray[playerTileInfoIndex]
+// }
+
+async function fetchPlayerTileData(playerID: number) {
+  console.log(`Search string: ${playerID}`)
+  const url = import.meta.env.VITE_API_GET_TILE_INFO_URL + `?search=${playerID}`
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+    })
+
+    if (response.ok) {
+      const responseData = await response.json()
+      return responseData
+    }
+
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 function makePlayerInfoTile(
@@ -191,9 +210,9 @@ export function lightFusePlayerInfoTile(
   fuseHandler(playerID, position)
 }
 
-function updatePlayerData(playerID: number, setPlayerData: React.Dispatch<React.SetStateAction<PlayerInfoTileData | null>>) {
-  // const playerData = await fetchPlayerTileData(playerID)
-  const playerData = fetchPlayerTileData(playerID)
+async function updatePlayerData(playerID: number, setPlayerData: React.Dispatch<React.SetStateAction<PlayerInfoTileData | null>>) {
+  const playerData = await fetchPlayerTileData(playerID)
+  // const playerData = fetchPlayerTileData(playerID)
   setPlayerData(playerData)
 }
 
@@ -222,8 +241,8 @@ function destroyTile(
   }
 }
 
-function getPositionFromMouseEvent(event: React.MouseEvent<HTMLElement, MouseEvent>): PlayerInfoTilePosition {
-  const element = event.target
+function getPositionFromMouseEvent(event: React.MouseEvent<Element, MouseEvent>): PlayerInfoTilePosition {
+  const element = event.target as HTMLElement
   const rect = element.getBoundingClientRect()
 
   return {
