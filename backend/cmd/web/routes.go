@@ -19,12 +19,8 @@ func withLogSessionSecureCorsChain(handlerFunc http.HandlerFunc) http.Handler {
 	return app.logRequest(app.recoverPanic(wrapWithSessionManager(app.sessionManager, secureHeaders(corsHeaders(http.HandlerFunc(handlerFunc))))))
 }
 
-func withSSELogSessionSecureCorsChain(handlerFunc http.HandlerFunc) http.Handler {
-	return app.logRequest(sseHeaders(app.recoverPanic(wrapWithSessionManager(app.sessionManager, secureHeaders(corsHeaders(http.HandlerFunc(handlerFunc)))))))
-}
-
-func withLogSessionCorsChain(handlerFunc http.HandlerFunc) http.Handler {
-	return app.logRequest(app.recoverPanic(wrapWithSessionManager(app.sessionManager, corsHeaders(http.HandlerFunc(handlerFunc)))))
+func withLogSecureCorsChain(handlerFunc http.HandlerFunc) http.Handler {
+	return app.logRequest(app.recoverPanic(secureHeaders(corsHeaders(http.HandlerFunc(handlerFunc)))))
 }
 
 func (app *application) routes() http.Handler {
@@ -40,6 +36,7 @@ func (app *application) routes() http.Handler {
 	mux.Handle("/login", withLogSessionSecureCorsChain(loginHandler))
 	mux.Handle("/logout", withLogSessionSecureCorsChain(logoutHandler))
 	mux.Handle("/validateSession", withLogSessionSecureCorsChain(validateSessionHandler))
+	mux.Handle("/userSearch", withLogSecureCorsChain(userSearchHandler))
 
 	// mux.Handle("/listenformatch", withSSELogSessionSecureCorsChain(matchFoundSSEHandler))
 	mux.Handle("/listenformatch", app.logRequest(app.recoverPanic(http.HandlerFunc(matchFoundSSEHandler))))

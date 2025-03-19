@@ -43,6 +43,10 @@ type authData struct {
 	Username string `json:"username"`
 }
 
+type userSearchData struct {
+	SearchString string `json:"searchString"`
+}
+
 func generateNewPlayerId() int64 {
 	return rand.Int63()
 }
@@ -424,6 +428,39 @@ func validateSessionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonStr, err := json.Marshal(authData)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	w.Write(jsonStr)
+}
+
+func userSearchHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() { app.perfLog.Printf("validateSessionHandler took: %s\n", time.Since(start)) }()
+
+	if r.Method != "GET" {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+
+	queryParams := r.URL.Query()
+
+	searchString := queryParams.Get("search")
+
+	if searchString == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	userList, err := app.users.SearchForUsers(searchString)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	jsonStr, err := json.Marshal(userList)
 	if err != nil {
 		app.serverError(w, err, false)
 		return

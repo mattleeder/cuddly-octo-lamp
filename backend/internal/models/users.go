@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"math/rand"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -375,4 +376,42 @@ func (m *UserModel) UpdateEmailFromUsername(username string, email string) error
 
 func (m *UserModel) UpdateEmailFromPlayerID(playerID int64, email string) error {
 	return m.updateEmail(email, "", playerID, qmPlayerID)
+}
+
+func (m *UserModel) SearchForUsers(searchString string) ([]UserClientSide, error) {
+	sqlStmt := `
+	SELECT player_id, username, join_date, last_seen
+	  FROM users
+	 WHERE UPPER(username) GLOB ?
+	`
+
+	var output []UserClientSide
+	var playerID int64
+	var username string
+	var joinDate int64
+	var lastSeen int64
+
+	rows, err := m.DB.Query(sqlStmt, strings.ToUpper(searchString))
+	if err != nil {
+		app.errorLog.Printf("Error in SearchForUsers: %s\n", err.Error())
+		return nil, err
+	}
+
+	for rows.Next() {
+		err := rows.Scan(&playerID, &username, &joinDate, &lastSeen)
+
+		if err != nil {
+			app.errorLog.Printf("Error in SearchForUsers: %s\n", err.Error())
+			return nil, err
+		}
+
+		output = append(output, UserClientSide{
+			PlayerID: playerID,
+			Username: username,
+			JoinDate: joinDate,
+			LastSeen: lastSeen,
+		})
+	}
+
+	return output, nil
 }

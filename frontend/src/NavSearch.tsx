@@ -4,27 +4,48 @@ import { PlayerInfoTileContext, PlayerInfoTileContextInterface } from './PlayerI
 import { Link } from 'react-router-dom';
 
 interface navbarSearchResult {
-  displayName: string
+  username: string
   playerID: number
+  joinDate: number,
+  lastSeen: number,
 }
 
-const fakeData: navbarSearchResult[] = [
-  {displayName: "userOne", playerID: 1},
-  {displayName: "userTwo", playerID: 2},
-  {displayName: "userThree", playerID: 3},
-  {displayName: "userFour", playerID: 4},
-]
+// const fakeData: navbarSearchResult[] = [
+//   {displayName: "userOne", playerID: 1},
+//   {displayName: "userTwo", playerID: 2},
+//   {displayName: "userThree", playerID: 3},
+//   {displayName: "userFour", playerID: 4},
+// ]
+
+// async function fetchSearchResults(searchString: string) {
+//   console.log(`Search string: ${searchString}`)
+//   return fakeData
+// }
 
 async function fetchSearchResults(searchString: string) {
   console.log(`Search string: ${searchString}`)
-  return fakeData
+  const url = import.meta.env.VITE_API_VALIDATE_USER_SEARCH_URL + `?search=${searchString}`
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+    })
+
+    if (response.ok) {
+      const responseData = await response.json()
+      return responseData
+    }
+
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 async function handleSearchChange(newSearchString: string, setSearchValue: React.Dispatch<React.SetStateAction<string>> ,setLoading: React.Dispatch<React.SetStateAction<boolean>>, setSearchResults: React.Dispatch<React.SetStateAction<navbarSearchResult[]>>) {
   setLoading(true)
   setSearchValue(newSearchString)
   const searchResults = await fetchSearchResults(newSearchString)
-  setSearchResults(searchResults)
+  setSearchResults(searchResults || [])
   setLoading(false)
 }
 
@@ -62,7 +83,7 @@ function NavbarSearchResults({ active, loading, searchResults, searchValue }: { 
           key={searchResult.playerID}
           onMouseEnter={(event) => playerInfoTile?.spawnPlayerInfoTile(searchResult.playerID, event)}
           onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(searchResult.playerID, event)}
-        ><Link to={`#${searchResult.playerID}`}><span>{searchResult.displayName}</span></Link></li>
+        ><Link to={`#${searchResult.playerID}`}><span>{searchResult.username}</span></Link></li>
       )
     })
   )
@@ -75,6 +96,10 @@ export function NavbarSearch() {
   const [loadingSearchResults, setLoadingSearchResults] = useState(false)
   const [searchResults, setSearchResults] = useState<navbarSearchResult[]>([])
   const [searchValue, setSearchValue] = useState("")
+
+  useEffect(() => {
+    console.log(searchResults)
+  }, [searchResults])
 
 
   // Close search input if mouse not over
