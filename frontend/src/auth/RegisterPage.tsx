@@ -1,44 +1,34 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { useNavigate, NavigateFunction, useSearchParams } from 'react-router-dom';
 import { FormError } from '../FormError';
+import { AuthContext, AuthContextType, RegisterFormValidationErrors } from './AuthContext';
 
 // When redirected to login can use ?referrer=/somePage to redirect after successful login attempt
 
-interface RegisterFormValidationErrors {
-  username: string
-  password: string
-  email: string
-}
-
-async function handleFormSubmit(formData: FormData, navigate: NavigateFunction, setLoading: React.Dispatch<React.SetStateAction<boolean>>, setValidationErrors: React.Dispatch<React.SetStateAction<RegisterFormValidationErrors>>) {
+async function handleFormSubmit(auth: AuthContextType, formData: FormData, navigate: NavigateFunction, setLoading: React.Dispatch<React.SetStateAction<boolean>>, setValidationErrors: React.Dispatch<React.SetStateAction<RegisterFormValidationErrors>>) {
   setLoading(true)
-  const url = import.meta.env.VITE_API_REGISTER_URL
   const redirectUrl = formData.get("referrer") as string || "/"
+  const registerData = {
+    username: formData.get("username") as string,
+    password: formData.get("password") as string,
+    email: formData.get("email") as string || undefined,
+    rememberMe: formData.get("rememberMe") == "true" ? true : false,
+  }
 
-  try {
+  console.log(registerData)
 
-    // @TODO, send settings when registering account
-    const response = await fetch(url, {
-      method: "POST",
-      credentials: "include",
-      body: JSON.stringify({
-        username: formData.get("username"),
-        password: formData.get("password"),
-        email: formData.get("email"),
-      })
-    })
-
-    if (response.ok) {
+  const registerCallback = (success: boolean, responseData: RegisterFormValidationErrors | undefined) => {
+    if (success) {
       navigate(redirectUrl)
     } else {
-      const validationErrors: RegisterFormValidationErrors = await response.json()
-      setValidationErrors(validationErrors)
+      if (responseData != undefined) {
+        setValidationErrors(responseData)
+      }
     }
-  } catch (e) {
-    console.error(e)
-  } finally {
-    setLoading(false)
   }
+
+  auth.register(registerData, registerCallback)
+  setLoading(false)
 }
 
 function RegisterForm() {
@@ -54,9 +44,10 @@ function RegisterForm() {
     password: "",
     email: ""
   })
+  const auth = useContext(AuthContext)
   
   return (
-    <form method="post" action={(formData) => {if (!loading) {handleFormSubmit(formData, navigate, setLoading, setValidationErrors)}}}>
+    <form method="post" action={(formData) => {if (!loading) {handleFormSubmit(auth, formData, navigate, setLoading, setValidationErrors)}}}>
       <div className='formGroup'>
         <label htmlFor="username">Username</label>
         <input name="username" type="text" required={true} value={username} onChange={(event) => setUsername(event.target.value)} />

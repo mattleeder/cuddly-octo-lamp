@@ -29,14 +29,16 @@ type NewUserOptions struct {
 }
 
 type NewUserInfo struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	Email      string `json:"email"`
+	RememberMe bool   `json:"rememberMe"`
 }
 
 type UserLoginInfo struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	RememberMe bool   `json:"rememberMe"`
 }
 
 type UserModel struct {
@@ -78,18 +80,18 @@ func CreateNewUserOptions(newUser NewUserInfo) (options NewUserOptions) {
 	return options
 }
 
-func (m *UserModel) InsertNew(username string, password string, options *NewUserOptions) error {
+func (m *UserModel) InsertNew(username string, password string, options *NewUserOptions) (int64, error) {
 	defer m.LogAll()
 	app.infoLog.Printf("Inserting new user: %v\n", username)
 
 	if username == "" {
 		app.errorLog.Printf("Username not given")
-		return errors.New("username not given")
+		return 0, errors.New("username not given")
 	}
 
 	if username == "" {
 		app.errorLog.Printf("Username not given")
-		return errors.New("password not given")
+		return 0, errors.New("password not given")
 	}
 
 	var playerID = rand.Int63()
@@ -97,7 +99,7 @@ func (m *UserModel) InsertNew(username string, password string, options *NewUser
 	password = "" // Overwrite password to avoid accidental usage
 	if err != nil {
 		app.errorLog.Printf("Error generating password hash: %v\n", err.Error())
-		return err
+		return 0, err
 	}
 	var email = sql.NullString{Valid: false}
 	if options.email != nil {
@@ -115,20 +117,20 @@ func (m *UserModel) InsertNew(username string, password string, options *NewUser
 	tx, err := m.DB.Begin()
 	if err != nil {
 		app.errorLog.Printf("Error starting transaction: %v\n", err)
-		return err
+		return 0, err
 	}
 
 	stmtOne, err = tx.Prepare(stepOne)
 	if err != nil {
 		app.errorLog.Printf("Error preparing first statement: %v\n", err)
-		return err
+		return 0, err
 	}
 	defer stmtOne.Close()
 
 	stmtTwo, err = tx.Prepare(stepTwo)
 	if err != nil {
 		app.errorLog.Printf("Error preparing second statement: %v\n", err)
-		return err
+		return 0, err
 	}
 	defer stmtTwo.Close()
 
@@ -138,7 +140,7 @@ func (m *UserModel) InsertNew(username string, password string, options *NewUser
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			app.errorLog.Printf("insert users: unable to rollback: %s", rollbackErr)
 		}
-		return err
+		return 0, err
 	}
 
 	_, err = stmtTwo.Exec(playerID, username)
@@ -147,16 +149,16 @@ func (m *UserModel) InsertNew(username string, password string, options *NewUser
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			app.errorLog.Printf("insert user_ratings: unable to rollback: %v", rollbackErr)
 		}
-		return err
+		return 0, err
 	}
 
 	err = tx.Commit()
 	if err != nil {
 		app.errorLog.Printf("Error commiting transaction: %v\n", err)
-		return err
+		return 0, err
 	}
 
-	return nil
+	return playerID, nil
 }
 
 func (m *UserModel) Authenticate(username string, password string) (playerID int64, authorized bool) {

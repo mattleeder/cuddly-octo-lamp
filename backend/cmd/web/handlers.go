@@ -285,7 +285,7 @@ func registerUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	var registerUserValidationErrors models.NewUserInfo
 
-	err = app.users.InsertNew(newUser.Username, newUser.Password, &newUserOptions)
+	playerID, err := app.users.InsertNew(newUser.Username, newUser.Password, &newUserOptions)
 	if err != nil {
 		app.errorLog.Printf("DB Error: %s\n", err.Error())
 		if err.Error() == "constraint failed: UNIQUE constraint failed: users.username (2067)" {
@@ -302,7 +302,27 @@ func registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var authData = authData{
+		Username: newUser.Username,
+	}
+
+	jsonStr, err := json.Marshal(authData)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	err = app.sessionManager.RenewToken(r.Context())
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	app.sessionManager.RememberMe(r.Context(), newUser.RememberMe)
+	app.sessionManager.Put(r.Context(), "username", newUser.Username)
+	app.sessionManager.Put(r.Context(), "playerID", playerID)
 	w.WriteHeader(http.StatusCreated)
+	w.Write(jsonStr)
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -353,6 +373,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	app.sessionManager.RememberMe(r.Context(), loginInfo.RememberMe)
 	app.sessionManager.Put(r.Context(), "username", loginInfo.Username)
 	app.sessionManager.Put(r.Context(), "playerID", playerID)
 	w.Write(jsonStr)

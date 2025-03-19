@@ -6,8 +6,6 @@ import { AuthContext, AuthContextType, LoginFormValidationErrors } from './AuthC
 // When redirected to login can use ?referrer=/somePage to redirect after successful login attempt
 
 async function handleFormSubmit(auth: AuthContextType, formData: FormData, navigate: NavigateFunction, setLoading: React.Dispatch<React.SetStateAction<boolean>>, setValidationErrors: React.Dispatch<React.SetStateAction<LoginFormValidationErrors>>) {
-  console.log("Logging in")
-  console.log(auth)
   setLoading(true)
   const redirectUrl = formData.get("referrer") as string || "/"
   const loginData = {
