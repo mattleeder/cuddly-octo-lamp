@@ -64,10 +64,10 @@ type UserClientSide struct {
 }
 
 type Ratings struct {
-	BulletRating    int64 `json:"bulletRating"`
-	BlitzRating     int64 `json:"blitzRating"`
-	RapidRating     int64 `json:"rapidRating"`
-	ClassicalRating int64 `json:"classicalRating"`
+	BulletRating    int64 `json:"bullet"`
+	BlitzRating     int64 `json:"blitz"`
+	RapidRating     int64 `json:"rapid"`
+	ClassicalRating int64 `json:"classical"`
 }
 
 type UserTileInfo struct {
@@ -435,18 +435,16 @@ func (m *UserModel) SearchForUsers(searchString string) ([]UserClientSide, error
 	return output, nil
 }
 
-func (m *UserModel) GetTileInfoFromPlayerID(playerID int64) (*UserTileInfo, error) {
+func (m *UserModel) GetTileInfoFromUsername(username string) (*UserTileInfo, error) {
 	sqlStmt := `
-	SELECT users.username, join_date, last_seen, bullet_rating, blitz_rating, rapid_rating, classical_rating
+	SELECT users.player_id, join_date, last_seen, bullet_rating, blitz_rating, rapid_rating, classical_rating
 	  FROM users
 	 INNER JOIN user_ratings
 	    ON users.player_id = user_ratings.player_id  
-	 WHERE users.player_id = ?
+	 WHERE users.username = ?
 	`
 
-	app.infoLog.Printf("Searching for player_id: %v\n", playerID)
-
-	var username string
+	var playerID int64
 	var joinDate int64
 	var lastSeen int64
 	var bullet_rating int64
@@ -455,7 +453,7 @@ func (m *UserModel) GetTileInfoFromPlayerID(playerID int64) (*UserTileInfo, erro
 	var classical_rating int64
 
 	row := m.DB.QueryRow(sqlStmt, username)
-	err := row.Scan(&username, &joinDate, &lastSeen, &bullet_rating, &blitz_rating, &rapid_rating, &classical_rating)
+	err := row.Scan(&playerID, &joinDate, &lastSeen, &bullet_rating, &blitz_rating, &rapid_rating, &classical_rating)
 	if err != nil {
 		app.errorLog.Printf("Error in GetTileInfoFromPlayerID: %s\n", err.Error())
 		return nil, err

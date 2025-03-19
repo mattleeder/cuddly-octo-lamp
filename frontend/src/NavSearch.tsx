@@ -81,8 +81,8 @@ function NavbarSearchResults({ active, loading, searchResults, searchValue }: { 
         <li 
           className="navbarSearchResultItem" 
           key={searchResult.playerID}
-          onMouseEnter={(event) => playerInfoTile?.spawnPlayerInfoTile(searchResult.playerID, event)}
-          onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(searchResult.playerID, event)}
+          onMouseEnter={(event) => playerInfoTile?.spawnPlayerInfoTile(searchResult.username, event)}
+          onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(searchResult.username, event)}
         ><Link to={`#${searchResult.playerID}`}><span>{searchResult.username}</span></Link></li>
       )
     })

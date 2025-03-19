@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 
@@ -488,14 +487,7 @@ func getTileInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	playerID, err := strconv.ParseInt(searchString, 10, 64)
-	if err != nil {
-		app.errorLog.Println("Could not convert searchString to int64")
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
-
-	tileInfo, err := app.users.GetTileInfoFromPlayerID(playerID)
+	tileInfo, err := app.users.GetTileInfoFromUsername(searchString)
 	if err != nil {
 		app.serverError(w, err, false)
 		return
