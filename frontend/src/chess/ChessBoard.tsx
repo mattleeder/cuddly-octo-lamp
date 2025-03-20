@@ -30,8 +30,8 @@ interface Rect {
   height: number,
 }
 
-function getSquareIdxFromClick(x: number, y: number, rect: React.RefObject<Rect | null>) {
-  if (rect === null || rect.current === null) {
+function getSquareIdxFromClick(x: number, y: number, rect?: React.RefObject<Rect | null>) {
+  if (rect === undefined || rect === null || rect.current === null) {
     throw new Error("Bounding rect for board is not defined")
   }
 
@@ -241,14 +241,10 @@ function getRowAndColFromBoardIndex(idx: number, flip: boolean): [number, number
   return [row, col]
 }
 
-function PiecesComponent({ flip, squareWidth, onDragEnd, rect }: { flip: boolean, squareWidth: number, onDragEnd: (startIdx: number, endIdx: number) => void, rect: React.RefObject<Rect | null> }) {
-  const game = useContext(GameContext)
-  if (!game) {
-    throw new Error("PiecesComponent must be called from within a GameContext")
-  }
+function PiecesComponent({ flip, squareWidth, onDragEnd, rect, board }: { flip: boolean, squareWidth: number, onDragEnd: (startIdx: number, endIdx: number) => void, rect?: React.RefObject<Rect | null>, board: [PieceColour | null, PieceVariant | null][] }) {
 
   return (
-    game.matchData.activeState.board.map((square, idx) => {
+    board.map((square, idx) => {
       const [colour, variant] = square
       if (colour === null || variant === null) {
         return <React.Fragment key={idx} />
@@ -320,14 +316,10 @@ function CapturesComponent({ captures, flip, squareWidth }: { captures: number[]
     }))
 }
 
-function LastMoveComponent({ flip, squareWidth }: { flip: boolean, squareWidth: number }) {
-  const game = useContext(GameContext)
-  if (!game) {
-    throw new Error("LastMoveComponent must be called from within a GameContext")
-  }
+function LastMoveComponent({ flip, squareWidth, lastMove, showLastMove }: { flip: boolean, squareWidth: number, lastMove: [number, number], showLastMove: boolean }) {
   return (
-    game.matchData.activeState.lastMove.map((move, idx) => {
-      if (game.matchData.activeMove == 0) {
+    lastMove.map((move, idx) => {
+      if (showLastMove) {
         return <React.Fragment key={idx} />
       }
       const [row, col] = getRowAndColFromBoardIndex(move, flip)
@@ -558,8 +550,8 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
               setWaiting
             )}}}
       >
-        <LastMoveComponent flip={game.flip} squareWidth={squareWidth}/>
-        <PiecesComponent flip={game.flip} squareWidth={squareWidth} rect={rect} onDragEnd={
+        <LastMoveComponent flip={game.flip} squareWidth={squareWidth} lastMove={game.matchData.activeState.lastMove} showLastMove={game.matchData.activeMove == 0}/>
+        <PiecesComponent flip={game.flip} squareWidth={squareWidth} rect={rect} board={game.matchData.activeState.board} onDragEnd={
           (startIdx, endIdx) => {
             if (startIdx != endIdx) {
               clickHandler(
@@ -589,5 +581,76 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
         <GameOverComponent squareWidth={squareWidth}/>
       </div>
     </div>
+  )
+}
+
+export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [PieceColour | null, PieceVariant | null][], lastMove: [number, number], showLastMove: boolean }) {
+  const boardRef = useRef<HTMLDivElement | null>(null)
+  const rect = useRef<Rect | null>(null)
+  const [boardWidth, setBoardWidth] = useState(boardRef.current?.getBoundingClientRect().width || 200)
+  const squareWidth = boardWidth / 8
+
+  useEffect(() => {
+    const resizeObserver = new ResizeObserver((entries) => {
+      console.log("RESIZE")
+      for (const entry of entries) {
+        const boundingRect = entry.target.getBoundingClientRect()
+        rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
+        setBoardWidth(boundingRect.width)
+      }
+    })
+    if (boardRef.current) {
+      resizeObserver.observe(boardRef.current)
+    }
+
+    window.addEventListener('scroll', () => {
+      console.log("RESIZE")
+      if (boardRef.current) {
+        const boundingRect = boardRef.current.getBoundingClientRect()
+        rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
+        setBoardWidth(boundingRect.width)
+      }
+    })
+
+    window.addEventListener('resize', () => {
+      console.log("RESIZE")
+      if (boardRef.current) {
+        const boundingRect = boardRef.current.getBoundingClientRect()
+        rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
+        setBoardWidth(boundingRect.width)
+      }
+    })
+
+    return () => {
+      resizeObserver.disconnect()
+
+      window.removeEventListener('scroll', () => {
+        console.log("RESIZE")
+        if (boardRef.current) {
+          const boundingRect = boardRef.current.getBoundingClientRect()
+          rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
+          setBoardWidth(boundingRect.width)
+        }
+      })
+
+      window.removeEventListener('resize', () => {
+        console.log("RESIZE")
+        if (boardRef.current) {
+          const boundingRect = boardRef.current.getBoundingClientRect()
+          rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
+          setBoardWidth(boundingRect.width)
+        }
+      })
+
+    }
+  }, [boardRef])
+
+  // style={{width: `${squareWidth * 8}px`, height: `${squareWidth * 8}px`, backgroundSize: `${squareWidth * 8}px`}} 
+  
+  return (
+      <div className='chessboard' style={{width: "100%", height: `${squareWidth * 8}px`, backgroundSize: `${squareWidth * 8}px`}} ref={boardRef}>
+        <LastMoveComponent flip={false} squareWidth={squareWidth} lastMove={lastMove} showLastMove={showLastMove}/>
+        <PiecesComponent flip={false} squareWidth={squareWidth} board={board} onDragEnd={() => {}}/>
+      </div>
   )
 }

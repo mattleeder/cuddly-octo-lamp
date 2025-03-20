@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { LoaderCircle, Swords, Flame, Rabbit, TrainFront, Turtle } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
+import { FrozenChessBoard } from "./chess/ChessBoard";
+import { parseGameStateFromFEN } from "./chess/ChessLogic";
 
 interface SQLNullString {
   String: string
@@ -67,11 +69,13 @@ function MatchTile({ matchData }: { matchData: matchData }) {
     outcome = "Draw"
   }
 
+  const gameState = parseGameStateFromFEN(matchData.finalFEN)
+
     return (
-        <li style={{listStyle: "none", display: "grid", gridTemplateColumns: "0.2fr 1fr"}}>
+        <li style={{listStyle: "none", display: "grid", gridTemplateColumns: "0.2fr 1fr", width: "50vw"}}>
           <div>
-            Chessboard
             {/* Chessboard, display final position */}
+            <FrozenChessBoard board={gameState.board} lastMove={[matchData.lastMovePiece as number, matchData.lastMoveMove as number]} showLastMove={matchData.lastMovePiece != null && matchData.lastMoveMove != null}/>
           </div>
           <div style={{display: "grid", gridTemplateRows: "1fr 1fr"}}>
             {/* Info, grid 2 rows, top row is format info and date, 2nd row is player Info and victory */}
@@ -150,7 +154,7 @@ export function WatchPage() {
           <ul>
           {matchList.map((matchData) => {
             return (
-              <MatchTile matchData={matchData} />
+              <MatchTile key={`match_${matchData.matchID}`} matchData={matchData} />
             )
           })}
           </ul>
