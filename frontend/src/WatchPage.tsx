@@ -23,16 +23,16 @@ interface matchData {
   averageElo: number
 }
 
-function FormatIcon({ timeFormatInMilliseconds }: { timeFormatInMilliseconds: number }) {
+function FormatIcon({ timeFormatInMilliseconds, style }: { timeFormatInMilliseconds: number, style?: React.CSSProperties }) {
   const minute = 60_000
   if (timeFormatInMilliseconds < 2 * minute) {
-    return <TrainFront />
+    return <TrainFront style={style}/>
   } else if (timeFormatInMilliseconds < 5 * minute) {
-    return <Flame />
+    return <Flame style={style}/>
   } else if (timeFormatInMilliseconds < 20 * minute) {
-    return <Rabbit />
+    return <Rabbit style={style}/>
   } else {
-    return <Turtle />
+    return <Turtle style={style}/>
   }
 }
 
@@ -59,7 +59,20 @@ async function fetchMatches(searchParams: URLSearchParams, signal: AbortSignal) 
   }
 }
 
-function MatchTile({ matchData }: { matchData: matchData }) {
+function getTimeFormatName(timeFormatInMilliseconds: number) {
+  const minute = 60_000
+  if (timeFormatInMilliseconds < 2 * minute) {
+    return "Bullet"
+  } else if (timeFormatInMilliseconds < 5 * minute) {
+    return "Blitz"
+  } else if (timeFormatInMilliseconds < 20 * minute) {
+    return "Rapid"
+  } else {
+    return "Classical"
+  }
+}
+
+function MatchTile({ matchData, idx }: { matchData: matchData, idx: number }) {
   let outcome = ""
   if (matchData.whitePlayerPoints > matchData.blackPlayerPoints) {
     outcome = "White wins"
@@ -72,26 +85,24 @@ function MatchTile({ matchData }: { matchData: matchData }) {
   const gameState = parseGameStateFromFEN(matchData.finalFEN)
 
     return (
-        <li style={{listStyle: "none", display: "grid", gridTemplateColumns: "0.2fr 1fr", width: "50vw"}}>
-          <div>
+        <li style={{listStyle: "none", display: "grid", gridTemplateColumns: "0.5fr 1fr", width: "50vw", backgroundColor: idx % 2 == 0 ? "#33312e" : "#33312e", padding: "1em"}}>
+          <div style={{marginTop: "auto", marginBottom: "auto", boxShadow: "2px 2px 2px #000000"}}>
             {/* Chessboard, display final position */}
             <FrozenChessBoard board={gameState.board} lastMove={[matchData.lastMovePiece as number, matchData.lastMoveMove as number]} showLastMove={matchData.lastMovePiece != null && matchData.lastMoveMove != null}/>
           </div>
-          <div style={{display: "grid", gridTemplateRows: "1fr 1fr"}}>
+          <div style={{display: "grid", gridTemplateRows: "1fr 1fr", marginLeft: "1em"}}>
             {/* Info, grid 2 rows, top row is format info and date, 2nd row is player Info and victory */}
-            <div style={{display: "grid", gridTemplateColumns: "1fr 1fr"}}>
+            <div style={{display: "grid", gridTemplateRows: "1fr 1fr"}}>
               {/* Grid 2 columns, first column is icon for rating, 2nd is info */}
               <div>
                 {/* Icon for rating */}
-                <FormatIcon timeFormatInMilliseconds={matchData.timeFormatInMilliseconds} />
+                <FormatIcon timeFormatInMilliseconds={matchData.timeFormatInMilliseconds} style={{float: "left"}}/>
+                <span style={{float: "left"}}>{Math.floor(matchData.timeFormatInMilliseconds / 60_000)}+{Math.floor(matchData.incrementInMilliseconds / 1000)} • {getTimeFormatName(matchData.timeFormatInMilliseconds)}</span>
               </div>
               <div style={{display: "grid", gridTemplateRows: "1fr 1fr"}}>
                 {/* Info, grid 2 rows, top is rating info bottom is date */}
                 <div>
-                  {Math.floor(matchData.timeFormatInMilliseconds / 60_000)}+{Math.floor(matchData.incrementInMilliseconds / 1000)}
-                </div>
-                <div>
-                  Date
+                  <span style={{float: "left"}}>Date</span>
                 </div>
               </div>
             </div>
@@ -152,9 +163,9 @@ export function WatchPage() {
     return (
         <div>
           <ul>
-          {matchList.map((matchData) => {
+          {matchList.map((matchData, idx) => {
             return (
-              <MatchTile key={`match_${matchData.matchID}`} matchData={matchData} />
+              <MatchTile key={`match_${matchData.matchID}`} matchData={matchData} idx={idx}/>
             )
           })}
           </ul>
