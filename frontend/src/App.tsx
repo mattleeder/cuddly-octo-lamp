@@ -14,6 +14,7 @@ import { PlayerInfoTile } from './PlayerInfoTile.tsx';
 import { PageNotFound } from './PageNotFound.tsx';
 import { RegisterPage } from './auth/RegisterPage.tsx';
 import { AuthProvider } from './auth/AuthContext.tsx';
+import { WatchPage } from './WatchPage.tsx';
 
 function App() {
   console.log(import.meta.env.VITE_API_URL)
@@ -30,6 +31,7 @@ function App() {
               <Route path="/matchroom/:matchid" element={<MatchRoom />} />
               <Route path="/login" element={<LoginPage />}/>
               <Route path="/register" element={<RegisterPage/>}/>
+              <Route path="/watch" element={<WatchPage />}/>
               <Route path="*" element={<PageNotFound />}/>
             </Routes>
           </Router>

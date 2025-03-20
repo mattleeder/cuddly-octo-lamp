@@ -29,7 +29,7 @@ type PastMatchSummary struct {
 	IncrementInMilliseconds  int64         `json:"incrementInMilliseconds"`
 	WhitePlayerPoints        float64       `json:"whitePlayerPoints"`
 	BlackPlayerPoints        float64       `json:"blackPlayerPoints"`
-	AverageElo               float64       `json:"averageELo"`
+	AverageElo               float64       `json:"averageElo"`
 }
 
 type PastMatchModel struct {

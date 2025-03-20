@@ -10,18 +10,6 @@ interface navbarSearchResult {
   lastSeen: number,
 }
 
-// const fakeData: navbarSearchResult[] = [
-//   {displayName: "userOne", playerID: 1},
-//   {displayName: "userTwo", playerID: 2},
-//   {displayName: "userThree", playerID: 3},
-//   {displayName: "userFour", playerID: 4},
-// ]
-
-// async function fetchSearchResults(searchString: string) {
-//   console.log(`Search string: ${searchString}`)
-//   return fakeData
-// }
-
 async function fetchSearchResults(searchString: string) {
   console.log(`Search string: ${searchString}`)
   const url = import.meta.env.VITE_API_USER_SEARCH_URL + `?search=${searchString}`
