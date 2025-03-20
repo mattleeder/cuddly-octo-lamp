@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { LoaderCircle, Swords, Flame, Rabbit, TrainFront, Turtle } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { FrozenChessBoard } from "./chess/ChessBoard";
 import { parseGameStateFromFEN } from "./chess/ChessLogic";
 
@@ -83,9 +83,16 @@ function MatchTile({ matchData, idx }: { matchData: matchData, idx: number }) {
   }
 
   const gameState = parseGameStateFromFEN(matchData.finalFEN)
+  let liClassname = ""
+  if (idx % 2 == 0) {
+    liClassname += "even"
+  } else {
+    liClassname += "odd"
+  }
+  liClassname += " matchRow"
 
     return (
-        <li style={{listStyle: "none", display: "grid", gridTemplateColumns: "0.5fr 1fr", width: "50vw", backgroundColor: idx % 2 == 0 ? "#33312e" : "#33312e", padding: "1em"}}>
+        <li className={liClassname}>
           <div style={{marginTop: "auto", marginBottom: "auto", boxShadow: "2px 2px 2px #000000"}}>
             {/* Chessboard, display final position */}
             <FrozenChessBoard board={gameState.board} lastMove={[matchData.lastMovePiece as number, matchData.lastMoveMove as number]} showLastMove={matchData.lastMovePiece != null && matchData.lastMoveMove != null}/>

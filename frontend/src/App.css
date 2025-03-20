@@ -779,3 +779,28 @@ input:invalid {
 .formError {
   color: red;
 }
+
+/**********
+MATCH TILE
+**********/
+
+.matchRow {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 0.5fr 1fr;
+  width: 50vw;
+  padding: 1em;
+}
+
+.even {
+  background-color: #33312e;
+}
+
+.odd {
+  background-color: #262421;
+}
+
+.matchRow:hover {
+  background-color: #3487d5;
+  cursor: pointer;
+}
