@@ -99,6 +99,15 @@ const (
 	BlackDisconnected
 )
 
+type timeFormatBoundaries [2]int64
+
+var (
+	Bullet    = [2]int64{0, 2 * 60_000}
+	Blitz     = [2]int64{Bullet[1], 5 * 60_000}
+	Rapid     = [2]int64{Blitz[1], 20 * 60_000}
+	Classical = [2]int64{Rapid[1], 120_000}
+)
+
 type pieceType struct {
 	position               int
 	colour                 pieceColour

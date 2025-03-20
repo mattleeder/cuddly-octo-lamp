@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"net/http"
 	"sync"
@@ -494,6 +495,55 @@ func getTileInfoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonStr, err := json.Marshal(tileInfo)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	w.Write(jsonStr)
+}
+
+func getPastMatchesListHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() { app.perfLog.Printf("getPastMatchesListHandler took: %s\n", time.Since(start)) }()
+
+	if r.Method != "GET" {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+
+	queryParams := r.URL.Query()
+
+	searchString := queryParams.Get("timeFormat")
+
+	var timeFormatLower int64
+	var timeFormatUpper int64
+
+	switch searchString {
+	case "bullet":
+		timeFormatLower, timeFormatUpper = Bullet[0], Bullet[1]
+
+	case "blitz":
+		timeFormatLower, timeFormatUpper = Blitz[0], Blitz[1]
+
+	case "rapid":
+		timeFormatLower, timeFormatUpper = Rapid[0], Rapid[1]
+
+	case "classical":
+		timeFormatLower, timeFormatUpper = Classical[0], Classical[1]
+
+	default:
+		timeFormatLower = 0
+		timeFormatUpper = math.MaxInt64
+	}
+
+	matchList, err := app.pastMatches.GetPastMatchesWithFormat(timeFormatLower, timeFormatUpper)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	jsonStr, err := json.Marshal(matchList)
 	if err != nil {
 		app.serverError(w, err, false)
 		return

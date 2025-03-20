@@ -38,6 +38,7 @@ func (app *application) routes() http.Handler {
 	mux.Handle("/validateSession", withLogSessionSecureCorsChain(validateSessionHandler))
 	mux.Handle("/userSearch", withLogSecureCorsChain(userSearchHandler))
 	mux.Handle("/getTileInfo", withLogSecureCorsChain(getTileInfoHandler))
+	mux.Handle("/getPastMatches", withLogSecureCorsChain(getPastMatchesListHandler))
 
 	// mux.Handle("/listenformatch", withSSELogSessionSecureCorsChain(matchFoundSSEHandler))
 	mux.Handle("/listenformatch", app.logRequest(app.recoverPanic(http.HandlerFunc(matchFoundSSEHandler))))
