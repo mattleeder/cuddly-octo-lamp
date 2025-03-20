@@ -789,6 +789,7 @@ MATCH TILE
   display: grid;
   grid-template-columns: 0.5fr 1fr;
   width: 50vw;
+  height: 35vh;
   padding: 1em;
 }
 

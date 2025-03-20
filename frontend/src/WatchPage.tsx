@@ -93,6 +93,7 @@ function MatchTile({ matchData, idx }: { matchData: matchData, idx: number }) {
 
     return (
         <li className={liClassname}>
+          <Link to={`/matchroom/${matchData.matchID}`} style={{display: "block", position: "absolute", width: "inherit", height: "inherit", boxSizing: "content-box"}}/>
           <div style={{marginTop: "auto", marginBottom: "auto", boxShadow: "2px 2px 2px #000000"}}>
             {/* Chessboard, display final position */}
             <FrozenChessBoard board={gameState.board} lastMove={[matchData.lastMovePiece as number, matchData.lastMoveMove as number]} showLastMove={matchData.lastMovePiece != null && matchData.lastMoveMove != null}/>
