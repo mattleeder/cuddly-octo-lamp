@@ -4,32 +4,34 @@ import (
 	"database/sql"
 )
 
+// @TODO: DOES SENDING THINGS AS sql.NullType GIVE AWAY THAT IT IS SQL DATABASE?
+
 type PastMatch struct {
-	MatchID                  int64         `json:"matchID"`
-	WhitePlayerID            int64         `json:"whitePlayerID"`
-	BlackPlayerID            int64         `json:"blackPlayerID"`
-	LastMovePiece            sql.NullInt64 `json:"lastMovePiece"`
-	LastMoveMove             sql.NullInt64 `json:"lastMoveMove"`
-	FinalFEN                 string        `json:"currentFEN"`
-	TimeFormatInMilliseconds int64         `json:"timeFormatInMilliseconds"`
-	IncrementInMilliseconds  int64         `json:"incrementInMilliseconds"`
-	WhitePlayerPoints        float64       `json:"whitePlayerTimeRemainingMilliseconds"`
-	BlackPlayerPoints        float64       `json:"blackPlayerTimeRemainingMilliseconds"`
-	GameHistoryJSONString    []byte        `json:"gameHistoryJSONstring"` // []MatchStateHistory{}
+	MatchID                  int64          `json:"matchID"`
+	WhitePlayerID            sql.NullString `json:"whitePlayerID"`
+	BlackPlayerID            sql.NullString `json:"blackPlayerID"`
+	LastMovePiece            sql.NullInt64  `json:"lastMovePiece"`
+	LastMoveMove             sql.NullInt64  `json:"lastMoveMove"`
+	FinalFEN                 string         `json:"currentFEN"`
+	TimeFormatInMilliseconds int64          `json:"timeFormatInMilliseconds"`
+	IncrementInMilliseconds  int64          `json:"incrementInMilliseconds"`
+	WhitePlayerPoints        float64        `json:"whitePlayerTimeRemainingMilliseconds"`
+	BlackPlayerPoints        float64        `json:"blackPlayerTimeRemainingMilliseconds"`
+	GameHistoryJSONString    []byte         `json:"gameHistoryJSONstring"` // []MatchStateHistory{}
 }
 
 type PastMatchSummary struct {
-	MatchID                  int64         `json:"matchID"`
-	WhitePlayerUsername      string        `json:"whitePlayerUsername"`
-	BlackPlayerUsername      string        `json:"blackPlayerUsername"`
-	LastMovePiece            sql.NullInt64 `json:"lastMovePiece"`
-	LastMoveMove             sql.NullInt64 `json:"lastMoveMove"`
-	FinalFEN                 string        `json:"finalFEN"`
-	TimeFormatInMilliseconds int64         `json:"timeFormatInMilliseconds"`
-	IncrementInMilliseconds  int64         `json:"incrementInMilliseconds"`
-	WhitePlayerPoints        float64       `json:"whitePlayerPoints"`
-	BlackPlayerPoints        float64       `json:"blackPlayerPoints"`
-	AverageElo               float64       `json:"averageElo"`
+	MatchID                  int64          `json:"matchID"`
+	WhitePlayerUsername      sql.NullString `json:"whitePlayerUsername"`
+	BlackPlayerUsername      sql.NullString `json:"blackPlayerUsername"`
+	LastMovePiece            sql.NullInt64  `json:"lastMovePiece"`
+	LastMoveMove             sql.NullInt64  `json:"lastMoveMove"`
+	FinalFEN                 string         `json:"finalFEN"`
+	TimeFormatInMilliseconds int64          `json:"timeFormatInMilliseconds"`
+	IncrementInMilliseconds  int64          `json:"incrementInMilliseconds"`
+	WhitePlayerPoints        float64        `json:"whitePlayerPoints"`
+	BlackPlayerPoints        float64        `json:"blackPlayerPoints"`
+	AverageElo               float64        `json:"averageElo"`
 }
 
 type PastMatchModel struct {
@@ -56,6 +58,7 @@ func (m *PastMatchModel) LogAll() {
 }
 
 func (m *PastMatchModel) GetPastMatchesWithFormat(timeFormatLower int64, timeFormatUpper int64) ([]PastMatchSummary, error) {
+	// Left join for anonymous players
 	sqlStmt := `
 	SELECT m.match_id,
 	       white_player.username,
@@ -69,9 +72,9 @@ func (m *PastMatchModel) GetPastMatchesWithFormat(timeFormatLower int64, timeFor
 		   m.black_player_points,
 		   m.average_elo
 	  FROM past_matches as m
-	 INNER JOIN users as white_player
+	  LEFT JOIN users as white_player
 	    ON m.white_player_id = white_player.player_id
-	 INNER JOIN users as black_player
+	  LEFT JOIN users as black_player
 	    on m.black_player_id = black_player.player_id
 	 WHERE m.time_format_in_milliseconds > ?
 	   AND m.time_format_in_milliseconds <= ?
@@ -79,8 +82,8 @@ func (m *PastMatchModel) GetPastMatchesWithFormat(timeFormatLower int64, timeFor
 
 	var output []PastMatchSummary
 	var matchID int64
-	var whitePlayerUsername string
-	var blackPlayerUsername string
+	var whitePlayerUsername sql.NullString
+	var blackPlayerUsername sql.NullString
 	var lastMovePiece sql.NullInt64
 	var lastMoveMove sql.NullInt64
 	var finalFEN string

@@ -266,6 +266,7 @@ func getHighestEloMatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.Write(jsonStr)
 }
 
@@ -323,6 +324,7 @@ func registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	app.sessionManager.RememberMe(r.Context(), newUser.RememberMe)
 	app.sessionManager.Put(r.Context(), "username", newUser.Username)
 	app.sessionManager.Put(r.Context(), "playerID", playerID)
@@ -378,6 +380,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	app.sessionManager.RememberMe(r.Context(), loginInfo.RememberMe)
 	app.sessionManager.Put(r.Context(), "username", loginInfo.Username)
 	app.sessionManager.Put(r.Context(), "playerID", playerID)
@@ -434,6 +437,8 @@ func validateSessionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+
 	w.Write(jsonStr)
 }
 
@@ -466,6 +471,8 @@ func userSearchHandler(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, err, false)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
 
 	w.Write(jsonStr)
 }
@@ -500,6 +507,8 @@ func getTileInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+
 	w.Write(jsonStr)
 }
 
@@ -515,6 +524,8 @@ func getPastMatchesListHandler(w http.ResponseWriter, r *http.Request) {
 	queryParams := r.URL.Query()
 
 	searchString := queryParams.Get("timeFormat")
+
+	app.infoLog.Printf("searchString: %s\n", searchString)
 
 	var timeFormatLower int64
 	var timeFormatUpper int64
@@ -542,12 +553,15 @@ func getPastMatchesListHandler(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, err, false)
 		return
 	}
+	app.infoLog.Printf("%v\n", matchList)
 
 	jsonStr, err := json.Marshal(matchList)
 	if err != nil {
 		app.serverError(w, err, false)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
 
 	w.Write(jsonStr)
 }
