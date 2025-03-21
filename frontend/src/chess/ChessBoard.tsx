@@ -319,7 +319,7 @@ function CapturesComponent({ captures, flip, squareWidth }: { captures: number[]
 function LastMoveComponent({ flip, squareWidth, lastMove, showLastMove }: { flip: boolean, squareWidth: number, lastMove: [number, number], showLastMove: boolean }) {
   return (
     lastMove.map((move, idx) => {
-      if (showLastMove) {
+      if (!showLastMove) {
         return <React.Fragment key={idx} />
       }
       const [row, col] = getRowAndColFromBoardIndex(move, flip)

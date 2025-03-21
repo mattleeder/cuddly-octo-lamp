@@ -9,12 +9,17 @@ interface SQLNullString {
   Valid: boolean
 }
 
+interface SQLNullInt64 {
+  Int64: number
+  Valid: boolean
+}
+
 interface matchData {
   matchID: number
   whitePlayerUsername: SQLNullString
   blackPlayerUsername: SQLNullString
-  lastMovePiece: number | null
-  lastMoveMove: number | null
+  lastMovePiece: SQLNullInt64
+  lastMoveMove: SQLNullInt64
   finalFEN: string
   timeFormatInMilliseconds: number
   incrementInMilliseconds: number
@@ -96,7 +101,7 @@ function MatchTile({ matchData, idx }: { matchData: matchData, idx: number }) {
           <Link to={`/matchroom/${matchData.matchID}`} style={{display: "block", position: "absolute", width: "100%", height: "100%", boxSizing: "content-box", zIndex: "3"}}/>
           <div style={{marginTop: "auto", marginBottom: "auto", boxShadow: "2px 2px 2px #000000", height: "inherit", width: "35vh"}}>
             {/* Chessboard, display final position */}
-            <FrozenChessBoard board={gameState.board} lastMove={[matchData.lastMovePiece as number, matchData.lastMoveMove as number]} showLastMove={matchData.lastMovePiece != null && matchData.lastMoveMove != null}/>
+            <FrozenChessBoard board={gameState.board} lastMove={[matchData.lastMovePiece.Int64, matchData.lastMoveMove.Int64]} showLastMove={matchData.lastMovePiece.Valid && matchData.lastMoveMove.Valid}/>
           </div>
           <div style={{display: "grid", gridTemplateRows: "1fr 1fr", marginLeft: "1em", height: "inherit"}}>
             {/* Info, grid 2 rows, top row is format info and date, 2nd row is player Info and victory */}
