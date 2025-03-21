@@ -345,7 +345,7 @@ func (m *LiveMatchModel) MoveMatchToPastMatches(matchID int64, result int, resul
 	}
 	defer stmtTwo.Close()
 
-	_, err = stmtOne.Exec(result, resultReason, whitePlayerEloGain, blackPlayerEloGain, matchID)
+	_, err = stmtOne.Exec(result, resultReason, whitePlayerEloGain, blackPlayerEloGain, time.Now().Unix(), matchID)
 	if err != nil {
 		app.errorLog.Printf("Error executing first statement: %v\n", err)
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
