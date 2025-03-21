@@ -461,6 +461,7 @@ NAVBAR
   left: 0;
   background-color: #343232;
   align-items: center;
+  z-index: 3;
 }
 
 .navBarContainer {
@@ -525,7 +526,7 @@ button.dropdownTitle {
   position: absolute;
   background-color: #7e7e7d;
   text-align: left;
-  z-index: 1;
+  z-index: 3;
 }
 
 .left .dropdownContent {
