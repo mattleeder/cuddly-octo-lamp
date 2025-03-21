@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { LoaderCircle, Swords, Flame, Rabbit, TrainFront, Turtle } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { FrozenChessBoard } from "./chess/ChessBoard";
 import { parseGameStateFromFEN } from "./chess/ChessLogic";
+import { PlayerInfoTileContext, PlayerInfoTileContextInterface } from "./PlayerInfoTile";
 
 interface SQLNullString {
   String: string
@@ -78,6 +79,7 @@ function getTimeFormatName(timeFormatInMilliseconds: number) {
 }
 
 function MatchTile({ matchData, idx }: { matchData: matchData, idx: number }) {
+  const playerInfoTile = useContext<PlayerInfoTileContextInterface>(PlayerInfoTileContext)
   let outcome = ""
   if (matchData.whitePlayerPoints > matchData.blackPlayerPoints) {
     outcome = "White wins"
@@ -125,7 +127,15 @@ function MatchTile({ matchData, idx }: { matchData: matchData, idx: number }) {
               {/* Player info, grid 3 columns, 1st is white info, 2nd is vs icon, 3rd is black info */}
               <div>
                 {/* White info*/}
-                {matchData.whitePlayerUsername.Valid ? matchData.whitePlayerUsername.String : "Anon" }
+                {matchData.whitePlayerUsername.Valid ? 
+                <span style={{position:"relative", zIndex: "4"}}
+                  onMouseEnter={(event) => {console.log("Enter"); playerInfoTile?.spawnPlayerInfoTile(matchData.whitePlayerUsername.String, event)}}
+                  onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(matchData.whitePlayerUsername.String, event)}
+                >
+                  {matchData.whitePlayerUsername.String}
+                </span>
+                 : 
+                <span>Anon</span>}
               </div>
               <div>
                 {/* VS icon */}
@@ -133,7 +143,15 @@ function MatchTile({ matchData, idx }: { matchData: matchData, idx: number }) {
               </div>
               <div>
                 {/* Black info */}
-                {matchData.blackPlayerUsername.Valid ? matchData.blackPlayerUsername.String : "Anon" }
+                {matchData.blackPlayerUsername.Valid ? 
+                <span style={{position:"relative", zIndex: "4"}}
+                  onMouseEnter={(event) => {console.log("Enter"); playerInfoTile?.spawnPlayerInfoTile(matchData.blackPlayerUsername.String, event)}}
+                  onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(matchData.blackPlayerUsername.String, event)}
+                >
+                  {matchData.blackPlayerUsername.String}
+                </span>
+                 : 
+                <span>Anon</span>}
               </div>
             </div>
             <div>
