@@ -399,7 +399,7 @@ function CountdownTimer({ countdownTimerMilliseconds, paused, className } : { co
   }, [paused])
   
   return (
-    <div className={className}>
+    <div className={className} style={{backgroundColor: `${paused ? "#262421" : "#394823"}`}}>
       {formatDuration(remainingTime)}
     </div>
   )

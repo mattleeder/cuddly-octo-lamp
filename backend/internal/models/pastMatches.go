@@ -15,9 +15,16 @@ type PastMatch struct {
 	FinalFEN                 string         `json:"currentFEN"`
 	TimeFormatInMilliseconds int64          `json:"timeFormatInMilliseconds"`
 	IncrementInMilliseconds  int64          `json:"incrementInMilliseconds"`
-	WhitePlayerPoints        float64        `json:"whitePlayerTimeRemainingMilliseconds"`
-	BlackPlayerPoints        float64        `json:"blackPlayerTimeRemainingMilliseconds"`
 	GameHistoryJSONString    []byte         `json:"gameHistoryJSONstring"` // []MatchStateHistory{}
+	Result                   int64          `json:"result"`
+	ResultReason             int64          `json:"resultReason"`
+	WhitePlayerElo           float64        `json:"whitePlayerElo"`
+	BlackPlayerElo           float64        `json:"blackPlayerElo"`
+	WhitePlayerEloGain       float64        `json:"whitePlayerEloGain"`
+	BlackPlayerEloGain       float64        `json:"blackPlayerEloGain"`
+	AverageElo               float64        `json:"averageElo"`
+	MatchStartTime           int64          `json:"matchStartTime"`
+	MatchEndTime             int64          `json:"matchEndTime"`
 }
 
 type PastMatchSummary struct {
@@ -29,9 +36,15 @@ type PastMatchSummary struct {
 	FinalFEN                 string         `json:"finalFEN"`
 	TimeFormatInMilliseconds int64          `json:"timeFormatInMilliseconds"`
 	IncrementInMilliseconds  int64          `json:"incrementInMilliseconds"`
-	WhitePlayerPoints        float64        `json:"whitePlayerPoints"`
-	BlackPlayerPoints        float64        `json:"blackPlayerPoints"`
+	Result                   int64          `json:"result"`
+	ResultReason             int64          `json:"resultReason"`
+	WhitePlayerElo           float64        `json:"whitePlayerElo"`
+	BlackPlayerElo           float64        `json:"blackPlayerElo"`
+	WhitePlayerEloGain       float64        `json:"whitePlayerEloGain"`
+	BlackPlayerEloGain       float64        `json:"blackPlayerEloGain"`
 	AverageElo               float64        `json:"averageElo"`
+	MatchStartTime           int64          `json:"matchStartTime"`
+	MatchEndTime             int64          `json:"matchEndTime"`
 }
 
 type PastMatchModel struct {
@@ -68,9 +81,15 @@ func (m *PastMatchModel) GetPastMatchesWithFormat(timeFormatLower int64, timeFor
 		   m.final_fen,
 		   m.time_format_in_milliseconds,
 		   m.increment_in_milliseconds,
-		   m.white_player_points,
-		   m.black_player_points,
-		   m.average_elo
+		   m.result,
+		   m.result_reason,
+		   m.white_player_elo,
+		   m.black_player_elo,
+		   m.white_player_elo_gain,
+		   m.black_player_elo_gain,
+		   m.average_elo,
+		   m.match_start_time,
+		   m.match_end_time
 	  FROM past_matches as m
 	  LEFT JOIN users as white_player
 	    ON m.white_player_id = white_player.player_id
@@ -89,9 +108,15 @@ func (m *PastMatchModel) GetPastMatchesWithFormat(timeFormatLower int64, timeFor
 	var finalFEN string
 	var timeFormatMilliseconds int64
 	var incrementMilliseconds int64
-	var whitePlayerPoints float64
-	var blackPlayerPoints float64
+	var result int64
+	var resultReason int64
+	var whitePlayerElo float64
+	var blackPlayerElo float64
+	var whitePlayerEloGain float64
+	var blackPlayerEloGain float64
 	var averageElo float64
+	var matchStartTime int64
+	var matchEndTime int64
 
 	rows, err := m.DB.Query(sqlStmt, timeFormatLower, timeFormatUpper)
 	if err != nil {
@@ -109,9 +134,15 @@ func (m *PastMatchModel) GetPastMatchesWithFormat(timeFormatLower int64, timeFor
 			&finalFEN,
 			&timeFormatMilliseconds,
 			&incrementMilliseconds,
-			&whitePlayerPoints,
-			&blackPlayerPoints,
+			&result,
+			&resultReason,
+			&whitePlayerElo,
+			&blackPlayerElo,
+			&whitePlayerEloGain,
+			&blackPlayerEloGain,
 			&averageElo,
+			&matchStartTime,
+			&matchEndTime,
 		)
 
 		if err != nil {
@@ -128,9 +159,15 @@ func (m *PastMatchModel) GetPastMatchesWithFormat(timeFormatLower int64, timeFor
 			FinalFEN:                 finalFEN,
 			TimeFormatInMilliseconds: timeFormatMilliseconds,
 			IncrementInMilliseconds:  incrementMilliseconds,
-			WhitePlayerPoints:        whitePlayerPoints,
-			BlackPlayerPoints:        blackPlayerPoints,
+			Result:                   result,
+			ResultReason:             resultReason,
+			WhitePlayerElo:           whitePlayerElo,
+			BlackPlayerElo:           blackPlayerElo,
+			WhitePlayerEloGain:       whitePlayerEloGain,
+			BlackPlayerEloGain:       blackPlayerEloGain,
 			AverageElo:               averageElo,
+			MatchStartTime:           matchStartTime,
+			MatchEndTime:             matchEndTime,
 		})
 	}
 

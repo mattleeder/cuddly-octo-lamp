@@ -28,8 +28,8 @@ import (
 
 type playerMatchmakingData struct {
 	playerID             int64
-	elo                  int
-	matchmakingThreshold int
+	elo                  int64
+	matchmakingThreshold int64
 	isMatched            bool
 }
 
@@ -38,7 +38,7 @@ type matchingScore struct {
 	playerOneIdx int
 	playerTwoID  int64
 	playerTwoIdx int
-	score        int
+	score        int64
 }
 
 type OpenPool struct {
@@ -112,13 +112,21 @@ func addPlayerToWaitingPool(playerID int64, timeFormatInMilliseconds int64, incr
 	queue.awaitingRemoval.mu.Unlock()
 
 	var pools = []*[]*playerMatchmakingData{queue.waitingToJoinPoolA, queue.waitingToJoinPoolB}
+	var elo int64
+
+	playerRatings, err := app.userRatings.GetRatingFromPlayerID(playerID)
+	if err != nil {
+		elo = 1500
+	} else {
+		elo = playerRatings.GetRatingForTimeFormat(timeFormatInMilliseconds)
+	}
 
 	// Should openPool be locked?
 	queue.openPool.mu.Lock()
 	*pools[queue.openPool.openPool] = append(*pools[queue.openPool.openPool],
 		&playerMatchmakingData{
 			playerID:             playerID,
-			elo:                  1500,
+			elo:                  elo,
 			matchmakingThreshold: defaultMatchmakingThreshold,
 			isMatched:            false,
 		})
@@ -145,6 +153,13 @@ func removePlayerFromWaitingPool(playerID int64, timeFormatInMilliseconds int64,
 		queue.awaitingRemoval.awaitingRemoval[playerID] = true
 	}
 	queue.awaitingRemoval.mu.Unlock()
+}
+
+func abs(x int64) int64 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 func calculateMatchingScore(playerOne *playerMatchmakingData, playerOneIdx int, playerTwo *playerMatchmakingData, playerTwoIdx int) *matchingScore {
@@ -194,18 +209,30 @@ func startingMatchHistory(timeFormatInMilliseconds int64) ([]byte, error) {
 	return jsonStr, nil
 }
 
-func createMatch(playerOneID int64, playerTwoID int64, timeFormatInMilliseconds int64, incrementInMilliseconds int64) error {
+func createMatch(playerOneData *playerMatchmakingData, playerTwoData *playerMatchmakingData, timeFormatInMilliseconds int64, incrementInMilliseconds int64) error {
+	playerOneID := playerOneData.playerID
+	playerTwoID := playerTwoData.playerID
+
 	playerOneIsWhite := rand.Intn(2) == 1
+
+	var whitePlayerData, blackPlayerData *playerMatchmakingData
+	if playerOneIsWhite {
+		whitePlayerData = playerOneData
+		blackPlayerData = playerTwoData
+	} else {
+		whitePlayerData = playerTwoData
+		blackPlayerData = playerOneData
+	}
 	startingHistory, err := startingMatchHistory(timeFormatInMilliseconds)
 	if err != nil {
 		app.errorLog.Printf("Error creating starting history for new match: %v\n", err)
 		return err
 	}
 
-	var averageElo float64 = 1500.0
+	var averageElo float64 = (float64(playerOneData.elo) + float64(playerTwoData.elo)) / 2
 
 	var matchID int64
-	matchID, err = app.liveMatches.EnQueueReturnInsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, startingHistory, averageElo)
+	matchID, err = app.liveMatches.EnQueueReturnInsertNew(playerOneID, playerTwoID, playerOneIsWhite, timeFormatInMilliseconds, incrementInMilliseconds, startingHistory, averageElo, float64(whitePlayerData.elo), float64(blackPlayerData.elo))
 	if err != nil {
 		app.errorLog.Printf("Error inserting new match: %v\n", err)
 		return err
@@ -306,7 +333,7 @@ func matchPlayers() {
 
 			queue.awaitingRemoval.mu.Unlock()
 			// Match players
-			err := createMatch(playerOne.playerID, playerTwo.playerID, timeFormatInMilliseconds, incrementInMilliseconds)
+			err := createMatch(playerOne, playerTwo, timeFormatInMilliseconds, incrementInMilliseconds)
 			if err != nil {
 				app.errorLog.Println(err)
 				continue

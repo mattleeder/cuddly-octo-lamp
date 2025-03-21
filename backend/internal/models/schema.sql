@@ -18,14 +18,17 @@ CREATE TABLE live_matches (
     black_player_id INTEGER NOT NULL,
     last_move_piece INTEGER,
     last_move_move INTEGER,
-    current_fen TEXT DEFAULT 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+    current_fen TEXT DEFAULT 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1' NOT NULL,
     time_format_in_milliseconds INTEGER NOT NULL,
     increment_in_milliseconds INTEGER NOT NULL,
     white_player_time_remaining_in_milliseconds INTEGER NOT NULL,
     black_player_time_remaining_in_milliseconds INTEGER NOT NULL,
     game_history_json_string BLOB NOT NULL,
     unix_ms_time_of_last_move INTEGER NOT NULL,
-    average_elo REAL NOT NULL
+    average_elo REAL NOT NULL,
+    white_player_elo REAL NOT NULL,
+    black_player_elo REAL NOT NULL,
+    match_start_time INTEGER NOT NULL
 );
 
 CREATE TABLE past_matches (
@@ -38,9 +41,15 @@ CREATE TABLE past_matches (
     time_format_in_milliseconds INTEGER NOT NULL,
     increment_in_milliseconds INTEGER NOT NULL,
     game_history_json_string BLOB NOT NULL,
-    white_player_points REAL NOT NULL,
-    black_player_points REAL NOT NULL,
-    average_elo REAL NOT NULL
+    result INTEGER NOT NULL,
+    result_reason INTEGER NOT NULL,
+    white_player_elo REAL NOT NULL,
+    black_player_elo REAL NOT NULL,
+    white_player_elo_gain REAL NOT NULL,
+    black_player_elo_gain REAL NOT NULL,
+    average_elo REAL NOT NULL,
+    match_start_time INTEGER NOT NULL,
+    match_end_time INTEGER NOT NULL
 );
 
 CREATE TABLE users (

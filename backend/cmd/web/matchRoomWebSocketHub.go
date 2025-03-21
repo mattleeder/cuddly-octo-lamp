@@ -1,9 +1,12 @@
 package main
 
 import (
+	"burrchess/internal/chess"
+	"burrchess/internal/models"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 )
@@ -38,18 +41,18 @@ const (
 // Bodies
 
 type onConnectBody struct {
-	MatchStateHistory        []MatchStateHistory `json:"matchStateHistory"`
-	GameOverStatusCode       gameOverStatusCode  `json:"gameOverStatus"`
-	ThreefoldRepetition      bool                `json:"threefoldRepetition"`
-	WhitePlayerConnected     bool                `json:"whitePlayerConnected"`
-	BlackPlayerConnected     bool                `json:"blackPlayerConnected"`
-	MillisecondsUntilTimeout int64               `json:"millisecondsUntilTimeout"`
+	MatchStateHistory        []MatchStateHistory      `json:"matchStateHistory"`
+	GameOverStatusCode       chess.GameOverStatusCode `json:"gameOverStatus"`
+	ThreefoldRepetition      bool                     `json:"threefoldRepetition"`
+	WhitePlayerConnected     bool                     `json:"whitePlayerConnected"`
+	BlackPlayerConnected     bool                     `json:"blackPlayerConnected"`
+	MillisecondsUntilTimeout int64                    `json:"millisecondsUntilTimeout"`
 }
 
 type onMoveBody struct {
-	MatchStateHistory   []MatchStateHistory `json:"matchStateHistory"`
-	GameOverStatusCode  gameOverStatusCode  `json:"gameOverStatus"`
-	ThreefoldRepetition bool                `json:"threefoldRepetition"`
+	MatchStateHistory   []MatchStateHistory      `json:"matchStateHistory"`
+	GameOverStatusCode  chess.GameOverStatusCode `json:"gameOverStatus"`
+	ThreefoldRepetition bool                     `json:"threefoldRepetition"`
 }
 
 type onPlayerConnectionChangeBody struct {
@@ -224,6 +227,14 @@ type MatchRoomHub struct {
 	gameEnded bool
 
 	threefoldRepetition bool
+
+	averageElo float64
+
+	whitePlayerElo float64
+
+	blackPlayerElo float64
+
+	matchStartTime int64
 }
 
 type playerTurn byte
@@ -270,7 +281,7 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		MessageType: onMove,
 		Body: onMoveBody{
 			MatchStateHistory:   matchStateHistory,
-			GameOverStatusCode:  Ongoing,
+			GameOverStatusCode:  chess.Ongoing,
 			ThreefoldRepetition: threefoldRepetition,
 		},
 	}
@@ -391,22 +402,26 @@ func (hub *MatchRoomHub) sendMessageToAllSpectators(message []byte) {
 	}
 }
 
-func (hub *MatchRoomHub) updateMatchThenMoveToFinished(newFEN string, piece int, move int, gameOverStatus gameOverStatusCode, turn playerTurn, matchStateHistoryData []byte) {
-	app.liveMatches.EnQueueReturnUpdateLiveMatch(hub.matchID, newFEN, piece, move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
-	var outcome int
-	if gameOverStatus == Checkmate || gameOverStatus == WhiteFlagged || gameOverStatus == BlackFlagged {
-		if turn == playerTurn(BlackTurn) {
-			// White wins as its blacks turn
-			outcome = 1
-		} else {
-			// Black wins
-			outcome = 2
-		}
+func getKFactor(elo float64) float64 {
+	if elo < 2100 {
+		return 32
+	} else if elo <= 2400 {
+		return 24
 	} else {
-		outcome = 0
+		return 16
 	}
-	app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, outcome)
-	app.pastMatches.LogAll()
+}
+
+func calculateEloChanges(playerOneElo float64, playerOnePoints float64, playerTwoElo float64, playerTwoPoints float64) (playerOneEloGain float64, playerTwoEloGain float64) {
+	var playerOneExpectedPoints, playerTwoExpectedPoints float64
+
+	playerOneExpectedPoints = (1) / (1 + math.Pow(10, (playerTwoExpectedPoints-playerOneExpectedPoints)/400))
+	playerTwoExpectedPoints = (1) / (1 + math.Pow(10, (playerOneExpectedPoints-playerTwoExpectedPoints)/400))
+
+	playerOneEloGain = getKFactor(playerOneElo) * (playerOnePoints - playerOneExpectedPoints)
+	playerTwoEloGain = getKFactor(playerTwoElo) * (playerTwoPoints - playerTwoExpectedPoints)
+
+	return playerOneEloGain, playerTwoEloGain
 }
 
 func (hub *MatchRoomHub) changeTurn() {
@@ -439,16 +454,16 @@ func (hub *MatchRoomHub) updateTimeRemaining() {
 	}
 }
 
-func (hub *MatchRoomHub) getOutcomeInt(gameOverStatus gameOverStatusCode) int {
-	if gameOverStatus == Checkmate {
-		if hub.turn == Black {
+func (hub *MatchRoomHub) getOutcomeInt(gameOverStatus chess.GameOverStatusCode) int {
+	if gameOverStatus == chess.Checkmate {
+		if hub.turn == chess.Black {
 			return 2
 		} else {
 			return 1
 		}
-	} else if gameOverStatus == WhiteFlagged || gameOverStatus == WhiteResigned {
+	} else if gameOverStatus == chess.WhiteFlagged || gameOverStatus == chess.WhiteResigned {
 		return 2
-	} else if gameOverStatus == BlackFlagged || gameOverStatus == BlackResigned {
+	} else if gameOverStatus == chess.BlackFlagged || gameOverStatus == chess.BlackResigned {
 		return 1
 	}
 	return 0
@@ -464,7 +479,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	}
 
 	// Validate Move
-	var validMove = IsMoveValid(hub.current_fen, chessMove.Body.Piece, chessMove.Body.Move)
+	var validMove = chess.IsMoveValid(hub.current_fen, chessMove.Body.Piece, chessMove.Body.Move)
 	if !validMove {
 		return errors.New("Move is not valid")
 	}
@@ -473,7 +488,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	hub.updateTimeRemaining()
 
 	// Calculate reply variables
-	newFEN, gameOverStatus, algebraicNotation := getFENAfterMove(hub.current_fen, chessMove.Body.Piece, chessMove.Body.Move, chessMove.Body.PromotionString)
+	newFEN, gameOverStatus, algebraicNotation := chess.GetFENAfterMove(hub.current_fen, chessMove.Body.Piece, chessMove.Body.Move, chessMove.Body.PromotionString)
 	var threefoldRepetition = false
 	splitFEN := strings.Join(strings.Split(newFEN, " ")[:4], " ")
 	hub.fenFreqMap[splitFEN] += 1
@@ -523,7 +538,7 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	// Update database
 	app.liveMatches.EnQueueUpdateLiveMatch(hub.matchID, newFEN, chessMove.Body.Piece, chessMove.Body.Move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
 
-	if gameOverStatus != Ongoing {
+	if gameOverStatus != chess.Ongoing {
 		return hub.endGame(gameOverStatus)
 	}
 
@@ -546,9 +561,9 @@ func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection(playerIdentifier m
 	}
 
 	var millisecondsUntilTimeout int64 = 0
-	if playerIdentifier == White && !hub.blackPlayerConnected {
+	if playerIdentifier == chess.White && !hub.blackPlayerConnected {
 		millisecondsUntilTimeout = pingTimeout.Milliseconds() - time.Since(hub.blackPlayerTimeoutStarted).Milliseconds()
-	} else if playerIdentifier == Black && !hub.whitePlayerConnected {
+	} else if playerIdentifier == chess.Black && !hub.whitePlayerConnected {
 		millisecondsUntilTimeout = pingTimeout.Milliseconds() - time.Since(hub.whitePlayerTimeoutStarted).Milliseconds()
 	}
 
@@ -623,7 +638,7 @@ func (hub *MatchRoomHub) acceptEventOffer(event eventType) {
 		hub.takeBack()
 
 	case draw:
-		hub.endGame(Draw)
+		hub.endGame(chess.Draw)
 		hub.sendMessageToAllClients(hub.currentGameState)
 
 	default:
@@ -631,7 +646,7 @@ func (hub *MatchRoomHub) acceptEventOffer(event eventType) {
 	}
 }
 
-func (hub *MatchRoomHub) endGame(reason gameOverStatusCode) error {
+func (hub *MatchRoomHub) endGame(reason chess.GameOverStatusCode) error {
 	// Updates game state and updates DB. Does not send response
 	app.infoLog.Println("Ending Match")
 	hub.flagTimer = nil
@@ -654,8 +669,25 @@ func (hub *MatchRoomHub) endGame(reason gameOverStatusCode) error {
 
 	hub.currentGameState = jsonStr
 	var outcome = hub.getOutcomeInt(reason)
+	var whitePlayerPoints, blackPlayerPoints float64
+
+	if outcome == 1 {
+		whitePlayerPoints = 1
+		blackPlayerPoints = 0
+	} else if outcome == 2 {
+		whitePlayerPoints = 0
+		blackPlayerPoints = 1
+	} else {
+		whitePlayerPoints = 0.5
+		blackPlayerPoints = 0.5
+	}
+
+	whitePlayerEloGain, blackPlayerEloGain := calculateEloChanges(hub.whitePlayerElo, whitePlayerPoints, hub.blackPlayerElo, blackPlayerPoints)
+	app.userRatings.UpdateRatingFromPlayerID(hub.whitePlayerID, models.GetRatingTypeFromTimeFormat(hub.timeFormatInMilliseconds), hub.whitePlayerElo+whitePlayerEloGain)
+	app.userRatings.UpdateRatingFromPlayerID(hub.blackPlayerID, models.GetRatingTypeFromTimeFormat(hub.timeFormatInMilliseconds), hub.blackPlayerElo+blackPlayerEloGain)
+
 	hub.gameEnded = true
-	app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, outcome)
+	app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, outcome, reason, whitePlayerEloGain, blackPlayerEloGain)
 	return nil
 }
 
@@ -695,17 +727,17 @@ func (hub *MatchRoomHub) oneSidedEvent(sender messageIdentifier, event eventType
 	case extraTime:
 		return
 	case resign:
-		if sender == White {
-			hub.endGame(WhiteResigned)
+		if sender == chess.White {
+			hub.endGame(chess.WhiteResigned)
 		} else {
-			hub.endGame(BlackResigned)
+			hub.endGame(chess.BlackResigned)
 		}
 		hub.sendMessageToAllClients(hub.currentGameState)
 	case disconnect:
-		if sender == White && hub.whiteCanClaimTimeout {
-			hub.endGame(BlackDisconnected)
-		} else if sender == Black && hub.blackCanClaimTimeout {
-			hub.endGame(WhiteDisconnected)
+		if sender == chess.White && hub.whiteCanClaimTimeout {
+			hub.endGame(chess.BlackDisconnected)
+		} else if sender == chess.Black && hub.blackCanClaimTimeout {
+			hub.endGame(chess.WhiteDisconnected)
 		}
 		hub.sendMessageToAllClients(hub.currentGameState)
 	}
@@ -721,7 +753,7 @@ func (hub *MatchRoomHub) handlePlayerEvent(message []byte) {
 
 	if data.Body.EventType == threefoldRepetition {
 		if hub.threefoldRepetition {
-			hub.endGame(ThreefoldRepetition)
+			hub.endGame(chess.ThreefoldRepetition)
 			hub.sendMessageToAllClients(hub.currentGameState)
 		}
 		return
@@ -860,11 +892,11 @@ func (hub *MatchRoomHub) run() {
 			}
 
 		case <-hub.flagTimer:
-			var gameOverStatus gameOverStatusCode
+			var gameOverStatus chess.GameOverStatusCode
 			if hub.turn == playerTurn(WhiteTurn) {
-				gameOverStatus = WhiteFlagged
+				gameOverStatus = chess.WhiteFlagged
 			} else {
-				gameOverStatus = BlackFlagged
+				gameOverStatus = chess.BlackFlagged
 			}
 			err := hub.endGame(gameOverStatus)
 			if err != nil {

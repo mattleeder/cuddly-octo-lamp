@@ -1,32 +1,22 @@
-package main
+package chess
 
 import (
 	"fmt"
+	"log"
+	"math"
+	"os"
 	"slices"
 	"strconv"
 	"time"
 	"unicode"
 )
 
-/*
-Gos basic types
-
-bool
-
-string
-
-int  int8  int16  int32  int64
-uint uint8 uint16 uint32 uint64 uintptr
-
-byte // alias for uint8
-
-rune // alias for int32
-     // represents a Unicode code point
-
-float32 float64
-
-complex64 complex128
-*/
+type application struct {
+	errorLog *log.Logger
+	infoLog  *log.Logger
+	rowsLog  *log.Logger
+	perfLog  *log.Logger
+}
 
 /*
 
@@ -81,7 +71,7 @@ var pieceVariantName = map[pieceVariant]string{
 	King:   "king",
 }
 
-type gameOverStatusCode int
+type GameOverStatusCode int
 
 const (
 	Ongoing = iota
@@ -105,7 +95,7 @@ var (
 	Bullet    = [2]int64{0, 2 * 60_000}
 	Blitz     = [2]int64{Bullet[1], 5 * 60_000}
 	Rapid     = [2]int64{Blitz[1], 20 * 60_000}
-	Classical = [2]int64{Rapid[1], 120_000}
+	Classical = [2]int64{Rapid[1], math.MaxInt64}
 )
 
 type pieceType struct {
@@ -136,6 +126,26 @@ type gameState struct {
 	enPassantAvailable      bool
 	halfMoveClock           int
 	fullMoveNumber          int
+}
+
+var app *application
+
+func init() {
+	println("RUNNING MODELS INIT")
+
+	infoLog := log.New(os.Stdout, "CHESS INFO\t", log.Ldate|log.Ltime)
+	errorLog := log.New(os.Stderr, "CHESS ERROR\t", log.Ldate|log.Ltime|log.Llongfile)
+	rowsLog := log.New(os.Stdout, "CHESS ROW\t", 0)
+	perfLog := log.New(os.Stdout, "CHESS PERF\t", log.Lshortfile)
+
+	app = &application{
+		errorLog: errorLog,
+		infoLog:  infoLog,
+		rowsLog:  rowsLog,
+		perfLog:  perfLog,
+	}
+
+	app.infoLog.Println("EXITING MODELS INIT")
 }
 
 func filter[T any](arr []T, fn func(T) bool) []T {
@@ -887,13 +897,13 @@ func createBoard() [64]square {
 	return board
 }
 
-func getValidMovesForPiece(piecePosition int, currentGameState gameState) (moves []int, captures []int, triggerPromotion bool, friendlyKingInCheck bool) {
+func GetValidMovesForPiece(piecePosition int, currentGameState gameState) (moves []int, captures []int, triggerPromotion bool, friendlyKingInCheck bool) {
 	moves, captures, triggerPromotion, friendlyKingInCheck = getMovesandCapturesForPiece(piecePosition, currentGameState)
 	fmt.Printf("Moves for piece: %v\n", append(moves, captures...))
 	return
 }
 
-func boardFromFEN(fen string) gameState {
+func BoardFromFEN(fen string) gameState {
 	var colour pieceColour
 	var variant pieceVariant
 	var boardIndex = 0
@@ -1034,8 +1044,8 @@ func boardFromFEN(fen string) gameState {
 }
 
 func IsMoveValid(fen string, piece int, move int) bool {
-	var currentGameState = boardFromFEN(fen)
-	var moves, captures, _, _ = getValidMovesForPiece(piece, currentGameState)
+	var currentGameState = BoardFromFEN(fen)
+	var moves, captures, _, _ = GetValidMovesForPiece(piece, currentGameState)
 	fmt.Printf("Moves for piece: %v\n", append(moves, captures...))
 
 	for _, possibleMove := range append(moves, captures...) {
@@ -1052,7 +1062,7 @@ func canColourMove(currentGameState gameState, colour pieceColour) bool {
 	for i := range currentGameState.board {
 		piece = currentGameState.board[i].piece
 		if piece != nil && piece.colour == colour {
-			var moves, captures, _, _ = getValidMovesForPiece(i, currentGameState)
+			var moves, captures, _, _ = GetValidMovesForPiece(i, currentGameState)
 			if len(moves) > 0 || len(captures) > 0 {
 				return true
 			}
@@ -1113,8 +1123,8 @@ func intToAlgebraicNotation(position int) string {
 	return fmt.Sprintf("%s%v", columns[col], row)
 }
 
-func getFENAfterMove(currentFEN string, piece int, move int, promotionString string) (string, gameOverStatusCode, string) {
-	var currentGameState = boardFromFEN(currentFEN)
+func GetFENAfterMove(currentFEN string, piece int, move int, promotionString string) (string, GameOverStatusCode, string) {
+	var currentGameState = BoardFromFEN(currentFEN)
 
 	// Algebraic Notation
 	// Add the piece type, if pawn add nothing but store the file
@@ -1289,7 +1299,7 @@ func getFENAfterMove(currentFEN string, piece int, move int, promotionString str
 	}
 
 	// Check for checkmate / stalemate
-	var gameOverStatus gameOverStatusCode = Ongoing
+	var gameOverStatus GameOverStatusCode = Ongoing
 	var enemyKing = newGameState.blackKingPosition
 	var enemyKingColour = Black
 	if currentGameState.board[move].piece.colour == Black {
@@ -1297,7 +1307,7 @@ func getFENAfterMove(currentFEN string, piece int, move int, promotionString str
 		enemyKingColour = White
 	}
 
-	var moves, captures, _, enemyKingInCheck = getValidMovesForPiece(enemyKing, newGameState)
+	var moves, captures, _, enemyKingInCheck = GetValidMovesForPiece(enemyKing, newGameState)
 	var enemyKingMoves = append(moves, captures...)
 
 	// If king has no moves, check if colour can move
@@ -1481,14 +1491,14 @@ func chessMain() {
 	// var currentGameState = boardFromFEN("rn3qnr/pb5p/3bp3/1p1p2k1/1Q3Pp1/2P1P3/PP4PP/RNB1KB1R b KQ f3 0 28")
 	// White Castling, black no castling
 	// var currentGameState = boardFromFEN("r3k2r/pb1p1ppp/nppb1n2/q3p3/3PP2N/2NBB3/PPPQ1PPP/R3K2R w KQ - 2 17")
-	var currentGameState = boardFromFEN("r3k2r/pb1p1ppp/nppb1n2/4p3/3P2qN/2NBB3/PPPQ1PPP/R3K2R b KQ - 3 20")
+	var currentGameState = BoardFromFEN("r3k2r/pb1p1ppp/nppb1n2/4p3/3P2qN/2NBB3/PPPQ1PPP/R3K2R b KQ - 3 20")
 
 	fmt.Println(currentGameState)
 
 	var out []string
 	var testPosition = 60
 
-	moves, captures, _, _ = getValidMovesForPiece(testPosition, currentGameState)
+	moves, captures, _, _ = GetValidMovesForPiece(testPosition, currentGameState)
 
 	for _, v := range append(moves, captures...) {
 		row := v / 8

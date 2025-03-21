@@ -1,6 +1,7 @@
 package models
 
 import (
+	"burrchess/internal/chess"
 	"database/sql"
 	"errors"
 )
@@ -25,6 +26,30 @@ type UserRatings struct {
 	BlitzRating     int64  `json:"blitzRating"`
 	RapidRating     int64  `json:"rapidRating"`
 	ClassicalRating int64  `json:"classicalRating"`
+}
+
+func (u *UserRatings) GetRatingForTimeFormat(timeFormatInMilliseconds int64) int64 {
+	if timeFormatInMilliseconds < chess.Bullet[1] {
+		return u.BulletRating
+	} else if timeFormatInMilliseconds < chess.Blitz[1] {
+		return u.BlitzRating
+	} else if timeFormatInMilliseconds < chess.Rapid[1] {
+		return u.RapidRating
+	} else {
+		return u.ClassicalRating
+	}
+}
+
+func GetRatingTypeFromTimeFormat(timeFormatInMilliseconds int64) RatingType {
+	if timeFormatInMilliseconds < chess.Bullet[1] {
+		return bullet
+	} else if timeFormatInMilliseconds < chess.Blitz[1] {
+		return blitz
+	} else if timeFormatInMilliseconds < chess.Rapid[1] {
+		return rapid
+	} else {
+		return classical
+	}
 }
 
 func (m *UserRatingsModel) getRating(username string, playerID int64, queryMode QueryMode) (UserRatings, error) {
@@ -79,7 +104,7 @@ func (m *UserRatingsModel) GetRatingFromPlayerID(playerID int64) (UserRatings, e
 	return m.getRating("", playerID, 0)
 }
 
-func (m *UserRatingsModel) updateRating(username string, playerID int64, ratingType RatingType, newRating int64, queryMode QueryMode) error {
+func (m *UserRatingsModel) updateRating(username string, playerID int64, ratingType RatingType, newRating float64, queryMode QueryMode) error {
 	sqlStmt := `
 	UPDATE user_ratings
 	`
@@ -113,10 +138,10 @@ func (m *UserRatingsModel) updateRating(username string, playerID int64, ratingT
 	return err
 }
 
-func (m *UserRatingsModel) UpdateRatingFromUsername(username string, ratingType RatingType, newRating int64) error {
+func (m *UserRatingsModel) UpdateRatingFromUsername(username string, ratingType RatingType, newRating float64) error {
 	return m.updateRating(username, 0, ratingType, newRating, qmUsername)
 }
 
-func (m *UserRatingsModel) UpdateRatingFromPlayerID(playerID int64, ratingType RatingType, newRating int64) error {
+func (m *UserRatingsModel) UpdateRatingFromPlayerID(playerID int64, ratingType RatingType, newRating float64) error {
 	return m.updateRating("", playerID, ratingType, newRating, qmPlayerID)
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"burrchess/internal/chess"
 	"burrchess/internal/models"
 	"encoding/json"
 	"errors"
@@ -78,8 +79,8 @@ func getChessMovesHandler(w http.ResponseWriter, r *http.Request) {
 
 	app.infoLog.Printf("Received body: %+v\n", chessMoveData)
 
-	var currentGameState = boardFromFEN(chessMoveData.Fen)
-	var moves, captures, triggerPromotion, _ = getValidMovesForPiece(chessMoveData.Piece, currentGameState)
+	var currentGameState = chess.BoardFromFEN(chessMoveData.Fen)
+	var moves, captures, triggerPromotion, _ = chess.GetValidMovesForPiece(chessMoveData.Piece, currentGameState)
 
 	var data = getChessMoveDataJSON{Moves: moves, Captures: captures, TriggerPromotion: triggerPromotion}
 
@@ -123,6 +124,18 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var playerID = app.sessionManager.GetInt64(r.Context(), "playerID")
+
+	isInMatch, err := app.liveMatches.IsPlayerInMatch(playerID)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	if isInMatch {
+		app.errorLog.Printf("Already in match, playerID: %v\n")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
 	app.infoLog.Printf("Player ID: %v\n", playerID)
 
@@ -532,16 +545,16 @@ func getPastMatchesListHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch searchString {
 	case "bullet":
-		timeFormatLower, timeFormatUpper = Bullet[0], Bullet[1]
+		timeFormatLower, timeFormatUpper = chess.Bullet[0], chess.Bullet[1]
 
 	case "blitz":
-		timeFormatLower, timeFormatUpper = Blitz[0], Blitz[1]
+		timeFormatLower, timeFormatUpper = chess.Blitz[0], chess.Blitz[1]
 
 	case "rapid":
-		timeFormatLower, timeFormatUpper = Rapid[0], Rapid[1]
+		timeFormatLower, timeFormatUpper = chess.Rapid[0], chess.Rapid[1]
 
 	case "classical":
-		timeFormatLower, timeFormatUpper = Classical[0], Classical[1]
+		timeFormatLower, timeFormatUpper = chess.Classical[0], chess.Classical[1]
 
 	default:
 		timeFormatLower = 0
