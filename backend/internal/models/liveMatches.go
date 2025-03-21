@@ -140,7 +140,24 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 	var blackPlayerElo float64
 	var matchStartTime int64
 
-	err := row.Scan(&_matchID, &whitePlayerID, &blackPlayerID, &lastMovePiece, &lastMoveMove, &currentFEN, &timeFormatInMilliseconds, &incrementInMilliseconds, &whitePlayerTimeRemainingMilliseconds, &blackPlayerTimeRemainingMilliseconds, &gameHistoryJSONString, &unixMsTimeOfLastMove, &averageElo)
+	err := row.Scan(
+		&_matchID,
+		&whitePlayerID,
+		&blackPlayerID,
+		&lastMovePiece,
+		&lastMoveMove,
+		&currentFEN,
+		&timeFormatInMilliseconds,
+		&incrementInMilliseconds,
+		&whitePlayerTimeRemainingMilliseconds,
+		&blackPlayerTimeRemainingMilliseconds,
+		&gameHistoryJSONString,
+		&unixMsTimeOfLastMove,
+		&averageElo,
+		&whitePlayerElo,
+		&blackPlayerElo,
+		&matchStartTime,
+	)
 	if err != nil {
 		return nil, err
 	}
