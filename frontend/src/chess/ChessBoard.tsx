@@ -587,7 +587,7 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
 export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [PieceColour | null, PieceVariant | null][], lastMove: [number, number], showLastMove: boolean }) {
   const boardRef = useRef<HTMLDivElement | null>(null)
   const rect = useRef<Rect | null>(null)
-  const [boardWidth, setBoardWidth] = useState(boardRef.current?.getBoundingClientRect().width || 200)
+  const [boardWidth, setBoardWidth] = useState(boardRef.current?.getBoundingClientRect().height || 200)
   const squareWidth = boardWidth / 8
 
   useEffect(() => {
@@ -596,7 +596,7 @@ export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [Pi
       for (const entry of entries) {
         const boundingRect = entry.target.getBoundingClientRect()
         rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
-        setBoardWidth(boundingRect.width)
+        setBoardWidth(boundingRect.height)
       }
     })
     if (boardRef.current) {
@@ -608,7 +608,7 @@ export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [Pi
       if (boardRef.current) {
         const boundingRect = boardRef.current.getBoundingClientRect()
         rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
-        setBoardWidth(boundingRect.width)
+        setBoardWidth(boundingRect.height)
       }
     })
 
@@ -617,7 +617,7 @@ export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [Pi
       if (boardRef.current) {
         const boundingRect = boardRef.current.getBoundingClientRect()
         rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
-        setBoardWidth(boundingRect.width)
+        setBoardWidth(boundingRect.height)
       }
     })
 
@@ -629,7 +629,7 @@ export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [Pi
         if (boardRef.current) {
           const boundingRect = boardRef.current.getBoundingClientRect()
           rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
-          setBoardWidth(boundingRect.width)
+          setBoardWidth(boundingRect.height)
         }
       })
 
@@ -638,7 +638,7 @@ export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [Pi
         if (boardRef.current) {
           const boundingRect = boardRef.current.getBoundingClientRect()
           rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
-          setBoardWidth(boundingRect.width)
+          setBoardWidth(boundingRect.height)
         }
       })
 
@@ -648,7 +648,7 @@ export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [Pi
   // style={{width: `${squareWidth * 8}px`, height: `${squareWidth * 8}px`, backgroundSize: `${squareWidth * 8}px`}} 
   
   return (
-      <div className='chessboard' style={{width: "100%", height: `${squareWidth * 8}px`, backgroundSize: `${squareWidth * 8}px`}} ref={boardRef}>
+      <div className='chessboard' style={{width: "35vh", height: "35vh", backgroundSize: `${squareWidth * 8}px`}} ref={boardRef}>
         <LastMoveComponent flip={false} squareWidth={squareWidth} lastMove={lastMove} showLastMove={showLastMove}/>
         <PiecesComponent flip={false} squareWidth={squareWidth} board={board} onDragEnd={() => {}}/>
       </div>
