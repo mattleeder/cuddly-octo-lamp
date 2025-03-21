@@ -332,6 +332,10 @@ function LastMoveComponent({ flip, squareWidth, lastMove, showLastMove }: { flip
             width: `${squareWidth}px`,
             height: `${squareWidth}px`,
             backgroundSize: `${squareWidth}px`,
+            borderTopLeftRadius: `${idx == 0 ? 4 : 0}px`,
+            borderTopRightRadius: `${idx == 7 ? 4 : 0}px`,
+            borderBottomLeftRadius: `${idx == 56 ? 4 : 0}px`,
+            borderBottomRightRadius: `${idx ==63 ? 4 : 0}px`,
           }} 
         />
       )
@@ -550,7 +554,7 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
               setWaiting
             )}}}
       >
-        <LastMoveComponent flip={game.flip} squareWidth={squareWidth} lastMove={game.matchData.activeState.lastMove} showLastMove={game.matchData.activeMove == 0}/>
+        <LastMoveComponent flip={game.flip} squareWidth={squareWidth} lastMove={game.matchData.activeState.lastMove} showLastMove={game.matchData.activeMove != 0}/>
         <PiecesComponent flip={game.flip} squareWidth={squareWidth} rect={rect} board={game.matchData.activeState.board} onDragEnd={
           (startIdx, endIdx) => {
             if (startIdx != endIdx) {
