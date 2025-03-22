@@ -12,6 +12,8 @@ import (
 	"os"
 	"time"
 
+	_ "modernc.org/sqlite"
+
 	"github.com/alexedwards/scs/sqlite3store" //Sqlite3 ?
 	"github.com/alexedwards/scs/v2"
 )
@@ -35,7 +37,7 @@ var app *application
 func main() {
 	addr := flag.String("addr", ":8080", "HTTPS network address")
 	dbDriverName := flag.String("db", "sqlite", "Database Driver Name")
-	dbDataSourceName := flag.String("dsn", "./chess_site.db", "Database Data Source Name")
+	dbDataSourceName := flag.String("dsn", "./chess_site.db?_busy_timeout=5000", "Database Data Source Name")
 
 	flag.Parse()
 
@@ -51,17 +53,22 @@ func main() {
 	}
 	defer db.Close()
 
-	// Set busy_timeout to 5 seconds
-	_, err = db.Exec("PRAGMA busy_timeout = 5000;")
+	// Set connection pool settings
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(0)
+
+	// Set busy_timeout to 2 seconds
+	_, err = db.Exec("PRAGMA busy_timeout = 5000")
 	if err != nil {
 		errorLog.Fatal(err)
 	}
 
 	// Write-Ahead Logging
-	_, err = db.Exec("PRAGMA journal_mode=WAL;")
-	if err != nil {
-		errorLog.Fatal(err)
-	}
+	// _, err = db.Exec("PRAGMA journal_mode=WAL;")
+	// if err != nil {
+	// 	errorLog.Fatal(err)
+	// }
 
 	sessionManager := scs.New()
 	sessionManager.Store = sqlite3store.New(db)

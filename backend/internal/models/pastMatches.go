@@ -124,6 +124,7 @@ func (m *PastMatchModel) GetPastMatchesWithFormat(timeFormatLower int64, timeFor
 		return nil, err
 	}
 
+	defer rows.Close()
 	for rows.Next() {
 		err := rows.Scan(
 			&matchID,

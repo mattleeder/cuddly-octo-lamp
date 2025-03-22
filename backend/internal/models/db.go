@@ -71,35 +71,35 @@ func (taskQueue *TaskQueue) runWorker() {
 	}
 }
 
-func (taskQueue *TaskQueue) EnQueue(task task) {
-	taskQueue.tasks <- Task{task: task, channel: nil}
+func (taskQueue *TaskQueue) EnQueue(task task, waitFor *sync.WaitGroup, block *sync.WaitGroup) {
+	taskQueue.tasks <- Task{task: task, channel: nil, waitFor: waitFor, block: block}
 }
 
-func (taskQueue *TaskQueue) EnQueueReturn(task task) (any, error) {
+func (taskQueue *TaskQueue) EnQueueReturn(task task, waitFor *sync.WaitGroup, block *sync.WaitGroup) (any, error) {
 	channel := make(chan TaskResponse, 1)
-	taskQueue.tasks <- Task{task: task, channel: channel}
+	taskQueue.tasks <- Task{task: task, channel: channel, waitFor: waitFor, block: block}
 	taskResponse := <-channel
 	return taskResponse.val, taskResponse.err
 }
 
-func (taskQueue *TaskQueue) EnQueueValueOnlyTask(task valueOnlyTask) {
-	taskQueue.tasks <- Task{task: wrapValueOnlyTask(task), channel: nil}
+func (taskQueue *TaskQueue) EnQueueValueOnlyTask(task valueOnlyTask, waitFor *sync.WaitGroup, block *sync.WaitGroup) {
+	taskQueue.tasks <- Task{task: wrapValueOnlyTask(task), channel: nil, waitFor: waitFor, block: block}
 }
 
-func (taskQueue *TaskQueue) EnQueueReturnValueOnlyTask(task valueOnlyTask) any {
+func (taskQueue *TaskQueue) EnQueueReturnValueOnlyTask(task valueOnlyTask, waitFor *sync.WaitGroup, block *sync.WaitGroup) any {
 	channel := make(chan TaskResponse, 1)
-	taskQueue.tasks <- Task{task: wrapValueOnlyTask(task), channel: channel}
+	taskQueue.tasks <- Task{task: wrapValueOnlyTask(task), channel: channel, waitFor: waitFor, block: block}
 	taskResponse := <-channel
 	return taskResponse.val
 }
 
-func (taskQueue *TaskQueue) EnQueueErrorOnlyTask(task errorOnlyTask) {
-	taskQueue.tasks <- Task{task: wrapErrorOnlyTask(task), channel: nil}
+func (taskQueue *TaskQueue) EnQueueErrorOnlyTask(task errorOnlyTask, waitFor *sync.WaitGroup, block *sync.WaitGroup) {
+	taskQueue.tasks <- Task{task: wrapErrorOnlyTask(task), channel: nil, waitFor: waitFor, block: block}
 }
 
-func (taskQueue *TaskQueue) EnQueueReturnErrorOnlyTask(task errorOnlyTask) error {
+func (taskQueue *TaskQueue) EnQueueReturnErrorOnlyTask(task errorOnlyTask, waitFor *sync.WaitGroup, block *sync.WaitGroup) error {
 	channel := make(chan TaskResponse, 1)
-	taskQueue.tasks <- Task{task: wrapErrorOnlyTask(task), channel: channel}
+	taskQueue.tasks <- Task{task: wrapErrorOnlyTask(task), channel: channel, waitFor: waitFor, block: block}
 	taskResponse := <-channel
 	return taskResponse.err
 }
@@ -108,7 +108,7 @@ var app *application
 
 var DBTaskQueue *TaskQueue
 
-const numdbTaskQueueWorkers = 1
+const numdbTaskQueueWorkers = 2
 
 func init() {
 

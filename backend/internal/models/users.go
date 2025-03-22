@@ -101,6 +101,9 @@ func CreateNewUserOptions(newUser NewUserInfo) (options NewUserOptions) {
 
 func (m *UserModel) InsertNew(username string, password string, options *NewUserOptions) (int64, error) {
 	defer m.LogAll()
+	ratings := UserRatingsModel{DB: m.DB}
+	defer ratings.LogAll()
+
 	app.infoLog.Printf("Inserting new user: %v\n", username)
 
 	if username == "" {
@@ -336,20 +339,46 @@ func (m *UserModel) updateLastSeen(username string, playerID int64, queryMode Qu
 	UPDATE users
 	   SET last_seen = unixepoch('now')
 	`
-	var err error
 
 	if queryMode == qmUsername {
 		sqlStmt += ` WHERE username = ?`
-		_, err = m.DB.Exec(sqlStmt, username)
 	} else if queryMode == qmPlayerID {
 		sqlStmt += ` WHERE player_id = ?`
-		_, err = m.DB.Exec(sqlStmt, playerID)
 	} else {
 		return errors.New("queryMode unknown")
 	}
 
+	tx, err := m.DB.Begin()
 	if err != nil {
-		app.errorLog.Printf("Error updating last_seen: %v\n", err.Error())
+		app.errorLog.Printf("Error starting transaction: %v\n", err)
+		return err
+	}
+
+	updateStmt, err := tx.Prepare(sqlStmt)
+	if err != nil {
+		app.errorLog.Printf("Error preparing statement: %v\n", err)
+		return err
+	}
+	defer updateStmt.Close()
+
+	if queryMode == qmUsername {
+		_, err = updateStmt.Exec(username)
+	} else if queryMode == qmPlayerID {
+		_, err = updateStmt.Exec(playerID)
+	}
+
+	if err != nil {
+		app.errorLog.Printf("Error executing statement: %v\n", err)
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("insert updateLastSeen: unable to rollback: %v", rollbackErr)
+		}
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		app.errorLog.Printf("Error commiting transaction in updateRating: %v\n", err)
+		return err
 	}
 
 	return err
@@ -371,20 +400,46 @@ func (m *UserModel) updateEmail(email string, username string, playerID int64, q
 	UPDATE users
 	   SET email = ?
 	`
-	var err error
 
 	if queryMode == qmUsername {
 		sqlStmt += ` WHERE username = ?`
-		_, err = m.DB.Exec(sqlStmt, username, email)
 	} else if queryMode == qmPlayerID {
 		sqlStmt += ` WHERE player_id = ?`
-		_, err = m.DB.Exec(sqlStmt, playerID, email)
 	} else {
 		return errors.New("queryMode unknown")
 	}
 
+	tx, err := m.DB.Begin()
 	if err != nil {
-		app.errorLog.Printf("Error updating email: %v\n", err.Error())
+		app.errorLog.Printf("Error starting transaction: %v\n", err)
+		return err
+	}
+
+	updateStmt, err := tx.Prepare(sqlStmt)
+	if err != nil {
+		app.errorLog.Printf("Error preparing statement: %v\n", err)
+		return err
+	}
+	defer updateStmt.Close()
+
+	if queryMode == qmUsername {
+		_, err = updateStmt.Exec(username, email)
+	} else if queryMode == qmPlayerID {
+		_, err = updateStmt.Exec(playerID, email)
+	}
+
+	if err != nil {
+		app.errorLog.Printf("Error executing statement: %v\n", err)
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("insert updateRating: unable to rollback: %v", rollbackErr)
+		}
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		app.errorLog.Printf("Error commiting transaction in updateEmail: %v\n", err)
+		return err
 	}
 
 	return err
@@ -417,6 +472,7 @@ func (m *UserModel) SearchForUsers(searchString string) ([]UserClientSide, error
 		return nil, err
 	}
 
+	defer rows.Close()
 	for rows.Next() {
 		err := rows.Scan(&playerID, &username, &joinDate, &lastSeen)
 
@@ -449,7 +505,7 @@ func (m *UserModel) GetTileInfoFromUsername(username string) (*UserTileInfo, err
 	var joinDate int64
 	var lastSeen int64
 	var bullet_rating int64
-	var blitz_rating string
+	var blitz_rating int64
 	var rapid_rating int64
 	var classical_rating int64
 
@@ -488,10 +544,11 @@ func (m *UserModel) GetTileInfoFromUsername(username string) (*UserTileInfo, err
 		LastSeen:   lastSeen,
 		Ratings: Ratings{
 			BulletRating:    bullet_rating,
-			BlitzRating:     bullet_rating,
+			BlitzRating:     blitz_rating,
 			RapidRating:     rapid_rating,
 			ClassicalRating: classical_rating,
 		},
+		NumberOfGames: numberOfGames,
 	}, nil
 
 }

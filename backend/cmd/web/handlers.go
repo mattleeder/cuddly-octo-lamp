@@ -132,7 +132,7 @@ func joinQueueHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if isInMatch {
-		app.errorLog.Printf("Already in match, playerID: %v\n")
+		app.errorLog.Printf("Already in match, playerID: %v\n", playerID)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

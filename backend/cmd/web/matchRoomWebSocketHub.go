@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -230,11 +231,13 @@ type MatchRoomHub struct {
 
 	averageElo float64
 
-	whitePlayerElo float64
+	whitePlayerElo int64
 
-	blackPlayerElo float64
+	blackPlayerElo int64
 
 	matchStartTime int64
+
+	taskQueueWaitGroup *sync.WaitGroup
 }
 
 type playerTurn byte
@@ -246,7 +249,7 @@ const (
 
 func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 	// Build hub from data in db
-	matchState, err := app.liveMatches.EnQueueReturnGetFromMatchID(matchID)
+	matchState, err := app.liveMatches.EnQueueReturnGetFromMatchID(matchID, nil, nil)
 
 	if err != nil {
 		app.errorLog.Println(err)
@@ -344,6 +347,10 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		whitePlayerConnected:     false,
 		blackPlayerConnected:     false,
 		threefoldRepetition:      threefoldRepetition,
+		averageElo:               matchState.AverageElo,
+		whitePlayerElo:           matchState.WhitePlayerElo,
+		blackPlayerElo:           matchState.BlackPlayerElo,
+		matchStartTime:           matchState.MatchStartTime,
 	}
 
 	return match, nil
@@ -402,7 +409,7 @@ func (hub *MatchRoomHub) sendMessageToAllSpectators(message []byte) {
 	}
 }
 
-func getKFactor(elo float64) float64 {
+func getKFactor(elo int64) float64 {
 	if elo < 2100 {
 		return 32
 	} else if elo <= 2400 {
@@ -412,7 +419,7 @@ func getKFactor(elo float64) float64 {
 	}
 }
 
-func calculateEloChanges(playerOneElo float64, playerOnePoints float64, playerTwoElo float64, playerTwoPoints float64) (playerOneEloGain float64, playerTwoEloGain float64) {
+func calculateEloChanges(playerOneElo int64, playerOnePoints float64, playerTwoElo int64, playerTwoPoints float64) (playerOneEloGain float64, playerTwoEloGain float64) {
 	var playerOneExpectedPoints, playerTwoExpectedPoints float64
 
 	playerOneExpectedPoints = (1) / (1 + math.Pow(10, (playerTwoExpectedPoints-playerOneExpectedPoints)/400))
@@ -475,13 +482,13 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	var chessMove postMoveResponse
 	err = json.Unmarshal(message[1:], &chessMove)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Error unmarshalling JSON: %v\n", err))
+		return errors.New(fmt.Sprintf("error unmarshalling JSON: %v\n", err))
 	}
 
 	// Validate Move
 	var validMove = chess.IsMoveValid(hub.current_fen, chessMove.Body.Piece, chessMove.Body.Move)
 	if !validMove {
-		return errors.New("Move is not valid")
+		return errors.New("move is not valid")
 	}
 
 	// Calcuate new time remaining
@@ -536,7 +543,11 @@ func (hub *MatchRoomHub) updateGameStateAfterMove(message []byte) (err error) {
 	}
 
 	// Update database
-	app.liveMatches.EnQueueUpdateLiveMatch(hub.matchID, newFEN, chessMove.Body.Piece, chessMove.Body.Move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove)
+	// @TODO: do we need a new waitGroup each time? Hub could just have one waitGroup that we add tasks to
+	var wg sync.WaitGroup
+	wg.Add(1)
+	app.liveMatches.EnQueueUpdateLiveMatch(hub.matchID, newFEN, chessMove.Body.Piece, chessMove.Body.Move, hub.whitePlayerTimeRemaining.Milliseconds(), hub.blackPlayerTimeRemaining.Milliseconds(), matchStateHistoryData, hub.timeOfLastMove, hub.taskQueueWaitGroup, &wg)
+	hub.taskQueueWaitGroup = &wg
 
 	if gameOverStatus != chess.Ongoing {
 		return hub.endGame(gameOverStatus)
@@ -683,11 +694,14 @@ func (hub *MatchRoomHub) endGame(reason chess.GameOverStatusCode) error {
 	}
 
 	whitePlayerEloGain, blackPlayerEloGain := calculateEloChanges(hub.whitePlayerElo, whitePlayerPoints, hub.blackPlayerElo, blackPlayerPoints)
-	go app.userRatings.UpdateRatingFromPlayerID(hub.whitePlayerID, models.GetRatingTypeFromTimeFormat(hub.timeFormatInMilliseconds), hub.whitePlayerElo+whitePlayerEloGain)
-	go app.userRatings.UpdateRatingFromPlayerID(hub.blackPlayerID, models.GetRatingTypeFromTimeFormat(hub.timeFormatInMilliseconds), hub.blackPlayerElo+blackPlayerEloGain)
+	app.infoLog.Printf("whitePlayerElo: %v, whitePlayerEloGain: %v\n", hub.whitePlayerElo, whitePlayerEloGain)
+	whitePlayerNewElo := int64(math.Max(float64(hub.whitePlayerElo)+math.Round(whitePlayerEloGain), 0))
+	blackPlayerNewElo := int64(math.Max(float64(hub.blackPlayerElo)+math.Round(blackPlayerEloGain), 0))
+	go app.userRatings.UpdateRatingFromPlayerID(hub.whitePlayerID, models.GetRatingTypeFromTimeFormat(hub.timeFormatInMilliseconds), whitePlayerNewElo)
+	go app.userRatings.UpdateRatingFromPlayerID(hub.blackPlayerID, models.GetRatingTypeFromTimeFormat(hub.timeFormatInMilliseconds), blackPlayerNewElo)
 
 	hub.gameEnded = true
-	app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, outcome, reason, whitePlayerEloGain, blackPlayerEloGain)
+	app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, outcome, reason, whitePlayerEloGain, blackPlayerEloGain, hub.taskQueueWaitGroup, nil)
 	return nil
 }
 
