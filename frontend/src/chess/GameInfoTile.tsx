@@ -1,5 +1,5 @@
 import React, { useContext, useRef, useEffect, useState } from "react";
-import { CornerUpLeft, Handshake, Flag, Microscope, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, AlignJustify } from "lucide-react";
+import { CornerUpLeft, Handshake, Flag, Microscope, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, AlignJustify, GitMerge } from "lucide-react";
 import { PieceColour, PieceVariant, parseGameStateFromFEN } from "./ChessLogic";
 import { GameContext, OpponentEventType, gameContext, boardHistory, SQLNullString } from "./GameContext";
 import { variantToString } from "./ChessBoard";
@@ -494,33 +494,47 @@ export function GameInfoTile() {
   let bottomTime
   let topPaused
   let bottomPaused
+  let topUsername
+  let bottomUsername
+  let topPieceCounts
+  let bottomPieceCounts
 
   if (game.flip) {
     topTime = game.matchData.activeState.whitePlayerTimeRemainingMilliseconds
     topPaused = isWhiteClockPaused(game)
+    topUsername = game.whitePlayerUsername
+    topPieceCounts = PieceColour.White
+
     bottomTime = game.matchData.activeState.blackPlayerTimeRemainingMilliseconds
     bottomPaused = isBlackClockPaused(game)
+    bottomUsername = game.blackPlayerUsername
+    bottomPieceCounts = PieceColour.Black
   } else {
     topTime = game.matchData.activeState.blackPlayerTimeRemainingMilliseconds
     topPaused = isBlackClockPaused(game)
+    topUsername = game.blackPlayerUsername
+    topPieceCounts = PieceColour.Black
+
     bottomTime = game.matchData.activeState.whitePlayerTimeRemainingMilliseconds
     bottomPaused = isWhiteClockPaused(game)
+    bottomUsername = game.whitePlayerUsername
+    bottomPieceCounts = PieceColour.White
   }
   
   return (
     <div className="gameInfoContainer">
-      <PlayerPieceCounts colour={PieceColour.White}/>
+      <PlayerPieceCounts colour={topPieceCounts}/>
       <CountdownTimer className="playerTimeTop" paused={topPaused} countdownTimerMilliseconds={topTime}/>
       <div className='gameInfo'>
         <EventTypeDialog />
-        <PlayerInfo connected={game.isWhiteConnected} username={game.whitePlayerUsername}/>
+        <PlayerInfo connected={game.isWhiteConnected} username={topUsername}/>
         <MoveHistoryControls />
         <Moves />
         <GameControls />
-        <PlayerInfo connected={game.isBlackConnected} username={game.blackPlayerUsername}/>
+        <PlayerInfo connected={game.isBlackConnected} username={bottomUsername}/>
       </div>
       <CountdownTimer className="playerTimeBottom" paused={bottomPaused} countdownTimerMilliseconds={bottomTime}/>
-      <PlayerPieceCounts colour={PieceColour.Black}/>
+      <PlayerPieceCounts colour={bottomPieceCounts}/>
     </div>
   )
 }
