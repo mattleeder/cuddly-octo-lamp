@@ -683,8 +683,8 @@ func (hub *MatchRoomHub) endGame(reason chess.GameOverStatusCode) error {
 	}
 
 	whitePlayerEloGain, blackPlayerEloGain := calculateEloChanges(hub.whitePlayerElo, whitePlayerPoints, hub.blackPlayerElo, blackPlayerPoints)
-	app.userRatings.UpdateRatingFromPlayerID(hub.whitePlayerID, models.GetRatingTypeFromTimeFormat(hub.timeFormatInMilliseconds), hub.whitePlayerElo+whitePlayerEloGain)
-	app.userRatings.UpdateRatingFromPlayerID(hub.blackPlayerID, models.GetRatingTypeFromTimeFormat(hub.timeFormatInMilliseconds), hub.blackPlayerElo+blackPlayerEloGain)
+	go app.userRatings.UpdateRatingFromPlayerID(hub.whitePlayerID, models.GetRatingTypeFromTimeFormat(hub.timeFormatInMilliseconds), hub.whitePlayerElo+whitePlayerEloGain)
+	go app.userRatings.UpdateRatingFromPlayerID(hub.blackPlayerID, models.GetRatingTypeFromTimeFormat(hub.timeFormatInMilliseconds), hub.blackPlayerElo+blackPlayerEloGain)
 
 	hub.gameEnded = true
 	app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, outcome, reason, whitePlayerEloGain, blackPlayerEloGain)

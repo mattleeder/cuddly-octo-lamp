@@ -46,7 +46,19 @@ func main() {
 
 	models.InitDatabase(*dbDriverName, *dbDataSourceName)
 	db, err := sql.Open(*dbDriverName, *dbDataSourceName)
+	if err != nil {
+		errorLog.Fatal(err)
+	}
 	defer db.Close()
+
+	// Set busy_timeout to 5 seconds
+	_, err = db.Exec("PRAGMA busy_timeout = 5000;")
+	if err != nil {
+		errorLog.Fatal(err)
+	}
+
+	// Write-Ahead Logging
+	_, err = db.Exec("PRAGMA journal_mode=WAL;")
 	if err != nil {
 		errorLog.Fatal(err)
 	}

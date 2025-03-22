@@ -132,7 +132,7 @@ func (m *UserRatingsModel) updateRating(username string, playerID int64, ratingT
 	}
 
 	if err != nil {
-		app.errorLog.Printf("Error updating email: %v\n", err.Error())
+		app.errorLog.Printf("Error updating rating: %v\n", err.Error())
 	}
 
 	return err

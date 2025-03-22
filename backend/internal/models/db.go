@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 type application struct {
@@ -26,6 +27,8 @@ type TaskResponse struct {
 type Task struct {
 	task    task
 	channel chan TaskResponse
+	waitFor *sync.WaitGroup // Wait for this group to be done before executing
+	block   *sync.WaitGroup // Block this group from executing until done
 }
 
 type TaskQueue struct {
@@ -48,8 +51,19 @@ func (taskQueue *TaskQueue) runWorker() {
 	for {
 		select {
 		case task := <-taskQueue.tasks:
+			// Wait
+			if task.waitFor != nil {
+				task.waitFor.Wait()
+			}
+
 			channel := task.channel
 			result, err := task.task()
+
+			// Remove block on completion
+			if task.block != nil {
+				task.block.Done()
+			}
+
 			if channel != nil {
 				channel <- TaskResponse{val: result, err: err}
 			}
