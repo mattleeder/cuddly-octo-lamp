@@ -27,6 +27,27 @@ type LiveMatch struct {
 	MatchStartTime                       int64         `json:"matchStartTime"`
 }
 
+type LiveMatchWithUsernames struct {
+	MatchID                              int64          `json:"matchID"`
+	WhitePlayerID                        int64          `json:"whitePlayerID"`
+	BlackPlayerID                        int64          `json:"blackPlayerID"`
+	LastMovePiece                        sql.NullInt64  `json:"lastMovePiece"`
+	LastMoveMove                         sql.NullInt64  `json:"lastMoveMove"`
+	CurrentFEN                           string         `json:"currentFEN"`
+	TimeFormatInMilliseconds             int64          `json:"timeFormatInMilliseconds"`
+	IncrementInMilliseconds              int64          `json:"incrementInMilliseconds"`
+	WhitePlayerTimeRemainingMilliseconds int64          `json:"whitePlayerTimeRemainingMilliseconds"`
+	BlackPlayerTimeRemainingMilliseconds int64          `json:"blackPlayerTimeRemainingMilliseconds"`
+	GameHistoryJSONString                []byte         `json:"gameHistoryJSONstring"` // []MatchStateHistory{}
+	UnixMsTimeOfLastMove                 int64          `json:"unixTimeOfLastMove"`
+	AverageElo                           float64        `json:"averageElo"`
+	WhitePlayerElo                       int64          `json:"whitePlayerElo"`
+	BlackPlayerElo                       int64          `json:"blackPlayerElo"`
+	MatchStartTime                       int64          `json:"matchStartTime"`
+	WhitePlayerUsername                  sql.NullString `json:"whitePlayerUsername"`
+	BlackPlayerUsername                  sql.NullString `json:"blackPlayerUsername"`
+}
+
 type LiveMatchModel struct {
 	DB *sql.DB
 }
@@ -130,8 +151,34 @@ func (m *LiveMatchModel) EnQueueInsertNew(playerOneID int64, playerTwoID int64, 
 	}, waitFor, block)
 }
 
-func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
-	row := m.DB.QueryRow("select * from live_matches where match_id=?;", matchID)
+func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatchWithUsernames, error) {
+	sqlStmt := `
+	SELECT live_matches.match_id,
+           live_matches.white_player_id,
+           live_matches.black_player_id,
+           live_matches.last_move_piece,
+           live_matches.last_move_move,
+           live_matches.current_fen,
+           live_matches.time_format_in_milliseconds,
+           live_matches.increment_in_milliseconds,
+           live_matches.white_player_time_remaining_in_milliseconds,
+           live_matches.black_player_time_remaining_in_milliseconds,
+           live_matches.game_history_json_string,
+           live_matches.unix_ms_time_of_last_move,
+           live_matches.average_elo,
+           live_matches.white_player_elo,
+           live_matches.black_player_elo,
+           live_matches.match_start_time,
+		   white_player.username,
+		   black_player.username
+	  FROM live_matches
+	  LEFT JOIN users as white_player
+	    ON live_matches.white_player_id = white_player.player_id
+	  LEFT JOIN users as black_player
+	    on live_matches.black_player_id = black_player.player_id
+	 WHERE match_id = ?
+	`
+	row := m.DB.QueryRow(sqlStmt, matchID)
 
 	var _matchID int64
 	var whitePlayerID int64
@@ -149,6 +196,8 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 	var whitePlayerElo int64
 	var blackPlayerElo int64
 	var matchStartTime int64
+	var whitePlayerUsername sql.NullString
+	var blackPlayerUsername sql.NullString
 
 	err := row.Scan(
 		&_matchID,
@@ -167,12 +216,14 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 		&whitePlayerElo,
 		&blackPlayerElo,
 		&matchStartTime,
+		&whitePlayerUsername,
+		&blackPlayerUsername,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	match := &LiveMatch{
+	match := &LiveMatchWithUsernames{
 		MatchID:                              matchID,
 		WhitePlayerID:                        whitePlayerID,
 		BlackPlayerID:                        blackPlayerID,
@@ -189,6 +240,8 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 		WhitePlayerElo:                       whitePlayerElo,
 		BlackPlayerElo:                       blackPlayerElo,
 		MatchStartTime:                       matchStartTime,
+		WhitePlayerUsername:                  whitePlayerUsername,
+		BlackPlayerUsername:                  blackPlayerUsername,
 	}
 
 	app.infoLog.Printf("%+v", match)
@@ -196,17 +249,17 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatch, error) {
 	return match, nil
 }
 
-func (m *LiveMatchModel) EnQueueReturnGetFromMatchID(matchID int64, waitFor *sync.WaitGroup, block *sync.WaitGroup) (*LiveMatch, error) {
+func (m *LiveMatchModel) EnQueueReturnGetFromMatchID(matchID int64, waitFor *sync.WaitGroup, block *sync.WaitGroup) (*LiveMatchWithUsernames, error) {
 	result, err := DBTaskQueue.EnQueueReturn(func() (any, error) {
 		return m.GetFromMatchID(matchID)
 	}, waitFor, block)
 	if err != nil {
 		return nil, err
 	}
-	matchState, ok := result.(*LiveMatch)
+	matchState, ok := result.(*LiveMatchWithUsernames)
 	if !ok {
-		app.errorLog.Println("matchState is not *models.LiveMatch")
-		return nil, errors.New("matchState is not *models.LiveMatch")
+		app.errorLog.Println("matchState is not *models.LiveMatchWithUsernames")
+		return nil, errors.New("matchState is not *models.LiveMatchWithUsernames")
 	}
 	return matchState, nil
 }

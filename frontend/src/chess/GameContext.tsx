@@ -26,6 +26,11 @@ export interface matchData {
   gameOverStatus: number,
 }
 
+export interface SQLNullString {
+  String: string
+  Valid: boolean
+}
+
 export interface gameContext {
   matchData: matchData,
   setMatchData: React.Dispatch<React.SetStateAction<matchData>>,
@@ -34,6 +39,8 @@ export interface gameContext {
   playerColour: PieceColour,
   isWhiteConnected: boolean,
   isBlackConnected: boolean,
+  whitePlayerUsername: SQLNullString,
+  blackPlayerUsername: SQLNullString,
   opponentEventType: OpponentEventType,
   setOpponentEventType: React.Dispatch<React.SetStateAction<OpponentEventType>>,
   millisecondsUntilOpponentTimeout: number | null,
@@ -59,6 +66,8 @@ interface OnConnectMessage {
   threefoldRepetition: boolean
   whitePlayerConnected: boolean
   blackPlayerConnected: boolean
+  whitePlayerUsername: SQLNullString
+  blackPlayerUsername: SQLNullString
 }
 
 interface OnMoveMessage {
@@ -117,10 +126,14 @@ function onConnectHandler(
   matchData: matchData,
   setMatchData: React.Dispatch<React.SetStateAction<matchData>>,
   setThreefoldRepetition: React.Dispatch<React.SetStateAction<boolean>>,
+  setWhitePlayerUsername: React.Dispatch<React.SetStateAction<SQLNullString>>,
+  setBlackPlayerUsername: React.Dispatch<React.SetStateAction<SQLNullString>>,
 ) {
   onMoveHandler(body as OnMoveMessage, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition)
   setIsWhiteConnected(body["whitePlayerConnected"])
   setIsBlackConnected(body["blackPlayerConnected"])
+  setWhitePlayerUsername(body["whitePlayerUsername"])
+  setBlackPlayerUsername(body["blackPlayerUsername"])
 }
 
 function connectionStatusHandler(
@@ -218,6 +231,8 @@ function readMessage(
   matchData: matchData,
   setMatchData: React.Dispatch<React.SetStateAction<matchData>>,
   setThreefoldRepetition: React.Dispatch<React.SetStateAction<boolean>>,
+  setWhitePlayerUsername: React.Dispatch<React.SetStateAction<SQLNullString>>,
+  setBlackPlayerUsername: React.Dispatch<React.SetStateAction<SQLNullString>>,
 ) {
   console.log("FROM WEBSOCKET")
   console.log(message)
@@ -236,7 +251,7 @@ function readMessage(
       sendPlayerCodeHandler(parsedMsg["body"] as PlayerCodeMessage, setPlayerColour)
       break;
     case "onConnect":
-      onConnectHandler(parsedMsg["body"] as OnConnectMessage, setIsWhiteConnected, setIsBlackConnected, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition)
+      onConnectHandler(parsedMsg["body"] as OnConnectMessage, setIsWhiteConnected, setIsBlackConnected, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition, setWhitePlayerUsername, setBlackPlayerUsername)
       break;
     case "connectionStatus":
       connectionStatusHandler(parsedMsg["body"] as ConnectionStatusMessage, setIsWhiteConnected, setIsBlackConnected, setMillisecondsUntilOpponentTimeout)
@@ -280,6 +295,8 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
   const [playerColour, setPlayerColour] = useState(PieceColour.Spectator)
   const [isWhiteConnected, setIsWhiteConnected] = useState(false)
   const [isBlackConnected, setIsBlackConnected] = useState(false)
+  const [whitePlayerUsername, setWhitePlayerUsername] = useState<SQLNullString>({String: "", Valid: false})
+  const [blackPlayerUsername, setBlackPlayerUsername] = useState<SQLNullString>({String: "", Valid: false})
   const [millisecondsUntilOpponentTimeout, setMillisecondsUntilOpponentTimeout] = useState<number | null>(null)
   const [opponentEventType, setOpponentEventType] = useState(OpponentEventType.None)
   const [threefoldRepetition, setThreefoldRepetition] = useState(false)
@@ -293,7 +310,7 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
     const webSocketConnect = () => {
       webSocket.current = new WebSocket(import.meta.env.VITE_API_MATCHROOM_URL + matchID + '/ws')
       webSocket.current.onopen = () => console.log("Websocket connected")
-      webSocket.current.onmessage = (event) => readMessage(event.data, setPlayerColour, setIsWhiteConnected, setIsBlackConnected, setMillisecondsUntilOpponentTimeout, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition)
+      webSocket.current.onmessage = (event) => readMessage(event.data, setPlayerColour, setIsWhiteConnected, setIsBlackConnected, setMillisecondsUntilOpponentTimeout, setOpponentEventType, matchData, setMatchData, setThreefoldRepetition, setWhitePlayerUsername, setBlackPlayerUsername)
       webSocket.current.onerror = (event) => console.error(event)
       webSocket.current.onclose = () => {
         // Should be exponential backoff but server not hanling match not found properly
@@ -317,7 +334,7 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
   }, [matchData])
   
   return (
-    <GameContext.Provider value={{ matchData, setMatchData, webSocket, playerColour, isWhiteConnected, isBlackConnected, opponentEventType, setOpponentEventType, millisecondsUntilOpponentTimeout, threefoldRepetition, setThreefoldRepetition, flip, setFlip }}>
+    <GameContext.Provider value={{ matchData, setMatchData, webSocket, playerColour, isWhiteConnected, isBlackConnected, opponentEventType, setOpponentEventType, millisecondsUntilOpponentTimeout, threefoldRepetition, setThreefoldRepetition, flip, setFlip, whitePlayerUsername, blackPlayerUsername }}>
       {children}
     </GameContext.Provider>
   )

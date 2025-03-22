@@ -3,6 +3,7 @@ package main
 import (
 	"burrchess/internal/chess"
 	"burrchess/internal/models"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,6 +49,8 @@ type onConnectBody struct {
 	WhitePlayerConnected     bool                     `json:"whitePlayerConnected"`
 	BlackPlayerConnected     bool                     `json:"blackPlayerConnected"`
 	MillisecondsUntilTimeout int64                    `json:"millisecondsUntilTimeout"`
+	WhitePlayerUsername      sql.NullString           `json:"whitePlayerUsername"`
+	BlackPlayerUsername      sql.NullString           `json:"blackPlayerUsername"`
 }
 
 type onMoveBody struct {
@@ -180,6 +183,10 @@ type MatchRoomHub struct {
 	unregister chan *MatchRoomHubClient
 
 	whitePlayerID int64
+
+	whitePlayerUsername sql.NullString
+
+	blackPlayerUsername sql.NullString
 
 	blackPlayerID int64
 
@@ -331,6 +338,8 @@ func newMatchRoomHub(matchID int64) (*MatchRoomHub, error) {
 		unregister:               make(chan *MatchRoomHubClient),
 		clients:                  make(map[*MatchRoomHubClient]bool),
 		whitePlayerID:            matchState.WhitePlayerID,
+		whitePlayerUsername:      matchState.WhitePlayerUsername,
+		blackPlayerUsername:      matchState.BlackPlayerUsername,
 		blackPlayerID:            matchState.BlackPlayerID,
 		whitePlayerTimeRemaining: whitePlayerTimeRemaining,
 		blackPlayerTimeRemaining: blackPlayerTimeRemaining,
@@ -587,6 +596,8 @@ func (hub *MatchRoomHub) getCurrentMatchStateForNewConnection(playerIdentifier m
 			WhitePlayerConnected:     hub.whitePlayerConnected,
 			BlackPlayerConnected:     hub.blackPlayerConnected,
 			MillisecondsUntilTimeout: millisecondsUntilTimeout,
+			WhitePlayerUsername:      hub.whitePlayerUsername,
+			BlackPlayerUsername:      hub.blackPlayerUsername,
 		},
 	}
 

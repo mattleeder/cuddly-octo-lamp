@@ -682,7 +682,8 @@ PLAYER INFO TILE
   background-color: #898988;
   border-radius: 4px;
   box-shadow: 2px 2px 2px 2px black;
-  display: grid
+  display: grid;
+  z-index: 4;
 }
 
 .playerInfoTileRatings {

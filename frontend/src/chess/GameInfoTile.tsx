@@ -1,8 +1,9 @@
 import React, { useContext, useRef, useEffect, useState } from "react";
 import { CornerUpLeft, Handshake, Flag, Microscope, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, AlignJustify } from "lucide-react";
 import { PieceColour, PieceVariant, parseGameStateFromFEN } from "./ChessLogic";
-import { GameContext, OpponentEventType, gameContext, boardHistory } from "./GameContext";
+import { GameContext, OpponentEventType, gameContext, boardHistory, SQLNullString } from "./GameContext";
 import { variantToString } from "./ChessBoard";
+import { PlayerInfoTileContext, PlayerInfoTileContextInterface } from "../PlayerInfoTile";
 
 
 function isClockPaused(game: gameContext, colour: PieceColour) {
@@ -98,13 +99,26 @@ function PingStatus({ connected }: { connected: boolean }) {
   )
 }
 
-function PlayerInfo({ connected }: { connected: boolean }) {
+function PlayerInfo({ connected, username }: { connected: boolean, username: SQLNullString }) {
+  const playerInfoTile = useContext<PlayerInfoTileContextInterface>(PlayerInfoTileContext)
+
+  // useEffect(() => {
+  //   playerInfoTile?.lightFusePlayerInfoTile(username.String, event)
+  // }, [username])
+
   return (
     <div className='playerInfo'>
       <div className="playerPingStatus">
         <PingStatus connected={connected} />
       </div>
-      <div className='playerName'>Player</div>
+      <div className='playerName'
+                        onMouseEnter={(event) => {
+                          if (username.Valid) {
+                            playerInfoTile?.spawnPlayerInfoTile(username.String, event)
+                          }
+                        }}
+                        onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(username.String, event)}
+      >{username.Valid ? username.String : "Anon"}</div>
     </div>
   )
 }
@@ -499,11 +513,11 @@ export function GameInfoTile() {
       <CountdownTimer className="playerTimeTop" paused={topPaused} countdownTimerMilliseconds={topTime}/>
       <div className='gameInfo'>
         <EventTypeDialog />
-        <PlayerInfo connected={game.isWhiteConnected}/>
+        <PlayerInfo connected={game.isWhiteConnected} username={game.whitePlayerUsername}/>
         <MoveHistoryControls />
         <Moves />
         <GameControls />
-        <PlayerInfo connected={game.isBlackConnected}/>
+        <PlayerInfo connected={game.isBlackConnected} username={game.blackPlayerUsername}/>
       </div>
       <CountdownTimer className="playerTimeBottom" paused={bottomPaused} countdownTimerMilliseconds={bottomTime}/>
       <PlayerPieceCounts colour={PieceColour.Black}/>
