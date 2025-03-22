@@ -859,8 +859,10 @@ func (hub *MatchRoomHub) setDisconnected(client *MatchRoomHubClient) {
 	// Sets connections status of players and sends message to all clients
 	if client.playerIdentifier == messageIdentifier(WhitePlayer) {
 		hub.whitePlayerConnected = false
-		hub.whitePlayerTimeout = time.After(pingTimeout)
-		hub.whitePlayerTimeoutStarted = time.Now()
+		if !hub.gameEnded {
+			hub.whitePlayerTimeout = time.After(pingTimeout)
+			hub.whitePlayerTimeoutStarted = time.Now()
+		}
 		pingMessage, err := hub.pingStatusMessage("white", false, pingTimeout.Milliseconds())
 		if err != nil {
 			app.errorLog.Printf("Could not generate pingMessage: %s", err)
@@ -868,8 +870,10 @@ func (hub *MatchRoomHub) setDisconnected(client *MatchRoomHubClient) {
 		hub.sendMessageToAllClients(pingMessage)
 	} else if client.playerIdentifier == messageIdentifier(BlackPlayer) {
 		hub.blackPlayerConnected = false
-		hub.blackPlayerTimeout = time.After(pingTimeout)
-		hub.blackPlayerTimeoutStarted = time.Now()
+		if !hub.gameEnded {
+			hub.blackPlayerTimeout = time.After(pingTimeout)
+			hub.blackPlayerTimeoutStarted = time.Now()
+		}
 		pingMessage, err := hub.pingStatusMessage("black", false, pingTimeout.Milliseconds())
 		if err != nil {
 			app.errorLog.Printf("Could not generate pingMessage: %s", err)

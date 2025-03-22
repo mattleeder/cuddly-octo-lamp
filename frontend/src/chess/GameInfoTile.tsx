@@ -285,6 +285,12 @@ function EventTypeDialog() {
 
   console.log(`Threefold Repetition? ${game.threefoldRepetition}`)
 
+  if (game.matchData.gameOverStatus != 0) {
+    return (
+      <></>
+    )
+  }
+
   if (game.threefoldRepetition) {
     return (
       <div className="eventTypeDialog">
