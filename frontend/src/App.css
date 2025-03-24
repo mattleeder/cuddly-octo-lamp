@@ -816,3 +816,23 @@ MATCH TILE
   background-color: #3487d5;
   cursor: pointer;
 }
+
+/**********
+USER PAGE
+**********/
+
+.userTimeFormat {
+  display: flex;
+  cursor: pointer;
+  padding-left: 1em;
+  height: 4em;
+  align-items: center;
+}
+
+.userTimeFormat.active {
+  background-color: #ababaa;
+}
+
+.userTimeFormat:hover {
+  background-color: #ababaa;
+}
