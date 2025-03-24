@@ -303,6 +303,13 @@ export function GameWrapper({ children, matchID, timeFormatInMilliseconds }: { c
   const [flip, setFlip] = useState(false)
 
   useEffect(() => {
+    console.log("GameWrapper mount")
+    return () => {
+      console.log("GameWrapper unmount")
+    }
+  }, [])
+
+  useEffect(() => {
     setFlip(playerColour == PieceColour.Black)
   }, [playerColour])
 

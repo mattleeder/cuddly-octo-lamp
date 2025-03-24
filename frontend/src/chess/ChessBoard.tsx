@@ -241,40 +241,80 @@ function getRowAndColFromBoardIndex(idx: number, flip: boolean): [number, number
   return [row, col]
 }
 
-function PiecesComponent({ flip, squareWidth, onDragEnd, rect, board }: { flip: boolean, squareWidth: number, onDragEnd: (startIdx: number, endIdx: number) => void, rect?: React.RefObject<Rect | null>, board: [PieceColour | null, PieceVariant | null][] }) {
+// function PiecesComponent({ flip, squareWidth, onDragEnd, rect, board }: { flip: boolean, squareWidth: number, onDragEnd: (startIdx: number, endIdx: number) => void, rect?: React.RefObject<Rect | null>, board: [PieceColour | null, PieceVariant | null][] }) {
+
+//   return (
+//     board.map((square, idx) => {
+//       const [colour, variant] = square
+//       if (colour === null || variant === null) {
+//         return <React.Fragment key={idx} />
+//       }
+
+//       // TODO: dragging
+//       // On mousedown record position
+//       // On mouseup record position
+//       // If squares are different, try to post that move
+      
+//       const [row, col] = getRowAndColFromBoardIndex(idx, flip)
+//       return (
+//         <div 
+//           key={idx}
+//           draggable={true}
+//           onDragEnd={(event) => {
+//             console.log(`onDragEnd ${event.clientX}, ${event.clientY}`)
+//             const endPosition = getSquareIdxFromClick(event.clientX, event.clientY, rect)
+//             onDragEnd(idx, endPosition)
+//           }}
+//           className={`${colourToString.get(colour)}-${variantToString.get(variant)} pieceTransition`} 
+//           style={{ 
+//             transform: `translate(${col * squareWidth}px, ${row * squareWidth}px)`,
+//             width: `${squareWidth}px`,
+//             height: `${squareWidth}px`,
+//             backgroundSize: `${squareWidth}px`,
+//           }} 
+//         />
+//       )
+//     })
+//   )
+// }
+
+function PiecesComponent({ flip, squareWidth, onDragEndCallback, rect, colour, variant, index }: { flip: boolean, squareWidth: number, onDragEndCallback: (startIdx: number, endIdx: number) => void, rect?: React.RefObject<Rect | null>, colour: PieceColour | null, variant: PieceVariant | null, index: number }) {
+  useEffect(() => {
+    console.log("Index changed")
+  }, [index])
+
+  useEffect(() => {
+    console.log("Piece Mount")
+    return () => {
+      console.log("Piece Unmount")
+    }
+  }, [])
+  
+  if (colour === null || variant === null) {
+    return <React.Fragment key={index} />
+  }
+  const [row, col] = getRowAndColFromBoardIndex(index, flip)
+  console.log(`Index: ${index}`)
 
   return (
-    board.map((square, idx) => {
-      const [colour, variant] = square
-      if (colour === null || variant === null) {
-        return <React.Fragment key={idx} />
-      }
-
-      // TODO: dragging
-      // On mousedown record position
-      // On mouseup record position
-      // If squares are different, try to post that move
-      
-      const [row, col] = getRowAndColFromBoardIndex(idx, flip)
-      return (
-        <div 
-          key={idx}
-          draggable={true}
-          onDragEnd={(event) => {
-            console.log(`onDragEnd ${event.clientX}, ${event.clientY}`)
-            const endPosition = getSquareIdxFromClick(event.clientX, event.clientY, rect)
-            onDragEnd(idx, endPosition)
-          }}
-          className={`${colourToString.get(colour)}-${variantToString.get(variant)}`} 
-          style={{ 
-            transform: `translate(${col * squareWidth}px, ${row * squareWidth}px)`,
-            width: `${squareWidth}px`,
-            height: `${squareWidth}px`,
-            backgroundSize: `${squareWidth}px`,
-          }} 
-        />
-      )
-    })
+    <div
+      key={`${colourToString.get(colour)}-${variantToString.get(variant)}`}
+      draggable={true}
+      onDragEnd={(event) => {
+        console.log(`onDragEnd ${event.clientX}, ${event.clientY}`)
+        const endPosition = getSquareIdxFromClick(event.clientX, event.clientY, rect)
+        onDragEndCallback(index, endPosition)
+      }}
+      className={`${colourToString.get(colour)}-${variantToString.get(variant)} pieceTransition`} 
+      style={{
+        position: "absolute",
+        transform: `translate(${col * squareWidth}px, ${row * squareWidth}px)`,
+        width: `${squareWidth}px`,
+        height: `${squareWidth}px`,
+        backgroundSize: `${squareWidth}px`,
+        transition: "transform 1s",
+      }} 
+    />
   )
 }
 
@@ -323,6 +363,8 @@ function LastMoveComponent({ flip, squareWidth, lastMove, showLastMove }: { flip
         return <React.Fragment key={idx} />
       }
       const [row, col] = getRowAndColFromBoardIndex(move, flip)
+
+      // @TODO: sort out lastMove Border radius with flips
       return (
         <div 
           key={idx} 
@@ -335,7 +377,7 @@ function LastMoveComponent({ flip, squareWidth, lastMove, showLastMove }: { flip
             borderTopLeftRadius: `${idx == 0 ? 4 : 0}px`,
             borderTopRightRadius: `${idx == 7 ? 4 : 0}px`,
             borderBottomLeftRadius: `${idx == 56 ? 4 : 0}px`,
-            borderBottomRightRadius: `${idx ==63 ? 4 : 0}px`,
+            borderBottomRightRadius: `${idx == 63 ? 4 : 0}px`,
           }} 
         />
       )
@@ -447,8 +489,14 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
   }
 
   useEffect(() => {
+    console.log("ChessBoard mount")
+    return () => {
+      console.log("ChessBoard unmount")
+    }
+  }, [])
+
+  useEffect(() => {
     const resizeObserver = new ResizeObserver((entries) => {
-      console.log("RESIZE")
       for (const entry of entries) {
         const boundingRect = entry.target.getBoundingClientRect()
         rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
@@ -460,7 +508,6 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
     }
 
     window.addEventListener('scroll', () => {
-      console.log("RESIZE")
       if (boardRef.current) {
         const boundingRect = boardRef.current.getBoundingClientRect()
         rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
@@ -469,7 +516,6 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
     })
 
     window.addEventListener('resize', () => {
-      console.log("RESIZE")
       if (boardRef.current) {
         const boundingRect = boardRef.current.getBoundingClientRect()
         rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
@@ -555,30 +601,35 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
             )}}}
       >
         <LastMoveComponent flip={game.flip} squareWidth={squareWidth} lastMove={game.matchData.activeState.lastMove} showLastMove={game.matchData.activeMove != 0}/>
-        <PiecesComponent flip={game.flip} squareWidth={squareWidth} rect={rect} board={game.matchData.activeState.board} onDragEnd={
-          (startIdx, endIdx) => {
-            if (startIdx != endIdx) {
-              clickHandler(
-                endIdx,
-                game,
-                promotionActive,
-                promotionSquare,
-                moves,
-                setMoves,
-                captures,
-                setCaptures,
-                selectedPiece,
-                setSelectedPiece,
-                promotionNextMove,
-                setPromotionNextMove,
-                setPromotionActive,
-                setPromotionSquare,
-                waiting,
-                setWaiting
-              )
-            }
-          }
-        }/>
+        {game.matchData.activeState.board.map((square, idx) => {
+          const [colour, variant] = square
+          return (
+            <PiecesComponent flip={game.flip} squareWidth={squareWidth} rect={rect} colour={colour} variant={variant} index={idx} onDragEndCallback={
+              (startIdx: number, endIdx: number) => {
+                if (startIdx != endIdx) {
+                  clickHandler(
+                    endIdx,
+                    game,
+                    promotionActive,
+                    promotionSquare,
+                    moves,
+                    setMoves,
+                    captures,
+                    setCaptures,
+                    selectedPiece,
+                    setSelectedPiece,
+                    promotionNextMove,
+                    setPromotionNextMove,
+                    setPromotionActive,
+                    setPromotionSquare,
+                    waiting,
+                    setWaiting
+                  )
+                }
+              }
+            }/>
+          )
+        })}
         <MovesComponent moves={moves} flip={game.flip} squareWidth={squareWidth}/>
         <CapturesComponent captures={captures} flip={game.flip} squareWidth={squareWidth}/>
         <PromotionComponent promotionSquare={promotionSquare} promotionActive={promotionActive} flip={game.flip} squareWidth={squareWidth}/>
@@ -654,7 +705,12 @@ export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [Pi
   return (
       <div className='chessboard' style={{width: "35vh", height: "35vh", backgroundSize: `${squareWidth * 8}px`}} ref={boardRef}>
         <LastMoveComponent flip={false} squareWidth={squareWidth} lastMove={lastMove} showLastMove={showLastMove}/>
-        <PiecesComponent flip={false} squareWidth={squareWidth} board={board} onDragEnd={() => {}}/>
+        {board.map((square, idx) => {
+          const [colour, variant] = square
+          return (
+            <PiecesComponent flip={false} squareWidth={squareWidth} colour={colour} variant={variant} index={idx} onDragEndCallback={() => {}}/>
+          )
+        })}
       </div>
   )
 }

@@ -23,7 +23,7 @@ interface PlayerInfoTileData {
   playerID: number
   username: string
   pingStatus: boolean
-  joinDate: string
+  joinDate: number
   lastSeen: number
   ratings: RatingsObject
   numberOfGames: number
@@ -253,6 +253,33 @@ function getPositionFromMouseEvent(event: React.MouseEvent<Element, MouseEvent>)
   }
 }
 
+function formatTimePassed(millisecondsSince: number) {
+  const intervals: [string, number][] = [
+    [" year", 31_536_000_000],
+    [" month", 2_592_000_000],
+    [" day", 86_400_000],
+    [" hour", 3_600_000],
+    [" minute", 60_000],
+    [" second", 1000],
+  ]
+
+  let output = ""
+
+  for (const [text, milliseconds] of intervals) {
+    if (millisecondsSince >= milliseconds) {
+      const multiplier = Math.floor(millisecondsSince / milliseconds)
+      output += multiplier
+      output += text
+      if (multiplier) {
+        output += "s"
+      }
+      return output
+    }
+  }
+
+  return "less than a second"
+}
+
 export function PlayerInfoTile({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState(false)
   const [fuseActive, setFuseActive] = useState(false)
@@ -342,6 +369,14 @@ export function PlayerInfoTile({ children }: { children: React.ReactNode }) {
     })
   }, [active, username, fuseActive, playerData, position, queuedUsername, queuedPlayerData, queuedPosition])
 
+  let timeSince: number | null = null
+  if (playerData) {
+    const joinDate = playerData.joinDate * 1000
+    const now = Date.now()
+    timeSince = now - joinDate
+  }
+
+
   return (
     <PlayerInfoTileContext.Provider value={tileContext}>
       {children}
@@ -384,7 +419,7 @@ export function PlayerInfoTile({ children }: { children: React.ReactNode }) {
               {`${playerData?.numberOfGames} games`}
             </div>
             <div style={{float:"right"}}>
-              {"Joined This Long Ago"}
+              {timeSince != null ? `Joined ${formatTimePassed(timeSince)} ago` : "Unknown"}
             </div>
           </div>
         </div>
