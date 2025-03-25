@@ -12,14 +12,14 @@ interface PlayerInfoTilePosition {
   y: number,
 }
 
-interface RatingsObject {
+export interface RatingsObject {
   bullet: number
   blitz: number
   rapid: number
   classical: number
 }
 
-interface PlayerInfoTileData {
+export interface PlayerInfoTileData {
   playerID: number
   username: string
   pingStatus: boolean

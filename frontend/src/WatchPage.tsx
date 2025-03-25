@@ -15,7 +15,7 @@ interface SQLNullInt64 {
   Valid: boolean
 }
 
-interface matchData {
+export interface matchData {
   matchID: number
   whitePlayerUsername: SQLNullString
   blackPlayerUsername: SQLNullString
@@ -78,7 +78,7 @@ function getTimeFormatName(timeFormatInMilliseconds: number) {
   }
 }
 
-function MatchTile({ matchData, idx }: { matchData: matchData, idx: number }) {
+export function MatchTile({ matchData, idx }: { matchData: matchData, idx: number }) {
   const playerInfoTile = useContext<PlayerInfoTileContextInterface>(PlayerInfoTileContext)
   let outcome = ""
   if (matchData.whitePlayerPoints > matchData.blackPlayerPoints) {
