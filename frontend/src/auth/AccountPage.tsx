@@ -62,7 +62,24 @@ function AccountContent({ pageData }: { pageData: PageData | undefined }) {
 }
 
 async function fetchPageData(username: string, activePage: Page, setPageCache: React.Dispatch<React.SetStateAction<Map<Page, PageData>>>, signal: AbortSignal) {
-  const url = import.meta.env.VITE_API_GET_PAST_MATCHES_FOR_USERNAME + `?username=${username}timeFormat=${activePage}`
+  let url = import.meta.env.VITE_API_GET_PAST_MATCHES_URL
+  let searchParams: [string, string][] = []
+
+  if (username != "") {
+    searchParams.push(["username", username])
+  }
+
+  if (activePage != Page.All) {
+    searchParams.push(["timeFormat", activePage])
+  }
+
+  if (searchParams.length > 0) {
+    url += "?"
+  }
+  
+  for (let [searchTerm, value] of searchParams) {
+    url += `${searchTerm}=${value}`
+  }
 
   try {
     const response = await fetch(url, {
