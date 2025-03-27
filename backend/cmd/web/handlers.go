@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"math/rand"
 	"net/http"
 	"sync"
@@ -534,34 +533,34 @@ func getPastMatchesListHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
 
+	filters := models.PastMatchFilters{}
+
 	queryParams := r.URL.Query()
 
 	searchString := queryParams.Get("timeFormat")
+	username := queryParams.Get("username")
+
+	if username != "" {
+		filters.Username = &username
+	}
 
 	app.infoLog.Printf("searchString: %s\n", searchString)
 
-	var timeFormatLower int64
-	var timeFormatUpper int64
-
 	switch searchString {
 	case "bullet":
-		timeFormatLower, timeFormatUpper = chess.Bullet[0], chess.Bullet[1]
+		filters.TimeFormatLower, filters.TimeFormatUpper = &chess.Bullet[0], &chess.Bullet[1]
 
 	case "blitz":
-		timeFormatLower, timeFormatUpper = chess.Blitz[0], chess.Blitz[1]
+		filters.TimeFormatLower, filters.TimeFormatUpper = &chess.Blitz[0], &chess.Blitz[1]
 
 	case "rapid":
-		timeFormatLower, timeFormatUpper = chess.Rapid[0], chess.Rapid[1]
+		filters.TimeFormatLower, filters.TimeFormatUpper = &chess.Rapid[0], &chess.Rapid[1]
 
 	case "classical":
-		timeFormatLower, timeFormatUpper = chess.Classical[0], chess.Classical[1]
-
-	default:
-		timeFormatLower = 0
-		timeFormatUpper = math.MaxInt64
+		filters.TimeFormatLower, filters.TimeFormatUpper = &chess.Classical[0], &chess.Classical[1]
 	}
 
-	matchList, err := app.pastMatches.GetPastMatchesWithFormat(timeFormatLower, timeFormatUpper)
+	matchList, err := app.pastMatches.GetPastMatchesWithFormat(filters)
 	if err != nil {
 		app.serverError(w, err, false)
 		return

@@ -89,10 +89,10 @@ function declineEvent(game: gameContext, isThreefold = false) {
     
 }
 
-function PingStatus({ connected }: { connected: boolean }) {
+export function PingStatus({ connected, style }: { connected: boolean, style?: React.CSSProperties }) {
   const fill = connected ? "#52f407" : "#bbb"
   return (
-    <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+    <svg style={style} viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
       <circle cx="10" cy="10" r="10" fill={fill} />
       Sorry, your browser does not support inline SVG.
     </svg> 

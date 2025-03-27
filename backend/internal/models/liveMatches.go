@@ -318,22 +318,32 @@ func (m *LiveMatchModel) UpdateLiveMatch(matchID int64, newFEN string, lastMoveP
 	}
 	defer updateStmt.Close()
 
-	_, err = updateStmt.Exec(lastMovePiece, lastMoveMove, newFEN, whitePlayerTimeRemainingMilliseconds, blackPlayerTimeRemainingMilliseconds, matchStateHistoryJSONstr, time.Time.UnixMilli(timeOfLastMove), matchID)
-	if err != nil {
-		app.errorLog.Printf("Error executing statement: %v\n", err)
-		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			app.errorLog.Printf("insert updateRating: unable to rollback: %v", rollbackErr)
+	for {
+
+		_, err = updateStmt.Exec(lastMovePiece, lastMoveMove, newFEN, whitePlayerTimeRemainingMilliseconds, blackPlayerTimeRemainingMilliseconds, matchStateHistoryJSONstr, time.Time.UnixMilli(timeOfLastMove), matchID)
+		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
+			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
+			time.Sleep(50 * time.Millisecond)
+			continue
+		} else if err != nil {
+			app.errorLog.Printf("Error executing statement: %v\n", err)
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				app.errorLog.Printf("insert updateRating: unable to rollback: %v", rollbackErr)
+			}
+			return err
 		}
-		return err
+
+		err = tx.Commit()
+		if err != nil {
+			app.errorLog.Printf("Error commiting transaction in updateLiveMatch: %v\n", err)
+			return err
+		}
+
+		break
+
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		app.errorLog.Printf("Error commiting transaction in updateRating: %v\n", err)
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (m *LiveMatchModel) EnQueueReturnUpdateLiveMatch(matchID int64, newFEN string, lastMovePiece int, lastMoveMove int, whitePlayerTimeRemainingMilliseconds int64, blackPlayerTimeRemainingMilliseconds int64, matchStateHistoryJSONstr []byte, timeOfLastMove time.Time, waitFor *sync.WaitGroup, block *sync.WaitGroup) error {
@@ -431,31 +441,51 @@ func (m *LiveMatchModel) MoveMatchToPastMatches(matchID int64, result int, resul
 	}
 	defer stmtTwo.Close()
 
-	_, err = stmtOne.Exec(result, resultReason, whitePlayerEloGain, blackPlayerEloGain, time.Now().Unix(), matchID)
-	if err != nil {
-		app.errorLog.Printf("Error executing first statement: %v\n", err)
-		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			app.errorLog.Printf("insert past_matches: unable to rollback: %v", rollbackErr)
+	for {
+
+		_, err = stmtOne.Exec(result, resultReason, whitePlayerEloGain, blackPlayerEloGain, time.Now().Unix(), matchID)
+		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
+			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
+			time.Sleep(50 * time.Millisecond)
+			continue
+		} else if err != nil {
+			app.errorLog.Printf("Error executing first statement: %v\n", err)
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				app.errorLog.Printf("insert past_matches: unable to rollback: %v", rollbackErr)
+			}
+			return err
 		}
-		return err
+
+		break
+
 	}
 
-	_, err = stmtTwo.Exec(matchID)
-	if err != nil {
-		app.errorLog.Printf("Error executing second statement: %v\n", err)
-		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			app.errorLog.Printf("delete live_matches: unable to rollback: %v", rollbackErr)
+	for {
+
+		_, err = stmtTwo.Exec(matchID)
+		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
+			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
+			time.Sleep(50 * time.Millisecond)
+			continue
+		} else if err != nil {
+			app.errorLog.Printf("Error executing second statement: %v\n", err)
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				app.errorLog.Printf("delete live_matches: unable to rollback: %v", rollbackErr)
+			}
+			return err
 		}
-		return err
+
+		err = tx.Commit()
+		if err != nil {
+			app.errorLog.Printf("Error commiting transaction: %v\n", err)
+			return err
+		}
+
+		break
+
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		app.errorLog.Printf("Error commiting transaction: %v\n", err)
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (m *LiveMatchModel) EnQueueReturnMoveMatchToPastMatches(matchID int64, result int, resultReason chess.GameOverStatusCode, whitePlayerEloGain float64, blackPlayerEloGain float64, waitFor *sync.WaitGroup, block *sync.WaitGroup) error {

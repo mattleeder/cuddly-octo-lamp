@@ -156,22 +156,41 @@ func (m *UserModel) InsertNew(username string, password string, options *NewUser
 	}
 	defer stmtTwo.Close()
 
-	_, err = stmtOne.Exec(playerID, username, hashedPassword, email)
-	if err != nil {
-		app.errorLog.Printf("Error inserting new user: %s\n", err.Error())
-		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			app.errorLog.Printf("insert users: unable to rollback: %s", rollbackErr)
+	for {
+
+		_, err = stmtOne.Exec(playerID, username, hashedPassword, email)
+		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
+			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
+			time.Sleep(50 * time.Millisecond)
+			continue
+		} else if err != nil {
+			app.errorLog.Printf("Error inserting new user: %s\n", err.Error())
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				app.errorLog.Printf("insert users: unable to rollback: %s", rollbackErr)
+			}
+			return 0, err
 		}
-		return 0, err
+
+		break
 	}
 
-	_, err = stmtTwo.Exec(playerID, username)
-	if err != nil {
-		app.errorLog.Printf("Error executing second statement: %v\n", err)
-		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			app.errorLog.Printf("insert user_ratings: unable to rollback: %v", rollbackErr)
+	for {
+
+		_, err = stmtTwo.Exec(playerID, username)
+		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
+			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
+			time.Sleep(50 * time.Millisecond)
+			continue
+		} else if err != nil {
+			app.errorLog.Printf("Error executing second statement: %v\n", err)
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				app.errorLog.Printf("insert user_ratings: unable to rollback: %v", rollbackErr)
+			}
+			return 0, err
 		}
-		return 0, err
+
+		break
+
 	}
 
 	err = tx.Commit()

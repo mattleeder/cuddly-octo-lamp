@@ -51,6 +51,12 @@ type PastMatchModel struct {
 	DB *sql.DB
 }
 
+type PastMatchFilters struct {
+	TimeFormatLower *int64
+	TimeFormatUpper *int64
+	Username        *string
+}
+
 func (m *PastMatchModel) LogAll() {
 	app.infoLog.Println("Past Matches:")
 
@@ -70,7 +76,8 @@ func (m *PastMatchModel) LogAll() {
 	}
 }
 
-func (m *PastMatchModel) GetPastMatchesWithFormat(timeFormatLower int64, timeFormatUpper int64) ([]PastMatchSummary, error) {
+func (m *PastMatchModel) GetPastMatchesWithFormat(filters PastMatchFilters) ([]PastMatchSummary, error) {
+	args := []any{}
 	// Left join for anonymous players
 	sqlStmt := `
 	SELECT m.match_id,
@@ -95,8 +102,7 @@ func (m *PastMatchModel) GetPastMatchesWithFormat(timeFormatLower int64, timeFor
 	    ON m.white_player_id = white_player.player_id
 	  LEFT JOIN users as black_player
 	    on m.black_player_id = black_player.player_id
-	 WHERE m.time_format_in_milliseconds > ?
-	   AND m.time_format_in_milliseconds <= ?
+	 WHERE 1=1
 	`
 
 	var output []PastMatchSummary
@@ -118,7 +124,25 @@ func (m *PastMatchModel) GetPastMatchesWithFormat(timeFormatLower int64, timeFor
 	var matchStartTime int64
 	var matchEndTime int64
 
-	rows, err := m.DB.Query(sqlStmt, timeFormatLower, timeFormatUpper)
+	if filters.TimeFormatLower != nil {
+		sqlStmt += " AND m.time_format_in_milliseconds > ?"
+		app.infoLog.Printf("TimeFormatLower: %v\n", filters.TimeFormatLower)
+		args = append(args, filters.TimeFormatLower)
+	}
+
+	if filters.TimeFormatUpper != nil {
+		sqlStmt += " AND m.time_format_in_milliseconds <= ?"
+		app.infoLog.Printf("TimeFormatUpper: %v\n", filters.TimeFormatUpper)
+		args = append(args, filters.TimeFormatUpper)
+	}
+
+	if filters.Username != nil {
+		sqlStmt += ` AND white_player.username = ? 
+		              OR black_player.username = ?`
+		args = append(args, filters.Username, filters.Username)
+	}
+
+	rows, err := m.DB.Query(sqlStmt, args...)
 	if err != nil {
 		app.errorLog.Printf("Error getting past matches with format: %s\n", err.Error())
 		return nil, err

@@ -1,19 +1,16 @@
-import React, { useEffect, useState } from "react"
-import { PlayerInfoTileData } from "../PlayerInfoTile"
-import { LoaderCircle } from "lucide-react"
+import React, { useEffect, useRef, useState } from "react"
+import { formatTimePassed, PlayerInfoTileData } from "../PlayerInfoTile"
+import { Flame, LoaderCircle, Rabbit, TrainFront, Turtle } from "lucide-react"
 import { useParams } from "react-router-dom"
 import { matchData, MatchTile } from "../WatchPage"
+import { PingStatus } from "../chess/GameInfoTile"
 
 enum Page {
-  All = "All",
-  Bullet = "Bullet",
-  Blitz = "Blitz",
-  Rapid = "Rapid",
-  Classical = "Classical",
-}
-
-interface PageData {
-  matchList: matchData[]
+  All = "all",
+  Bullet = "bullet",
+  Blitz = "blitz",
+  Rapid = "rapid",
+  Classical = "classical",
 }
 
 function AccountInfoDisplay({ accountInfo }: { accountInfo: PlayerInfoTileData | undefined }) {
@@ -28,20 +25,52 @@ function AccountInfoDisplay({ accountInfo }: { accountInfo: PlayerInfoTileData |
     <div style={{
       position: "relative",
       width: "70vw",
-      height: "20vh",
       backgroundColor: "#ababaa",
       borderRadius: "4px",
+      padding: "1em",
       
     }}>
-      {accountInfo.username}
+      <div style={{display: "flex", flexDirection: "row"}}>
+        <div style={{display: "flex", flexDirection: "row", margin: "auto", alignItems: "center"}}>
+          <PingStatus style={{width: "1em", paddingRight: "0.5em"}} connected={accountInfo.pingStatus}/>
+          <span>{accountInfo.username}</span>
+        </div>
+        <div style={{
+            display: "grid",
+            gridTemplateColumns: "auto auto",
+            columnGap: "1em",
+            marginLeft: "auto",
+            alignItems: "start",
+            textAlign: "left",
+          }}>
+          <div>
+            Joined:
+          </div>
+          <div>
+            {formatTimePassed(accountInfo.joinDate)}
+          </div>
+          <div>
+            Last Seen:
+          </div>
+          <div>
+            {accountInfo.lastSeen}  
+          </div>
+          <div>
+            Number of Games:
+          </div>
+          <div>
+            {accountInfo.numberOfGames}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
 
-function AccountContent({ pageData }: { pageData: PageData | undefined }) {
+function AccountContent({ pageData }: { pageData: matchData[] | undefined }) {
 
-  if (pageData === undefined) {
+  if (pageData === undefined || pageData === null) {
     return (
       <div>
         No data.
@@ -51,7 +80,7 @@ function AccountContent({ pageData }: { pageData: PageData | undefined }) {
   return (
     <div>
       <ul>
-        {pageData.matchList.map((matchData, idx) => {
+        {pageData.map((matchData, idx) => {
           return (
             <MatchTile key={`match_${matchData.matchID}`} matchData={matchData} idx={idx}/>
           )
@@ -61,7 +90,7 @@ function AccountContent({ pageData }: { pageData: PageData | undefined }) {
   )
 }
 
-async function fetchPageData(username: string, activePage: Page, setPageCache: React.Dispatch<React.SetStateAction<Map<Page, PageData>>>, signal: AbortSignal) {
+async function fetchPageData(username: string, activePage: Page, pageCache: React.RefObject<Map<Page, matchData[]>>, signal: AbortSignal) {
   let url = import.meta.env.VITE_API_GET_PAST_MATCHES_URL
   let searchParams: [string, string][] = []
 
@@ -78,7 +107,7 @@ async function fetchPageData(username: string, activePage: Page, setPageCache: R
   }
   
   for (let [searchTerm, value] of searchParams) {
-    url += `${searchTerm}=${value}`
+    url += `${searchTerm}=${value}&`
   }
 
   try {
@@ -89,14 +118,9 @@ async function fetchPageData(username: string, activePage: Page, setPageCache: R
 
     if (response.ok) {
       console.log(response)
-      const responseData: PageData = await response.json()
+      const responseData: matchData[] = await response.json()
       console.log(responseData)
-      setPageCache((currentCache) => {
-        return {
-          ...currentCache,
-          activePage: responseData
-        }
-      })
+      pageCache.current?.set(activePage, responseData)
       return responseData
     }
 
@@ -124,7 +148,6 @@ const exampleAccountInfo: PlayerInfoTileData = {
 
 async function fetchUserData(username: string, signal: AbortSignal) {
   const url = import.meta.env.VITE_API_GET_TILE_INFO_URL + `?search=${username}`
-  return exampleAccountInfo
 
   try {
     const response = await fetch(url, {
@@ -149,9 +172,9 @@ async function fetchUserData(username: string, signal: AbortSignal) {
 export function AccountPage() {
   const { username } = useParams()
   const [activePage, setActivePage] = useState(Page.All)
-  const [pageData, setPageData] = useState<PageData | undefined>(undefined)
+  const [pageData, setPageData] = useState<matchData[] | undefined>(undefined)
   const [playerData, setPlayerData] = useState<PlayerInfoTileData | undefined>(undefined)
-  const [pageCache, setPageCache] = useState(new Map<Page, PageData>()) // Should be a ref instead
+  const pageCache = useRef(new Map<Page, matchData[]>()) // Should be a ref instead
   const [loadingPlayerData, setLoadingPlayerData] = useState(true)
   const [loadingContent, setLoadingContent] = useState(true)
 
@@ -184,7 +207,8 @@ export function AccountPage() {
     const signal = controller.signal;
 
     (async() => {
-      const pageData = pageCache.get(activePage) || fetchPageData(username || "", activePage, setPageCache, signal)
+      console.log(pageCache)
+      const pageData = pageCache.current?.get(activePage) || fetchPageData(username || "", activePage, pageCache, signal)
       if (!ignore) {
         setPageData(await pageData)
         setLoadingContent(false)
@@ -198,7 +222,7 @@ export function AccountPage() {
   }, [username, activePage])
 
     return (
-    <div>
+    <>
       <div style={{
         display: "block",
         position: "fixed",
@@ -215,24 +239,65 @@ export function AccountPage() {
           margin: 0,
         }}>
           <li className={`userTimeFormat${activePage == Page.All ? " active" : ""}`} onClick={() => setActivePage(Page.All)}>
-            All
+            <div>
+              <span>All</span>
+            </div>
           </li>
           <li className={`userTimeFormat${activePage == Page.Bullet ? " active" : ""}`} onClick={() => setActivePage(Page.Bullet)}>
-            Bullet
+            <div style={{display: "flex", flexDirection: "column", width: "100%"}}>
+              <div style={{display: "flex", justifyItems: "center"}}>
+                <span>Bullet</span>
+                <TrainFront style={{marginLeft: "auto"}}/>
+              </div>
+              <div style={{textAlign: "center"}}>
+                {playerData?.ratings.bullet || "-"}
+              </div>
+            </div>
           </li>
           <li className={`userTimeFormat${activePage == Page.Blitz ? " active" : ""}`} onClick={() => setActivePage(Page.Blitz)}>
-            Blitz
+            <div style={{display: "flex", flexDirection: "column", width: "100%"}}>
+              <div style={{display: "flex", justifyItems: "center"}}>
+                <span>Blitz</span>
+                <Flame style={{marginLeft: "auto"}}/>
+              </div>
+              <div style={{textAlign: "center"}}>
+                {playerData?.ratings.blitz || "-"}
+              </div>
+            </div>
           </li>
           <li className={`userTimeFormat${activePage == Page.Rapid ? " active" : ""}`} onClick={() => setActivePage(Page.Rapid)}>
-            Rapid
+            <div style={{display: "flex", flexDirection: "column", width: "100%"}}>
+              <div style={{display: "flex", justifyItems: "center"}}>
+                <span>Rapid</span>
+                <Rabbit style={{marginLeft: "auto"}}/>
+              </div>
+              <div style={{textAlign: "center"}}>
+                {playerData?.ratings.rapid || "-"}
+              </div>
+            </div>
           </li>
           <li className={`userTimeFormat${activePage == Page.Classical ? " active" : ""}`} onClick={() => setActivePage(Page.Classical)}>
-            Classical
+            <div style={{display: "flex", flexDirection: "column", width: "100%"}}>
+              <div style={{display: "flex", justifyItems: "center"}}>
+                <span>Classical</span>
+                <Turtle style={{marginLeft: "auto"}}/>
+              </div>
+              <div style={{textAlign: "center"}}>
+                {playerData?.ratings.classical || "-"}
+              </div>
+            </div>
           </li>
         </ul>
       </div>
-      {loadingPlayerData ? <LoaderCircle className="loaderSpin"/> : <AccountInfoDisplay accountInfo={playerData}/>}
-      {loadingContent ? <LoaderCircle className="loaderSpin"/> : <AccountContent pageData={pageData}/>}
-    </div>
+      <div style={{
+        display:"flex",
+        flexDirection: "column",
+        height: "100vh",
+        paddingTop: "3em",
+      }}>
+        {loadingPlayerData ? <LoaderCircle className="loaderSpin"/> : <AccountInfoDisplay accountInfo={playerData}/>}
+        {loadingContent ? <LoaderCircle className="loaderSpin"/> : <AccountContent pageData={pageData}/>}
+      </div>
+    </>
     )
 }

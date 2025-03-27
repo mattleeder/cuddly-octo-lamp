@@ -163,7 +163,7 @@ func (m *UserRatingsModel) updateRating(username string, playerID int64, ratingT
 		} else if err != nil {
 			app.errorLog.Printf("Error executing statement: %v\n", err)
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				app.errorLog.Printf("insert updateRating: unable to rollback: %v", rollbackErr)
+				app.errorLog.Printf("updateRating: unable to rollback: %v", rollbackErr)
 			}
 			return err
 		}

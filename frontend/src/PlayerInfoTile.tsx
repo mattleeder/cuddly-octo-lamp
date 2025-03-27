@@ -253,7 +253,7 @@ function getPositionFromMouseEvent(event: React.MouseEvent<Element, MouseEvent>)
   }
 }
 
-function formatTimePassed(millisecondsSince: number) {
+export function formatTimePassed(millisecondsSince: number) {
   const intervals: [string, number][] = [
     [" year",   31_536_000_000],
     [" month",  2_592_000_000],     // 1 Month = 30 Days
