@@ -279,22 +279,11 @@ function getRowAndColFromBoardIndex(idx: number, flip: boolean): [number, number
 // }
 
 function PiecesComponent({ flip, squareWidth, onDragEndCallback, rect, colour, variant, index }: { flip: boolean, squareWidth: number, onDragEndCallback: (startIdx: number, endIdx: number) => void, rect?: React.RefObject<Rect | null>, colour: PieceColour | null, variant: PieceVariant | null, index: number }) {
-  useEffect(() => {
-    console.log("Index changed")
-  }, [index])
-
-  useEffect(() => {
-    console.log("Piece Mount")
-    return () => {
-      console.log("Piece Unmount")
-    }
-  }, [])
   
   if (colour === null || variant === null) {
     return <React.Fragment key={index} />
   }
   const [row, col] = getRowAndColFromBoardIndex(index, flip)
-  console.log(`Index: ${index}`)
 
   return (
     <div
@@ -527,7 +516,6 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
       resizeObserver.disconnect()
 
       window.removeEventListener('scroll', () => {
-        console.log("RESIZE")
         if (boardRef.current) {
           const boundingRect = boardRef.current.getBoundingClientRect()
           rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
@@ -536,7 +524,6 @@ export function ChessBoard({ resizeable, defaultWidth, chessboardContainerStyles
       })
 
       window.removeEventListener('resize', () => {
-        console.log("RESIZE")
         if (boardRef.current) {
           const boundingRect = boardRef.current.getBoundingClientRect()
           rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
@@ -647,7 +634,6 @@ export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [Pi
 
   useEffect(() => {
     const resizeObserver = new ResizeObserver((entries) => {
-      console.log("RESIZE")
       for (const entry of entries) {
         const boundingRect = entry.target.getBoundingClientRect()
         rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
@@ -659,7 +645,6 @@ export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [Pi
     }
 
     window.addEventListener('scroll', () => {
-      console.log("RESIZE")
       if (boardRef.current) {
         const boundingRect = boardRef.current.getBoundingClientRect()
         rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
@@ -668,7 +653,6 @@ export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [Pi
     })
 
     window.addEventListener('resize', () => {
-      console.log("RESIZE")
       if (boardRef.current) {
         const boundingRect = boardRef.current.getBoundingClientRect()
         rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
@@ -680,7 +664,6 @@ export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [Pi
       resizeObserver.disconnect()
 
       window.removeEventListener('scroll', () => {
-        console.log("RESIZE")
         if (boardRef.current) {
           const boundingRect = boardRef.current.getBoundingClientRect()
           rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)
@@ -689,7 +672,6 @@ export function FrozenChessBoard({ board, lastMove, showLastMove }: { board: [Pi
       })
 
       window.removeEventListener('resize', () => {
-        console.log("RESIZE")
         if (boardRef.current) {
           const boundingRect = boardRef.current.getBoundingClientRect()
           rect.current = getRect(boundingRect.top, boundingRect.left, boundingRect.width, boundingRect.height)

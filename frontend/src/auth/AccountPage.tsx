@@ -47,13 +47,13 @@ function AccountInfoDisplay({ accountInfo }: { accountInfo: PlayerInfoTileData |
             Joined:
           </div>
           <div>
-            {formatTimePassed(accountInfo.joinDate)}
+            {formatTimePassed(accountInfo.joinDate)} ago
           </div>
           <div>
             Last Seen:
           </div>
           <div>
-            {accountInfo.lastSeen}  
+            {formatTimePassed(accountInfo.lastSeen)} ago  
           </div>
           <div>
             Number of Games:

@@ -60,7 +60,7 @@ type PastMatchFilters struct {
 func (m *PastMatchModel) LogAll() {
 	app.infoLog.Println("Past Matches:")
 
-	rows, err := m.DB.Query("select * from past_matches;")
+	rows, err := QueryWithRetry(m.DB, "select * from past_matches;")
 	if err != nil {
 		app.errorLog.Println(err)
 		return
@@ -142,7 +142,7 @@ func (m *PastMatchModel) GetPastMatchesWithFormat(filters PastMatchFilters) ([]P
 		args = append(args, filters.Username, filters.Username)
 	}
 
-	rows, err := m.DB.Query(sqlStmt, args...)
+	rows, err := QueryWithRetry(m.DB, sqlStmt, args...)
 	if err != nil {
 		app.errorLog.Printf("Error getting past matches with format: %s\n", err.Error())
 		return nil, err

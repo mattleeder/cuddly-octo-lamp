@@ -156,41 +156,24 @@ func (m *UserModel) InsertNew(username string, password string, options *NewUser
 	}
 	defer stmtTwo.Close()
 
-	for {
+	_, err = ExecStatementWithRetry(stmtOne, playerID, username, hashedPassword, email)
 
-		_, err = stmtOne.Exec(playerID, username, hashedPassword, email)
-		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
-			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
-			time.Sleep(50 * time.Millisecond)
-			continue
-		} else if err != nil {
-			app.errorLog.Printf("Error inserting new user: %s\n", err.Error())
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				app.errorLog.Printf("insert users: unable to rollback: %s", rollbackErr)
-			}
-			return 0, err
+	if err != nil {
+		app.errorLog.Printf("Error inserting new user: %s\n", err.Error())
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("insert users: unable to rollback: %s", rollbackErr)
 		}
-
-		break
+		return 0, err
 	}
 
-	for {
+	_, err = ExecStatementWithRetry(stmtTwo, playerID, username)
 
-		_, err = stmtTwo.Exec(playerID, username)
-		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
-			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
-			time.Sleep(50 * time.Millisecond)
-			continue
-		} else if err != nil {
-			app.errorLog.Printf("Error executing second statement: %v\n", err)
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				app.errorLog.Printf("insert user_ratings: unable to rollback: %v", rollbackErr)
-			}
-			return 0, err
+	if err != nil {
+		app.errorLog.Printf("Error executing second statement: %v\n", err)
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("insert user_ratings: unable to rollback: %v", rollbackErr)
 		}
-
-		break
-
+		return 0, err
 	}
 
 	err = tx.Commit()
@@ -230,7 +213,7 @@ func (m *UserModel) Authenticate(username string, password string) (playerID int
 func (m *UserModel) LogAll() {
 	app.infoLog.Println("Users:")
 
-	rows, err := m.DB.Query("select * from users;")
+	rows, err := QueryWithRetry(m.DB, "select * from users;")
 	if err != nil {
 		app.errorLog.Println(err)
 		return
@@ -381,9 +364,9 @@ func (m *UserModel) updateLastSeen(username string, playerID int64, queryMode Qu
 	defer updateStmt.Close()
 
 	if queryMode == qmUsername {
-		_, err = updateStmt.Exec(username)
+		_, err = ExecStatementWithRetry(updateStmt, username)
 	} else if queryMode == qmPlayerID {
-		_, err = updateStmt.Exec(playerID)
+		_, err = ExecStatementWithRetry(updateStmt, playerID)
 	}
 
 	if err != nil {
@@ -442,9 +425,9 @@ func (m *UserModel) updateEmail(email string, username string, playerID int64, q
 	defer updateStmt.Close()
 
 	if queryMode == qmUsername {
-		_, err = updateStmt.Exec(username, email)
+		_, err = ExecStatementWithRetry(updateStmt, username, email)
 	} else if queryMode == qmPlayerID {
-		_, err = updateStmt.Exec(playerID, email)
+		_, err = ExecStatementWithRetry(updateStmt, playerID, email)
 	}
 
 	if err != nil {
@@ -485,7 +468,7 @@ func (m *UserModel) SearchForUsers(searchString string) ([]UserClientSide, error
 	var joinDate int64
 	var lastSeen int64
 
-	rows, err := m.DB.Query(sqlStmt, strings.ToUpper(searchString))
+	rows, err := QueryWithRetry(m.DB, sqlStmt, strings.ToUpper(searchString))
 	if err != nil {
 		app.errorLog.Printf("Error in SearchForUsers: %s\n", err.Error())
 		return nil, err

@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	_ "modernc.org/sqlite"
 )
 
 type application struct {
@@ -128,7 +130,7 @@ func init() {
 
 	DBTaskQueue = &TaskQueue{tasks: make(chan Task, 10)}
 
-	for i := 0; i < numdbTaskQueueWorkers; i++ {
+	for i := range numdbTaskQueueWorkers {
 		app.infoLog.Printf("Starting DB Task Queue Worker Number %v\n", i)
 		go DBTaskQueue.runWorker()
 	}
@@ -140,10 +142,10 @@ func InitDatabase(driverName string, dataSourceName string) {
 	os.Remove("./chess_site.db")
 
 	db, err := sql.Open(driverName, dataSourceName)
-	defer db.Close()
 	if err != nil {
 		app.errorLog.Fatal(err)
 	}
+	defer db.Close()
 
 	schemaPath := filepath.Join("internal", "models", "schema.sql")
 	c, ioErr := os.ReadFile(schemaPath)

@@ -78,46 +78,37 @@ func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerO
 	`
 	// Set white and black remaining time equal to the time format
 
-	for {
+	tx, err := m.DB.Begin()
+	if err != nil {
+		app.errorLog.Printf("Error starting transaction: %v\n", err)
+		return 0, err
+	}
 
-		tx, err := m.DB.Begin()
-		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
-			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
-			time.Sleep(50 * time.Millisecond)
-			continue
-		} else if err != nil {
-			app.errorLog.Printf("Error starting transaction: %v\n", err)
-			return 0, err
+	insertStmt, err := tx.Prepare(sqlStmt)
+	if err != nil {
+		app.errorLog.Printf("Error preparing statement: %v\n", err)
+		return 0, err
+	}
+	defer insertStmt.Close()
+
+	if playerOneIsWhite {
+		result, err = ExecStatementWithRetry(insertStmt, playerOneID, playerTwoID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()), averageElo, whitePlayerElo, blackPlayerElo, time.Time.Unix(time.Now()))
+	} else {
+		result, err = ExecStatementWithRetry(insertStmt, playerTwoID, playerOneID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()), averageElo, whitePlayerElo, blackPlayerElo, time.Time.Unix(time.Now()))
+	}
+
+	if err != nil {
+		app.errorLog.Printf("Error executing statement: %v\n", err)
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("insert updateRating: unable to rollback: %v", rollbackErr)
 		}
+		return 0, err
+	}
 
-		insertStmt, err := tx.Prepare(sqlStmt)
-		if err != nil {
-			app.errorLog.Printf("Error preparing statement: %v\n", err)
-			return 0, err
-		}
-		defer insertStmt.Close()
-
-		if playerOneIsWhite {
-			result, err = insertStmt.Exec(playerOneID, playerTwoID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()), averageElo, whitePlayerElo, blackPlayerElo, time.Time.Unix(time.Now()))
-		} else {
-			result, err = insertStmt.Exec(playerTwoID, playerOneID, timeFormatInMilliseconds, incrementInMilliseconds, timeFormatInMilliseconds, timeFormatInMilliseconds, gameHistory, time.Time.UnixMilli(time.Now()), averageElo, whitePlayerElo, blackPlayerElo, time.Time.Unix(time.Now()))
-		}
-
-		if err != nil {
-			app.errorLog.Printf("Error executing statement: %v\n", err)
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				app.errorLog.Printf("insert updateRating: unable to rollback: %v", rollbackErr)
-			}
-			return 0, err
-		}
-
-		err = tx.Commit()
-		if err != nil {
-			app.errorLog.Printf("Error commiting transaction in updateRating: %v\n", err)
-			return 0, err
-		}
-
-		break
+	err = tx.Commit()
+	if err != nil {
+		app.errorLog.Printf("Error commiting transaction in updateRating: %v\n", err)
+		return 0, err
 	}
 
 	insertID, err := result.LastInsertId()
@@ -267,7 +258,7 @@ func (m *LiveMatchModel) EnQueueReturnGetFromMatchID(matchID int64, waitFor *syn
 func (m *LiveMatchModel) LogAll() {
 	app.infoLog.Println("Live Matches:")
 
-	rows, err := m.DB.Query("select * from live_matches;")
+	rows, err := QueryWithRetry(m.DB, "select * from live_matches;")
 	if err != nil {
 		app.errorLog.Println(err)
 		return
@@ -318,29 +309,19 @@ func (m *LiveMatchModel) UpdateLiveMatch(matchID int64, newFEN string, lastMoveP
 	}
 	defer updateStmt.Close()
 
-	for {
-
-		_, err = updateStmt.Exec(lastMovePiece, lastMoveMove, newFEN, whitePlayerTimeRemainingMilliseconds, blackPlayerTimeRemainingMilliseconds, matchStateHistoryJSONstr, time.Time.UnixMilli(timeOfLastMove), matchID)
-		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
-			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
-			time.Sleep(50 * time.Millisecond)
-			continue
-		} else if err != nil {
-			app.errorLog.Printf("Error executing statement: %v\n", err)
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				app.errorLog.Printf("insert updateRating: unable to rollback: %v", rollbackErr)
-			}
-			return err
+	_, err = ExecStatementWithRetry(updateStmt, lastMovePiece, lastMoveMove, newFEN, whitePlayerTimeRemainingMilliseconds, blackPlayerTimeRemainingMilliseconds, matchStateHistoryJSONstr, time.Time.UnixMilli(timeOfLastMove), matchID)
+	if err != nil {
+		app.errorLog.Printf("Error executing statement: %v\n", err)
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("insert updateRating: unable to rollback: %v", rollbackErr)
 		}
+		return err
+	}
 
-		err = tx.Commit()
-		if err != nil {
-			app.errorLog.Printf("Error commiting transaction in updateLiveMatch: %v\n", err)
-			return err
-		}
-
-		break
-
+	err = tx.Commit()
+	if err != nil {
+		app.errorLog.Printf("Error commiting transaction in updateLiveMatch: %v\n", err)
+		return err
 	}
 
 	return err
@@ -441,48 +422,28 @@ func (m *LiveMatchModel) MoveMatchToPastMatches(matchID int64, result int, resul
 	}
 	defer stmtTwo.Close()
 
-	for {
-
-		_, err = stmtOne.Exec(result, resultReason, whitePlayerEloGain, blackPlayerEloGain, time.Now().Unix(), matchID)
-		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
-			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
-			time.Sleep(50 * time.Millisecond)
-			continue
-		} else if err != nil {
-			app.errorLog.Printf("Error executing first statement: %v\n", err)
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				app.errorLog.Printf("insert past_matches: unable to rollback: %v", rollbackErr)
-			}
-			return err
+	_, err = ExecStatementWithRetry(stmtOne, result, resultReason, whitePlayerEloGain, blackPlayerEloGain, time.Now().Unix(), matchID)
+	if err != nil {
+		app.errorLog.Printf("Error executing first statement: %v\n", err)
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("insert past_matches: unable to rollback: %v", rollbackErr)
 		}
-
-		break
-
+		return err
 	}
 
-	for {
-
-		_, err = stmtTwo.Exec(matchID)
-		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
-			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
-			time.Sleep(50 * time.Millisecond)
-			continue
-		} else if err != nil {
-			app.errorLog.Printf("Error executing second statement: %v\n", err)
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				app.errorLog.Printf("delete live_matches: unable to rollback: %v", rollbackErr)
-			}
-			return err
+	_, err = ExecStatementWithRetry(stmtTwo, matchID)
+	if err != nil {
+		app.errorLog.Printf("Error executing second statement: %v\n", err)
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("delete live_matches: unable to rollback: %v", rollbackErr)
 		}
+		return err
+	}
 
-		err = tx.Commit()
-		if err != nil {
-			app.errorLog.Printf("Error commiting transaction: %v\n", err)
-			return err
-		}
-
-		break
-
+	err = tx.Commit()
+	if err != nil {
+		app.errorLog.Printf("Error commiting transaction: %v\n", err)
+		return err
 	}
 
 	return err

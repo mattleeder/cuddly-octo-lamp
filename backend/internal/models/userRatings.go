@@ -4,7 +4,6 @@ import (
 	"burrchess/internal/chess"
 	"database/sql"
 	"errors"
-	"time"
 )
 
 type RatingType int
@@ -148,33 +147,24 @@ func (m *UserRatingsModel) updateRating(username string, playerID int64, ratingT
 	}
 	defer stmtOne.Close()
 
-	for {
+	if queryMode == qmUsername {
+		_, err = ExecStatementWithRetry(stmtOne, newRating, username)
+	} else if queryMode == qmPlayerID {
+		_, err = ExecStatementWithRetry(stmtOne, newRating, playerID)
+	}
 
-		if queryMode == qmUsername {
-			_, err = stmtOne.Exec(newRating, username)
-		} else if queryMode == qmPlayerID {
-			_, err = stmtOne.Exec(newRating, playerID)
+	if err != nil {
+		app.errorLog.Printf("Error executing statement: %v\n", err)
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("updateRating: unable to rollback: %v", rollbackErr)
 		}
+		return err
+	}
 
-		if err != nil && err.Error() == "database is locked (5) (SQLITE_BUSY)" {
-			app.errorLog.Printf("%v, sleeping for 50ms\n", err.Error())
-			time.Sleep(50 * time.Millisecond)
-			continue
-		} else if err != nil {
-			app.errorLog.Printf("Error executing statement: %v\n", err)
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				app.errorLog.Printf("updateRating: unable to rollback: %v", rollbackErr)
-			}
-			return err
-		}
-
-		err = tx.Commit()
-		if err != nil {
-			app.errorLog.Printf("Error commiting transaction in updateRating: %v\n", err)
-			return err
-		}
-
-		break
+	err = tx.Commit()
+	if err != nil {
+		app.errorLog.Printf("Error commiting transaction in updateRating: %v\n", err)
+		return err
 	}
 
 	return err
@@ -191,7 +181,7 @@ func (m *UserRatingsModel) UpdateRatingFromPlayerID(playerID int64, ratingType R
 func (m *UserRatingsModel) LogAll() {
 	app.infoLog.Println("UserRatings:")
 
-	rows, err := m.DB.Query("select * from user_ratings;")
+	rows, err := QueryWithRetry(m.DB, "select * from user_ratings;")
 	if err != nil {
 		app.errorLog.Println(err)
 		return
