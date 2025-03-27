@@ -15,6 +15,22 @@ interface SQLNullInt64 {
   Valid: boolean
 }
 
+const resultReasons = [
+  "Ongoing",
+	"Stalemate",
+	"Checkmate",
+	"ThreefoldRepetition",
+	"InsufficientMaterial",
+	"WhiteFlagged",
+	"BlackFlagged",
+	"Draw",
+	"WhiteResigned",
+	"BlackResigned",
+	"Abort",
+	"WhiteDisconnected",
+	"BlackDisconnected",
+]
+
 export interface matchData {
   matchID: number
   whitePlayerUsername: SQLNullString
@@ -24,8 +40,14 @@ export interface matchData {
   finalFEN: string
   timeFormatInMilliseconds: number
   incrementInMilliseconds: number
-  whitePlayerPoints: number
-  blackPlayerPoints: number
+  result: number
+  resultReason: number
+  whitePlayerElo: number
+  blackPlayerElo: number
+  whitePlayerEloGain: number
+  blackPlayerEloGain: number
+  matchStartTime: number
+  matchEndTime: number
   averageElo: number
 }
 
@@ -81,13 +103,15 @@ function getTimeFormatName(timeFormatInMilliseconds: number) {
 export function MatchTile({ matchData, idx }: { matchData: matchData, idx: number }) {
   const playerInfoTile = useContext<PlayerInfoTileContextInterface>(PlayerInfoTileContext)
   let outcome = ""
-  if (matchData.whitePlayerPoints > matchData.blackPlayerPoints) {
+  if (matchData.result == 0) {
     outcome = "White wins"
-  } else if (matchData.whitePlayerPoints < matchData.blackPlayerPoints) {
+  } else if (matchData.result == 1) {
     outcome = "Black wins"
   } else {
     outcome = "Draw"
   }
+
+  outcome += ` by ${resultReasons[matchData.resultReason]}`
 
   const gameState = parseGameStateFromFEN(matchData.finalFEN)
   let liClassname = ""
@@ -117,7 +141,7 @@ export function MatchTile({ matchData, idx }: { matchData: matchData, idx: numbe
               <div style={{display: "grid", gridTemplateRows: "1fr 1fr"}}>
                 {/* Info, grid 2 rows, top is rating info bottom is date */}
                 <div>
-                  <span style={{float: "left"}}>Date</span>
+                  <span style={{float: "left"}}>{`${new Date(matchData.matchEndTime * 1000)}`}</span>
                 </div>
               </div>
             </div>
@@ -132,7 +156,7 @@ export function MatchTile({ matchData, idx }: { matchData: matchData, idx: numbe
                   onMouseEnter={(event) => {console.log("Enter"); playerInfoTile?.spawnPlayerInfoTile(matchData.whitePlayerUsername.String, event)}}
                   onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(matchData.whitePlayerUsername.String, event)}
                 >
-                  {matchData.whitePlayerUsername.String}
+                  {`${matchData.whitePlayerUsername.String} (${matchData.whitePlayerElo} ${matchData.whitePlayerEloGain >= 0 ? "+" : "-"} ${matchData.whitePlayerEloGain})`}
                 </span>
                  : 
                 <span>Anon</span>}
@@ -148,7 +172,7 @@ export function MatchTile({ matchData, idx }: { matchData: matchData, idx: numbe
                   onMouseEnter={(event) => {console.log("Enter"); playerInfoTile?.spawnPlayerInfoTile(matchData.blackPlayerUsername.String, event)}}
                   onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(matchData.blackPlayerUsername.String, event)}
                 >
-                  {matchData.blackPlayerUsername.String}
+                  {`${matchData.blackPlayerUsername.String} (${matchData.blackPlayerElo} ${matchData.blackPlayerEloGain >= 0 ? "+" : "-"} ${matchData.blackPlayerEloGain})`}
                 </span>
                  : 
                 <span>Anon</span>}

@@ -37,7 +37,7 @@ var app *application
 func main() {
 	addr := flag.String("addr", ":8080", "HTTPS network address")
 	dbDriverName := flag.String("db", "sqlite", "Database Driver Name")
-	dbDataSourceName := flag.String("dsn", "./chess_site.db?_busy_timeout=5000", "Database Data Source Name")
+	dbDataSourceName := flag.String("dsn", "file:chess_site.db?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)", "Database Data Source Name")
 
 	flag.Parse()
 
@@ -59,10 +59,16 @@ func main() {
 	db.SetConnMaxLifetime(0)
 
 	// Set busy_timeout to 2 seconds
-	_, err = db.Exec("PRAGMA busy_timeout = 5000")
+	// _, err = db.Exec("PRAGMA busy_timeout = 5000;")
+	// if err != nil {
+	// 	errorLog.Fatal(err)
+	// }
+	var busyTimeout int
+	err = db.QueryRow("SELECT * FROM pragma_busy_timeout()").Scan(&busyTimeout)
 	if err != nil {
 		errorLog.Fatal(err)
 	}
+	infoLog.Printf("Busy timeout %d ms\n", busyTimeout)
 
 	// Write-Ahead Logging
 	// _, err = db.Exec("PRAGMA journal_mode=WAL;")
