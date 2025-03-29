@@ -71,20 +71,20 @@ func (m *UserRatingsModel) getRating(username string, playerID int64, queryMode 
 	var rapidRating int64
 	var classicalRating int64
 	var row *sql.Row
+	var err error
 
 	if queryMode == qmUsername {
 		sqlStmt += ` WHERE username = ?`
-		row = m.DB.QueryRow(sqlStmt, username)
+		err = QueryRowWithRetry(m.DB, sqlStmt, []any{username}, []any{&_playerID, &_username, &bulletRating, &blitzRating, &rapidRating, &classicalRating})
 		app.rowsLog.Println(row)
 	} else if queryMode == qmPlayerID {
 		sqlStmt += ` WHERE player_id = ?`
-		row = m.DB.QueryRow(sqlStmt, playerID)
+		err = QueryRowWithRetry(m.DB, sqlStmt, []any{playerID}, []any{&_playerID, &_username, &bulletRating, &blitzRating, &rapidRating, &classicalRating})
 		app.rowsLog.Println(row)
 	} else {
 		return UserRatings{}, errors.New("queryMode unknown")
 	}
 
-	err := row.Scan(&_playerID, &_username, &bulletRating, &blitzRating, &rapidRating, &classicalRating)
 	if err != nil {
 		app.errorLog.Printf("Error getting user_ratings: %s\n", err.Error())
 		return UserRatings{}, err

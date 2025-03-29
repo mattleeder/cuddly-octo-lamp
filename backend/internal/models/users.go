@@ -100,9 +100,6 @@ func CreateNewUserOptions(newUser NewUserInfo) (options NewUserOptions) {
 }
 
 func (m *UserModel) InsertNew(username string, password string, options *NewUserOptions) (int64, error) {
-	defer m.LogAll()
-	ratings := UserRatingsModel{DB: m.DB}
-	defer ratings.LogAll()
 
 	app.infoLog.Printf("Inserting new user: %v\n", username)
 
@@ -193,9 +190,8 @@ func (m *UserModel) Authenticate(username string, password string) (playerID int
 	sqlStmt := `
 	select player_id, password from users where username = ?
 	`
-	row := m.DB.QueryRow(sqlStmt, password)
 	var hashedPassword string
-	err := row.Scan(&playerID, &hashedPassword)
+	err := QueryRowWithRetry(m.DB, sqlStmt, []any{password}, []any{&playerID, &hashedPassword})
 	if err != nil {
 		app.errorLog.Printf("Error getting password for user: %v\n", err.Error())
 		return 0, false
@@ -245,19 +241,18 @@ func (m *UserModel) getUserClientSide(username string, playerID int64, queryMode
 	var _username string
 	var join_date int64
 	var last_seen int64
-	var row *sql.Row
+	var err error
 
 	if queryMode == qmUsername {
 		sqlStmt += ` WHERE username = ?`
-		row = m.DB.QueryRow(sqlStmt, username)
+		err = QueryRowWithRetry(m.DB, sqlStmt, []any{username}, []any{&_playerID, &_username, &join_date, &last_seen})
 	} else if queryMode == qmPlayerID {
 		sqlStmt += ` WHERE player_id = ?`
-		row = m.DB.QueryRow(sqlStmt, playerID)
+		err = QueryRowWithRetry(m.DB, sqlStmt, []any{playerID}, []any{&_playerID, &_username, &join_date, &last_seen})
 	} else {
 		return UserClientSide{}, errors.New("queryMode unknown")
 	}
 
-	err := row.Scan(&_playerID, &_username, &join_date, &last_seen)
 	if err != nil {
 		app.errorLog.Printf("Error getting user: %v\n", err.Error())
 		return UserClientSide{}, err
@@ -298,19 +293,19 @@ func (m *UserModel) getUserServerSide(username string, playerID int64, queryMode
 	var email string
 	var join_date int64
 	var last_seen int64
-	var row *sql.Row
+	var err error
 
 	if queryMode == qmUsername {
 		sqlStmt += ` WHERE username = ?`
-		row = m.DB.QueryRow(sqlStmt, username)
+		err = QueryRowWithRetry(m.DB, sqlStmt, []any{username}, []any{&_playerID, &_username, &password, &email, &join_date, &last_seen})
 	} else if queryMode == qmPlayerID {
 		sqlStmt += ` WHERE player_id = ?`
-		row = m.DB.QueryRow(sqlStmt, playerID)
+		err = QueryRowWithRetry(m.DB, sqlStmt, []any{playerID}, []any{&_playerID, &_username, &password, &email, &join_date, &last_seen})
+
 	} else {
 		return UserServerSide{}, errors.New("queryMode unknown")
 	}
 
-	err := row.Scan(&_playerID, &_username, &password, &email, &join_date, &last_seen)
 	if err != nil {
 		app.errorLog.Printf("Error getting user: %v\n", err.Error())
 		return UserServerSide{}, err
@@ -511,8 +506,7 @@ func (m *UserModel) GetTileInfoFromUsername(username string) (*UserTileInfo, err
 	var rapid_rating int64
 	var classical_rating int64
 
-	row := m.DB.QueryRow(sqlStmt, username)
-	err := row.Scan(&playerID, &joinDate, &lastSeen, &bullet_rating, &blitz_rating, &rapid_rating, &classical_rating)
+	err := QueryRowWithRetry(m.DB, sqlStmt, []any{username}, []any{&playerID, &joinDate, &lastSeen, &bullet_rating, &blitz_rating, &rapid_rating, &classical_rating})
 	if err != nil {
 		app.errorLog.Printf("Error in GetTileInfoFromPlayerID: %s\n", err.Error())
 		return nil, err
@@ -529,8 +523,7 @@ func (m *UserModel) GetTileInfoFromUsername(username string) (*UserTileInfo, err
 
 	var numberOfGames int64
 
-	row = m.DB.QueryRow(sqlStmt, username)
-	err = row.Scan(&numberOfGames)
+	err = QueryRowWithRetry(m.DB, sqlStmt, []any{username}, []any{&numberOfGames})
 	if err != nil {
 		app.errorLog.Printf("Error in GetTileInfoFromPlayerID gameCount: %s\n", err.Error())
 		return nil, err

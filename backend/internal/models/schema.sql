@@ -26,8 +26,8 @@ CREATE TABLE live_matches (
     game_history_json_string BLOB NOT NULL,
     unix_ms_time_of_last_move INTEGER NOT NULL,
     average_elo REAL NOT NULL,
-    white_player_elo REAL NOT NULL,
-    black_player_elo REAL NOT NULL,
+    white_player_elo INTEGER NOT NULL,
+    black_player_elo INTEGER NOT NULL,
     match_start_time INTEGER NOT NULL
 );
 
@@ -43,10 +43,10 @@ CREATE TABLE past_matches (
     game_history_json_string BLOB NOT NULL,
     result INTEGER NOT NULL,
     result_reason INTEGER NOT NULL,
-    white_player_elo REAL NOT NULL,
-    black_player_elo REAL NOT NULL,
-    white_player_elo_gain REAL NOT NULL,
-    black_player_elo_gain REAL NOT NULL,
+    white_player_elo INTEGER NOT NULL,
+    black_player_elo INTEGER NOT NULL,
+    white_player_elo_gain INTEGER NOT NULL,
+    black_player_elo_gain INTEGER NOT NULL,
     average_elo REAL NOT NULL,
     match_start_time INTEGER NOT NULL,
     match_end_time INTEGER NOT NULL

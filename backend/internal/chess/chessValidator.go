@@ -899,7 +899,7 @@ func createBoard() [64]square {
 
 func GetValidMovesForPiece(piecePosition int, currentGameState gameState) (moves []int, captures []int, triggerPromotion bool, friendlyKingInCheck bool) {
 	moves, captures, triggerPromotion, friendlyKingInCheck = getMovesandCapturesForPiece(piecePosition, currentGameState)
-	fmt.Printf("Moves for piece: %v\n", append(moves, captures...))
+	// fmt.Printf("Moves for piece: %v\n", append(moves, captures...))
 	return
 }
 
@@ -1046,7 +1046,7 @@ func BoardFromFEN(fen string) gameState {
 func IsMoveValid(fen string, piece int, move int) bool {
 	var currentGameState = BoardFromFEN(fen)
 	var moves, captures, _, _ = GetValidMovesForPiece(piece, currentGameState)
-	fmt.Printf("Moves for piece: %v\n", append(moves, captures...))
+	// fmt.Printf("Moves for piece: %v\n", append(moves, captures...))
 
 	for _, possibleMove := range append(moves, captures...) {
 		if move == possibleMove {
@@ -1509,9 +1509,9 @@ func chessMain() {
 
 	fmt.Println(out)
 
-	row := testPosition / 8
-	col := testPosition % 8
-	fmt.Printf("Moves for piece: %v\n", colMap[col]+rowMap[row])
+	// row := testPosition / 8
+	// col := testPosition % 8
+	// fmt.Printf("Moves for piece: %v\n", colMap[col]+rowMap[row])
 
 	for _, v := range out {
 		fmt.Println(v)

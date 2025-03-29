@@ -28,10 +28,12 @@ function AccountInfoDisplay({ accountInfo }: { accountInfo: PlayerInfoTileData |
       backgroundColor: "#ababaa",
       borderRadius: "4px",
       padding: "1em",
+      marginLeft: "auto",
+      marginRight: "auto",
       
     }}>
       <div style={{display: "flex", flexDirection: "row"}}>
-        <div style={{display: "flex", flexDirection: "row", margin: "auto", alignItems: "center"}}>
+        <div style={{display: "flex", flexDirection: "row", alignItems: "center"}}>
           <PingStatus style={{width: "1em", paddingRight: "0.5em"}} connected={accountInfo.pingStatus}/>
           <span>{accountInfo.username}</span>
         </div>
@@ -47,13 +49,13 @@ function AccountInfoDisplay({ accountInfo }: { accountInfo: PlayerInfoTileData |
             Joined:
           </div>
           <div>
-            {formatTimePassed(accountInfo.joinDate)} ago
+            {formatTimePassed(Date.now() - accountInfo.joinDate * 1000)} ago
           </div>
           <div>
             Last Seen:
           </div>
           <div>
-            {formatTimePassed(accountInfo.lastSeen)} ago  
+            {formatTimePassed(Date.now() - accountInfo.lastSeen * 1000)} ago  
           </div>
           <div>
             Number of Games:
@@ -78,7 +80,10 @@ function AccountContent({ pageData }: { pageData: matchData[] | undefined }) {
     )
   }
   return (
-    <div>
+    <div style={{
+      marginLeft: "auto",
+      marginRight: "auto",
+    }}>
       <ul>
         {pageData.map((matchData, idx) => {
           return (
@@ -129,21 +134,6 @@ async function fetchPageData(username: string, activePage: Page, pageCache: Reac
   }
 
   return undefined
-}
-
-const exampleAccountInfo: PlayerInfoTileData = {
-  playerID: 123,
-  username: "Test",
-  pingStatus: true,
-  joinDate: 1,
-  lastSeen: 2,
-  ratings: {
-    bullet: 1500,
-    blitz: 1500,
-    rapid: 1500,
-    classical: 1500,
-  },
-  numberOfGames: 2,
 }
 
 async function fetchUserData(username: string, signal: AbortSignal) {
@@ -294,6 +284,8 @@ export function AccountPage() {
         flexDirection: "column",
         height: "100vh",
         paddingTop: "3em",
+        marginLeft: "auto",
+        marginRight: "auto",
       }}>
         {loadingPlayerData ? <LoaderCircle className="loaderSpin"/> : <AccountInfoDisplay accountInfo={playerData}/>}
         {loadingContent ? <LoaderCircle className="loaderSpin"/> : <AccountContent pageData={pageData}/>}

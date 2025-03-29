@@ -53,7 +53,6 @@ type LiveMatchModel struct {
 }
 
 func (m *LiveMatchModel) InsertNew(playerOneID int64, playerTwoID int64, playerOneIsWhite bool, timeFormatInMilliseconds int64, incrementInMilliseconds int64, gameHistory []byte, averageElo float64, whitePlayerElo int64, blackPlayerElo int64) (int64, error) {
-	defer m.LogAll()
 	app.infoLog.Printf("Inserting new match")
 	var result sql.Result
 	var err error
@@ -169,7 +168,6 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatchWithUsernames,
 	    on live_matches.black_player_id = black_player.player_id
 	 WHERE match_id = ?
 	`
-	row := m.DB.QueryRow(sqlStmt, matchID)
 
 	var _matchID int64
 	var whitePlayerID int64
@@ -190,25 +188,30 @@ func (m *LiveMatchModel) GetFromMatchID(matchID int64) (*LiveMatchWithUsernames,
 	var whitePlayerUsername sql.NullString
 	var blackPlayerUsername sql.NullString
 
-	err := row.Scan(
-		&_matchID,
-		&whitePlayerID,
-		&blackPlayerID,
-		&lastMovePiece,
-		&lastMoveMove,
-		&currentFEN,
-		&timeFormatInMilliseconds,
-		&incrementInMilliseconds,
-		&whitePlayerTimeRemainingMilliseconds,
-		&blackPlayerTimeRemainingMilliseconds,
-		&gameHistoryJSONString,
-		&unixMsTimeOfLastMove,
-		&averageElo,
-		&whitePlayerElo,
-		&blackPlayerElo,
-		&matchStartTime,
-		&whitePlayerUsername,
-		&blackPlayerUsername,
+	err := QueryRowWithRetry(
+		m.DB,
+		sqlStmt,
+		[]any{matchID},
+		[]any{
+			&_matchID,
+			&whitePlayerID,
+			&blackPlayerID,
+			&lastMovePiece,
+			&lastMoveMove,
+			&currentFEN,
+			&timeFormatInMilliseconds,
+			&incrementInMilliseconds,
+			&whitePlayerTimeRemainingMilliseconds,
+			&blackPlayerTimeRemainingMilliseconds,
+			&gameHistoryJSONString,
+			&unixMsTimeOfLastMove,
+			&averageElo,
+			&whitePlayerElo,
+			&blackPlayerElo,
+			&matchStartTime,
+			&whitePlayerUsername,
+			&blackPlayerUsername,
+		},
 	)
 	if err != nil {
 		return nil, err
@@ -283,7 +286,6 @@ func (m *LiveMatchModel) EnQueueLogAll() {
 }
 
 func (m *LiveMatchModel) UpdateLiveMatch(matchID int64, newFEN string, lastMovePiece int, lastMoveMove int, whitePlayerTimeRemainingMilliseconds int64, blackPlayerTimeRemainingMilliseconds int64, matchStateHistoryJSONstr []byte, timeOfLastMove time.Time) error {
-	defer m.LogAll()
 	sqlStmt := `
 	UPDATE live_matches
 	   SET last_move_piece = ?, 
@@ -340,14 +342,12 @@ func (m *LiveMatchModel) EnQueueUpdateLiveMatch(matchID int64, newFEN string, la
 	}, waitFor, block)
 }
 
-func (m *LiveMatchModel) MoveMatchToPastMatches(matchID int64, result int, resultReason chess.GameOverStatusCode, whitePlayerEloGain float64, blackPlayerEloGain float64) error {
+func (m *LiveMatchModel) MoveMatchToPastMatches(matchID int64, result int, resultReason chess.GameOverStatusCode, whitePlayerEloGain int64, blackPlayerEloGain int64) error {
 	// outcome int
 	// draw      = 0
 	// whiteWins = 1
 	// blackWins = 2
 	app.infoLog.Printf("Moving %v to past matches", matchID)
-
-	defer m.LogAll()
 
 	stepOne := `
 		-- Step 1: Insert row into past_matches table
@@ -449,14 +449,14 @@ func (m *LiveMatchModel) MoveMatchToPastMatches(matchID int64, result int, resul
 	return err
 }
 
-func (m *LiveMatchModel) EnQueueReturnMoveMatchToPastMatches(matchID int64, result int, resultReason chess.GameOverStatusCode, whitePlayerEloGain float64, blackPlayerEloGain float64, waitFor *sync.WaitGroup, block *sync.WaitGroup) error {
+func (m *LiveMatchModel) EnQueueReturnMoveMatchToPastMatches(matchID int64, result int, resultReason chess.GameOverStatusCode, whitePlayerEloGain int64, blackPlayerEloGain int64, waitFor *sync.WaitGroup, block *sync.WaitGroup) error {
 	err := DBTaskQueue.EnQueueReturnErrorOnlyTask(func() error {
 		return m.MoveMatchToPastMatches(matchID, result, resultReason, whitePlayerEloGain, blackPlayerEloGain)
 	}, waitFor, block)
 	return err
 }
 
-func (m *LiveMatchModel) EnQueueMoveMatchToPastMatches(matchID int64, result int, resultReason chess.GameOverStatusCode, whitePlayerEloGain float64, blackPlayerEloGain float64, waitFor *sync.WaitGroup, block *sync.WaitGroup) {
+func (m *LiveMatchModel) EnQueueMoveMatchToPastMatches(matchID int64, result int, resultReason chess.GameOverStatusCode, whitePlayerEloGain int64, blackPlayerEloGain int64, waitFor *sync.WaitGroup, block *sync.WaitGroup) {
 	DBTaskQueue.EnQueueErrorOnlyTask(func() error {
 		return m.MoveMatchToPastMatches(matchID, result, resultReason, whitePlayerEloGain, blackPlayerEloGain)
 	}, waitFor, block)
@@ -473,8 +473,7 @@ func (m *LiveMatchModel) GetHighestEloMatch() (matchID int64, err error) {
 	 LIMIT 1
 	`
 
-	row := m.DB.QueryRow(sqlStmt)
-	err = row.Scan(&matchIDorNull)
+	err = QueryRowWithRetry(m.DB, sqlStmt, []any{}, []any{&matchIDorNull})
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			app.errorLog.Println("No matches currently being played")
@@ -505,8 +504,7 @@ func (m *LiveMatchModel) IsPlayerInMatch(playerID int64) (bool, error) {
 
 	var matchIDorNull sql.NullInt64
 
-	row := m.DB.QueryRow(sqlStmt, playerID, playerID)
-	err := row.Scan(&matchIDorNull)
+	err := QueryRowWithRetry(m.DB, sqlStmt, []any{playerID, playerID}, []any{&matchIDorNull})
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return false, nil

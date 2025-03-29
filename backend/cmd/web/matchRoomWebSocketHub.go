@@ -712,7 +712,7 @@ func (hub *MatchRoomHub) endGame(reason chess.GameOverStatusCode) error {
 	go app.userRatings.UpdateRatingFromPlayerID(hub.blackPlayerID, models.GetRatingTypeFromTimeFormat(hub.timeFormatInMilliseconds), blackPlayerNewElo)
 
 	hub.gameEnded = true
-	app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, outcome, reason, whitePlayerEloGain, blackPlayerEloGain, hub.taskQueueWaitGroup, nil)
+	app.liveMatches.EnQueueMoveMatchToPastMatches(hub.matchID, outcome, reason, whitePlayerNewElo-hub.whitePlayerElo, blackPlayerNewElo-hub.blackPlayerElo, hub.taskQueueWaitGroup, nil)
 	return nil
 }
 

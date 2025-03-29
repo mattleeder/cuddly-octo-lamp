@@ -141,7 +141,7 @@ export function MatchTile({ matchData, idx }: { matchData: matchData, idx: numbe
               <div style={{display: "grid", gridTemplateRows: "1fr 1fr"}}>
                 {/* Info, grid 2 rows, top is rating info bottom is date */}
                 <div>
-                  <span style={{float: "left"}}>{`${new Date(matchData.matchEndTime * 1000)}`}</span>
+                  <span style={{float: "left"}}>{`${new Date(matchData.matchEndTime * 1000).toLocaleString()}`}</span>
                 </div>
               </div>
             </div>
@@ -156,7 +156,7 @@ export function MatchTile({ matchData, idx }: { matchData: matchData, idx: numbe
                   onMouseEnter={(event) => {console.log("Enter"); playerInfoTile?.spawnPlayerInfoTile(matchData.whitePlayerUsername.String, event)}}
                   onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(matchData.whitePlayerUsername.String, event)}
                 >
-                  {`${matchData.whitePlayerUsername.String} (${matchData.whitePlayerElo} ${matchData.whitePlayerEloGain >= 0 ? "+" : "-"} ${matchData.whitePlayerEloGain})`}
+                  {`${matchData.whitePlayerUsername.String} (${matchData.whitePlayerElo} ${matchData.whitePlayerEloGain >= 0 ? "+" : ""}${matchData.whitePlayerEloGain})`}
                 </span>
                  : 
                 <span>Anon</span>}
@@ -172,7 +172,7 @@ export function MatchTile({ matchData, idx }: { matchData: matchData, idx: numbe
                   onMouseEnter={(event) => {console.log("Enter"); playerInfoTile?.spawnPlayerInfoTile(matchData.blackPlayerUsername.String, event)}}
                   onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(matchData.blackPlayerUsername.String, event)}
                 >
-                  {`${matchData.blackPlayerUsername.String} (${matchData.blackPlayerElo} ${matchData.blackPlayerEloGain >= 0 ? "+" : "-"} ${matchData.blackPlayerEloGain})`}
+                  {`${matchData.blackPlayerUsername.String} (${matchData.blackPlayerElo} ${matchData.blackPlayerEloGain >= 0 ? "+" : ""}${matchData.blackPlayerEloGain})`}
                 </span>
                  : 
                 <span>Anon</span>}
