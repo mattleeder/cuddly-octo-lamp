@@ -3,6 +3,7 @@ import { LoaderCircle } from "lucide-react"
 import { FormError } from "../ui/forms/FormError"
 import { submitFormData } from "../ui/forms/FormUtilities"
 import { SQLNullString } from "../chess/GameContext"
+import { SideBar } from "../ui/SideBar"
 
 interface AccountSettings {
   email: SQLNullString
@@ -121,19 +122,24 @@ async function handleEmailChange(
 
 function EmailChange({ accountSettings, setAccountSettings }: { accountSettings: AccountSettings, setAccountSettings: React.Dispatch<React.SetStateAction<AccountSettings | null>> }) {
   const [loading, setLoading] = useState(false)
-  const [email, setEmail] = useState(accountSettings.email.Valid ? accountSettings.email.String : "")
+  const [currentEmail, _setCurrentEmail] = useState(accountSettings.email.Valid ? accountSettings.email.String : "")
+  const [newEmail, setNewEmail] = useState("")
   const [validationErrors, setValidationErrors] = useState<EmailValidationErrors>({
     email: "",
   })
   return (
     <form action={(formData) => {if (!loading) {handleEmailChange(formData, setLoading, setAccountSettings, setValidationErrors)}}}>
       <div className='formGroup'>
-        <label htmlFor="email">Email</label>
-        <input name="email" type="text" required={true} value={email} onChange={(event) => setEmail(event.target.value)}/>
+        <label htmlFor="currentEmail">Current Email</label>
+        <input name="currentEmail" type="text" readOnly={true} value={currentEmail}/>
+      </div>
+      <div className='formGroup'>
+        <label htmlFor="newEmail">New Email</label>
+        <input name="newEmail" type="text" required={true} value={newEmail} onChange={(event) => setNewEmail(event.target.value)}/>
         <FormError errorMessage={validationErrors.email} />
       </div>
       <button className='signInButton'>Change Email</button>
-      <button className='signInButton'>Remove Email</button>
+      <button className='signInButton' style={{backgroundColor: "red"}}>Remove Email</button>
     </form>
   )
 }
@@ -180,8 +186,10 @@ export function AccountSettingsPage() {
 
   return (
     <div>
-      <PasswordChange/>
-      <EmailChange accountSettings={accountSettingsData} setAccountSettings={setAccountSettingsData}/>
+      <SideBar tabs={[
+        {title: "Change Email", content: <EmailChange accountSettings={accountSettingsData} setAccountSettings={setAccountSettingsData}/>},
+        {title: "Change Password", content: <PasswordChange />},
+      ]}/>
     </div>
   )
 }
