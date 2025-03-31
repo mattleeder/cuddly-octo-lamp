@@ -36,6 +36,7 @@ func (app *application) routes() http.Handler {
 	mux.Handle("/login", withLogSessionSecureCorsChain(loginHandler))
 	mux.Handle("/logout", withLogSessionSecureCorsChain(logoutHandler))
 	mux.Handle("/validateSession", withLogSessionSecureCorsChain(validateSessionHandler))
+	mux.Handle("/getAccountSettings", withLogSessionSecureCorsChain(getUserAccountSettingsHandler))
 
 	mux.Handle("/userSearch", withLogSecureCorsChain(userSearchHandler))
 	mux.Handle("/getTileInfo", withLogSecureCorsChain(getTileInfoHandler))

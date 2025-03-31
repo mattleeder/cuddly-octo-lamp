@@ -1,75 +1,146 @@
-import { useContext, useEffect, useState } from "react"
-import { AuthContext } from "./AuthContext"
-import { useNavigate } from "react-router-dom"
+import React, { useEffect, useState } from "react"
 import { LoaderCircle } from "lucide-react"
-import { FormError } from "../FormError"
+import { FormError } from "../ui/forms/FormError"
+import { submitFormData } from "../ui/forms/FormUtilities"
+import { SQLNullString } from "../chess/GameContext"
 
 interface AccountSettings {
-
+  email: SQLNullString
 }
 
-async function fetchAccountSettings(username: string, signal: AbortSignal) {
-    return null
+interface EmailValidationErrors {
+  email: string
 }
 
-function PasswordChange({ accountSettings }: { accountSettings: AccountSettings }) {
-    return (
-        <div>
-
-        </div>
-    )
+interface PasswordValidationErrors {
+  currentPassword: string,
+  newPassword: string,
 }
 
-async function handleFormSubmit(auth: AuthContextType, formData: FormData, navigate: NavigateFunction, setLoading: React.Dispatch<React.SetStateAction<boolean>>, setValidationErrors: React.Dispatch<React.SetStateAction<LoginFormValidationErrors>>) {
-  setLoading(true)
-  const redirectUrl = formData.get("referrer") as string || "/"
-  const loginData = {
-    username: formData.get("username") as string,
-    password: formData.get("password") as string,
-    rememberMe: formData.get("rememberMe") == "true" ? true : false,
+async function fetchAccountSettings(signal: AbortSignal) {
+  const url = import.meta.env.VITE_API_GET_ACCOUNT_SETTINGS
+  try {
+    const response = await fetch(url, {
+      signal: signal,
+      method: "GET",
+      credentials: "include",
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      return data
+    }
+  } catch (e) {
+    console.error(e)
   }
 
-  console.log(loginData)
+  return null
+}
 
-  const loginCallback = (success: boolean, responseData: LoginFormValidationErrors | undefined) => {
+async function handlePasswordChange(
+  formData: FormData,
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>,
+  setValidationErrors: React.Dispatch<React.SetStateAction<PasswordValidationErrors>>) {
+  const url = import.meta.env.VITE_API_PASSWORD_CHANGE_URL
+  const options: RequestInit = {
+    credentials: "include",
+    body: JSON.stringify({
+      currentPassowrd: formData.get("password") || "",
+      newPassword: formData.get("password") || "",
+    })
+  }
+
+  const passwordCallback = (success: boolean, responseData: unknown) => {
     if (success) {
-      navigate(redirectUrl)
+      console.log("GOOD")
     } else {
-      if (responseData != undefined) {
-        setValidationErrors(responseData)
-      }
+      setValidationErrors(responseData as PasswordValidationErrors)
     }
   }
 
-  auth.login(loginData, loginCallback)
-  setLoading(false)
+  submitFormData(url, options, passwordCallback, setLoading)
 }
 
-function EmailChange({ accountSettings }: { accountSettings: AccountSettings }) {
+function PasswordChange() {
   const [loading, setLoading] = useState(false)
-  const [email, setEmail] = useState("")
-  const navigate = useNavigate()
-  const [validationErrors, setValidationErrors] = useState({
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [validationErrors, setValidationErrors] = useState<PasswordValidationErrors>({
+    currentPassword: "",
+    newPassword: "",
+  })
+  return (
+    <form action={(formData) => {if (!loading) {handlePasswordChange(formData, setLoading, setValidationErrors)}}}>
+      <div className='formGroup'>
+        <label htmlFor="password">Current Password</label>
+        <input name="currentPassword" type="password" required={true} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)}/>
+        <FormError errorMessage={validationErrors.currentPassword} />
+      </div>
+      <div className='formGroup'>
+        <label htmlFor="password">New Password</label>
+        <input name="newPassword" type="password" required={true} value={newPassword} onChange={(event) => setNewPassword(event.target.value)}/>
+        <FormError errorMessage={validationErrors.newPassword} />
+      </div>
+      <button className='signInButton'>Change Password</button>
+    </form>
+  )
+}
+
+async function handleEmailChange(
+  formData: FormData,
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>,
+  setAccountSettings: React.Dispatch<React.SetStateAction<AccountSettings | null>>,
+  setValidationErrors: React.Dispatch<React.SetStateAction<EmailValidationErrors>>) {
+  const url = import.meta.env.VITE_API_EMAIL_CHANGE_URL
+  const options: RequestInit = {
+    credentials: "include",
+    body: JSON.stringify({
+      email: formData.get("email") || "",
+    })
+  }
+
+  const emailCallback = (success: boolean, responseData: unknown) => {
+    if (success) {
+      setAccountSettings((currentSettings) => {
+        if (currentSettings !== null) {
+          const newSettings = {...currentSettings}
+          newSettings.email = {
+            Valid: true,
+            String: formData.get("email")?.toString() || ""
+          }
+        }
+        return null
+      })
+    } else {
+      setValidationErrors(responseData as EmailValidationErrors)
+    }
+  }
+
+  submitFormData(url, options, emailCallback, setLoading)
+}
+
+function EmailChange({ accountSettings, setAccountSettings }: { accountSettings: AccountSettings, setAccountSettings: React.Dispatch<React.SetStateAction<AccountSettings | null>> }) {
+  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState(accountSettings.email.Valid ? accountSettings.email.String : "")
+  const [validationErrors, setValidationErrors] = useState<EmailValidationErrors>({
     email: "",
   })
-  const auth = useContext(AuthContext)
   return (
-    <form action={(formData) => {if (!loading) {handleFormSubmit(auth, formData, navigate, setLoading, setValidationErrors)}}}>
-    <div className='formGroup'>
-        <label htmlFor="username">Username</label>
-        <input name="username" type="text" required={true} value={email} onChange={(event) => setEmail(event.target.value)}/>
+    <form action={(formData) => {if (!loading) {handleEmailChange(formData, setLoading, setAccountSettings, setValidationErrors)}}}>
+      <div className='formGroup'>
+        <label htmlFor="email">Email</label>
+        <input name="email" type="text" required={true} value={email} onChange={(event) => setEmail(event.target.value)}/>
         <FormError errorMessage={validationErrors.email} />
-    </div>
-    <button className='signInButton'>SIGN IN</button>
+      </div>
+      <button className='signInButton'>Change Email</button>
+      <button className='signInButton'>Remove Email</button>
     </form>
   )
 }
 
 export function AccountSettingsPage() {
-    const auth = useContext(AuthContext)
-    const navigate = useNavigate()
-    const [loadingAccountSettings, setLoadingAccountSettings] = useState(true)
-    const [accountSettingsData, setAccountSettingsData] = useState<AccountSettings | null>(null)
+  const [loadingAccountSettings, setLoadingAccountSettings] = useState(true)
+  const [accountSettingsData, setAccountSettingsData] = useState<AccountSettings | null>(null)
 
   useEffect(() => {
     let ignore = false
@@ -78,7 +149,7 @@ export function AccountSettingsPage() {
     const signal = controller.signal;
 
     (async() => {
-      const accountSettingsData = fetchAccountSettings(auth.authData.username, signal)
+      const accountSettingsData = fetchAccountSettings(signal)
       if (!ignore) {
         setAccountSettingsData(await accountSettingsData)
         setLoadingAccountSettings(false)
@@ -91,30 +162,26 @@ export function AccountSettingsPage() {
     }
   }, [])
 
-    if (!auth.isLoggedIn) {
-        navigate("/")
-    }
-
-    if (loadingAccountSettings) {
-        return (
-            <div>
-                <LoaderCircle className="loaderSpin"/>
-            </div>
-        )
-    }
-
-    if (accountSettingsData === null) {
-        return (
-            <div>
-                Error getting data.
-            </div>
-        )
-    }
-
+  if (loadingAccountSettings) {
     return (
-        <div>
-            <PasswordChange accountSettings={accountSettingsData}/>
-            <EmailChange accountSettings={accountSettingsData}/>
-        </div>
+      <div>
+        <LoaderCircle className="loaderSpin"/>
+      </div>
     )
+  }
+
+  if (accountSettingsData === null) {
+    return (
+      <div>
+        Error getting data.
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <PasswordChange/>
+      <EmailChange accountSettings={accountSettingsData} setAccountSettings={setAccountSettingsData}/>
+    </div>
+  )
 }

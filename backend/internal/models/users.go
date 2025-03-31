@@ -80,6 +80,10 @@ type UserTileInfo struct {
 	NumberOfGames int64   `json:"numberOfGames"`
 }
 
+type AccountSettings struct {
+	Email sql.NullString `json:"email"`
+}
+
 func hashPassword(password string) (string, error) {
 	var passwordBytes = []byte(password)
 	hashedPasswordBytes, err := bcrypt.GenerateFromPassword(passwordBytes, PASSWORD_COST)
@@ -546,4 +550,28 @@ func (m *UserModel) GetTileInfoFromUsername(username string) (*UserTileInfo, err
 		NumberOfGames: numberOfGames,
 	}, nil
 
+}
+
+func (m *UserModel) GetUserAccountSettings(playerID int64) (AccountSettings, error) {
+	// queryMode:
+	// 0:	username
+	// 1:	playerID
+	sqlStmt := `
+	SELECT email
+	  FROM users
+	 WHERE player_id = ?
+	`
+
+	var email sql.NullString
+	var err error
+
+	err = QueryRowWithRetry(m.DB, sqlStmt, []any{playerID}, []any{&email})
+
+	if err != nil {
+		app.errorLog.Printf("Error getting account settings: %v\n", err.Error())
+		return AccountSettings{}, err
+	}
+	return AccountSettings{
+		Email: email,
+	}, nil
 }

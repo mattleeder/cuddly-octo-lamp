@@ -38,13 +38,13 @@ function AccountInfoDisplay({ accountInfo }: { accountInfo: PlayerInfoTileData |
           <span>{accountInfo.username}</span>
         </div>
         <div style={{
-            display: "grid",
-            gridTemplateColumns: "auto auto",
-            columnGap: "1em",
-            marginLeft: "auto",
-            alignItems: "start",
-            textAlign: "left",
-          }}>
+          display: "grid",
+          gridTemplateColumns: "auto auto",
+          columnGap: "1em",
+          marginLeft: "auto",
+          alignItems: "start",
+          textAlign: "left",
+        }}>
           <div>
             Joined:
           </div>
@@ -97,7 +97,7 @@ function AccountContent({ pageData }: { pageData: matchData[] | undefined }) {
 
 async function fetchPageData(username: string, activePage: Page, pageCache: React.RefObject<Map<Page, matchData[]>>, signal: AbortSignal) {
   let url = import.meta.env.VITE_API_GET_PAST_MATCHES_URL
-  let searchParams: [string, string][] = []
+  const searchParams: [string, string][] = []
 
   if (username != "") {
     searchParams.push(["username", username])
@@ -111,7 +111,7 @@ async function fetchPageData(username: string, activePage: Page, pageCache: Reac
     url += "?"
   }
   
-  for (let [searchTerm, value] of searchParams) {
+  for (const [searchTerm, value] of searchParams) {
     url += `${searchTerm}=${value}&`
   }
 
@@ -211,7 +211,7 @@ export function AccountPage() {
     }
   }, [username, activePage])
 
-    return (
+  return (
     <>
       <div style={{
         display: "block",
@@ -291,5 +291,5 @@ export function AccountPage() {
         {loadingContent ? <LoaderCircle className="loaderSpin"/> : <AccountContent pageData={pageData}/>}
       </div>
     </>
-    )
+  )
 }

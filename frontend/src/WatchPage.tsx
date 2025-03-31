@@ -17,18 +17,18 @@ interface SQLNullInt64 {
 
 const resultReasons = [
   "Ongoing",
-	"Stalemate",
-	"Checkmate",
-	"ThreefoldRepetition",
-	"InsufficientMaterial",
-	"WhiteFlagged",
-	"BlackFlagged",
-	"Draw",
-	"WhiteResigned",
-	"BlackResigned",
-	"Abort",
-	"WhiteDisconnected",
-	"BlackDisconnected",
+  "Stalemate",
+  "Checkmate",
+  "ThreefoldRepetition",
+  "InsufficientMaterial",
+  "WhiteFlagged",
+  "BlackFlagged",
+  "Draw",
+  "WhiteResigned",
+  "BlackResigned",
+  "Abort",
+  "WhiteDisconnected",
+  "BlackDisconnected",
 ]
 
 export interface matchData {
@@ -122,108 +122,108 @@ export function MatchTile({ matchData, idx }: { matchData: matchData, idx: numbe
   }
   liClassname += " matchRow"
 
-    return (
-        <li className={liClassname}>
-          <Link to={`/matchroom/${matchData.matchID}`} style={{display: "block", position: "absolute", width: "100%", height: "100%", boxSizing: "content-box", zIndex: "3"}}/>
-          <div style={{marginTop: "auto", marginBottom: "auto", boxShadow: "2px 2px 2px #000000", height: "inherit", width: "35vh"}}>
-            {/* Chessboard, display final position */}
-            <FrozenChessBoard board={gameState.board} lastMove={[matchData.lastMovePiece.Int64, matchData.lastMoveMove.Int64]} showLastMove={matchData.lastMovePiece.Valid && matchData.lastMoveMove.Valid}/>
+  return (
+    <li className={liClassname}>
+      <Link to={`/matchroom/${matchData.matchID}`} style={{display: "block", position: "absolute", width: "100%", height: "100%", boxSizing: "content-box", zIndex: "3"}}/>
+      <div style={{marginTop: "auto", marginBottom: "auto", boxShadow: "2px 2px 2px #000000", height: "inherit", width: "35vh"}}>
+        {/* Chessboard, display final position */}
+        <FrozenChessBoard board={gameState.board} lastMove={[matchData.lastMovePiece.Int64, matchData.lastMoveMove.Int64]} showLastMove={matchData.lastMovePiece.Valid && matchData.lastMoveMove.Valid}/>
+      </div>
+      <div style={{display: "grid", gridTemplateRows: "1fr 1fr", marginLeft: "1em", height: "inherit"}}>
+        {/* Info, grid 2 rows, top row is format info and date, 2nd row is player Info and victory */}
+        <div style={{display: "grid", gridTemplateRows: "1fr 1fr"}}>
+          {/* Grid 2 columns, first column is icon for rating, 2nd is info */}
+          <div>
+            {/* Icon for rating */}
+            <FormatIcon timeFormatInMilliseconds={matchData.timeFormatInMilliseconds} style={{float: "left"}}/>
+            <span style={{float: "left"}}>{Math.floor(matchData.timeFormatInMilliseconds / 60_000)}+{Math.floor(matchData.incrementInMilliseconds / 1000)} • {getTimeFormatName(matchData.timeFormatInMilliseconds)}</span>
           </div>
-          <div style={{display: "grid", gridTemplateRows: "1fr 1fr", marginLeft: "1em", height: "inherit"}}>
-            {/* Info, grid 2 rows, top row is format info and date, 2nd row is player Info and victory */}
-            <div style={{display: "grid", gridTemplateRows: "1fr 1fr"}}>
-              {/* Grid 2 columns, first column is icon for rating, 2nd is info */}
-              <div>
-                {/* Icon for rating */}
-                <FormatIcon timeFormatInMilliseconds={matchData.timeFormatInMilliseconds} style={{float: "left"}}/>
-                <span style={{float: "left"}}>{Math.floor(matchData.timeFormatInMilliseconds / 60_000)}+{Math.floor(matchData.incrementInMilliseconds / 1000)} • {getTimeFormatName(matchData.timeFormatInMilliseconds)}</span>
-              </div>
-              <div style={{display: "grid", gridTemplateRows: "1fr 1fr"}}>
-                {/* Info, grid 2 rows, top is rating info bottom is date */}
-                <div>
-                  <span style={{float: "left"}}>{`${new Date(matchData.matchEndTime * 1000).toLocaleString()}`}</span>
-                </div>
-              </div>
+          <div style={{display: "grid", gridTemplateRows: "1fr 1fr"}}>
+            {/* Info, grid 2 rows, top is rating info bottom is date */}
+            <div>
+              <span style={{float: "left"}}>{`${new Date(matchData.matchEndTime * 1000).toLocaleString()}`}</span>
             </div>
-            <div style={{display: "grid", gridTemplateRows: "1fr 1fr"}}>
-            {/* Player Info, grid 2 rows, top is player info, bottom is game outcome */}
-            <div style={{display: "grid", gridTemplateColumns: "1fr 1fr 1fr"}}>
-              {/* Player info, grid 3 columns, 1st is white info, 2nd is vs icon, 3rd is black info */}
-              <div>
-                {/* White info*/}
-                {matchData.whitePlayerUsername.Valid ? 
+          </div>
+        </div>
+        <div style={{display: "grid", gridTemplateRows: "1fr 1fr"}}>
+          {/* Player Info, grid 2 rows, top is player info, bottom is game outcome */}
+          <div style={{display: "grid", gridTemplateColumns: "1fr 1fr 1fr"}}>
+            {/* Player info, grid 3 columns, 1st is white info, 2nd is vs icon, 3rd is black info */}
+            <div>
+              {/* White info*/}
+              {matchData.whitePlayerUsername.Valid ? 
                 <span style={{position:"relative", zIndex: "4"}}
                   onMouseEnter={(event) => {console.log("Enter"); playerInfoTile?.spawnPlayerInfoTile(matchData.whitePlayerUsername.String, event)}}
                   onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(matchData.whitePlayerUsername.String, event)}
                 >
                   {`${matchData.whitePlayerUsername.String} (${matchData.whitePlayerElo} ${matchData.whitePlayerEloGain >= 0 ? "+" : ""}${matchData.whitePlayerEloGain})`}
                 </span>
-                 : 
+                : 
                 <span>Anon</span>}
-              </div>
-              <div>
-                {/* VS icon */}
-                <Swords />
-              </div>
-              <div>
-                {/* Black info */}
-                {matchData.blackPlayerUsername.Valid ? 
+            </div>
+            <div>
+              {/* VS icon */}
+              <Swords />
+            </div>
+            <div>
+              {/* Black info */}
+              {matchData.blackPlayerUsername.Valid ? 
                 <span style={{position:"relative", zIndex: "4"}}
                   onMouseEnter={(event) => {console.log("Enter"); playerInfoTile?.spawnPlayerInfoTile(matchData.blackPlayerUsername.String, event)}}
                   onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(matchData.blackPlayerUsername.String, event)}
                 >
                   {`${matchData.blackPlayerUsername.String} (${matchData.blackPlayerElo} ${matchData.blackPlayerEloGain >= 0 ? "+" : ""}${matchData.blackPlayerEloGain})`}
                 </span>
-                 : 
+                : 
                 <span>Anon</span>}
-              </div>
-            </div>
-            <div>
-              {outcome}
-            </div>
             </div>
           </div>
-        </li>
-    )
+          <div>
+            {outcome}
+          </div>
+        </div>
+      </div>
+    </li>
+  )
 }
 
 export function WatchPage() {
-    const [fetchingMatches, setFetchingMatches] = useState(true)
-    const [searchParams, _setSearchParams] = useSearchParams()
-    const [matchList, setMatchList] = useState<matchData[]>([])
+  const [fetchingMatches, setFetchingMatches] = useState(true)
+  const [searchParams, _setSearchParams] = useSearchParams()
+  const [matchList, setMatchList] = useState<matchData[]>([])
 
-    useEffect(() => {
-      const controller = new AbortController()
-      const signal = controller.signal
-      const getMatchList = async () => {
-        const matchList = await fetchMatches(searchParams, signal)
-        console.log(matchList)
-        setMatchList(matchList || [])
-        setFetchingMatches(false)
-      }
-      getMatchList()
-      return () => {
-        controller.abort("WatchPage searchParam changed")
-      }
-    }, [searchParams])
-
-    if (fetchingMatches) {
-        return (
-            <div>
-                <LoaderCircle className="loaderSpin"/>
-            </div>
-        )
+  useEffect(() => {
+    const controller = new AbortController()
+    const signal = controller.signal
+    const getMatchList = async () => {
+      const matchList = await fetchMatches(searchParams, signal)
+      console.log(matchList)
+      setMatchList(matchList || [])
+      setFetchingMatches(false)
     }
+    getMatchList()
+    return () => {
+      controller.abort("WatchPage searchParam changed")
+    }
+  }, [searchParams])
 
+  if (fetchingMatches) {
     return (
-        <div>
-          <ul>
-          {matchList.map((matchData, idx) => {
-            return (
-              <MatchTile key={`match_${matchData.matchID}`} matchData={matchData} idx={idx}/>
-            )
-          })}
-          </ul>
-        </div>
+      <div>
+        <LoaderCircle className="loaderSpin"/>
+      </div>
     )
+  }
+
+  return (
+    <div>
+      <ul>
+        {matchList.map((matchData, idx) => {
+          return (
+            <MatchTile key={`match_${matchData.matchID}`} matchData={matchData} idx={idx}/>
+          )
+        })}
+      </ul>
+    </div>
+  )
 }

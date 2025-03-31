@@ -112,12 +112,12 @@ function PlayerInfo({ connected, username }: { connected: boolean, username: SQL
         <PingStatus connected={connected} />
       </div>
       <div className='playerName'
-                        onMouseEnter={(event) => {
-                          if (username.Valid) {
-                            playerInfoTile?.spawnPlayerInfoTile(username.String, event)
-                          }
-                        }}
-                        onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(username.String, event)}
+        onMouseEnter={(event) => {
+          if (username.Valid) {
+            playerInfoTile?.spawnPlayerInfoTile(username.String, event)
+          }
+        }}
+        onMouseLeave={(event) => playerInfoTile?.lightFusePlayerInfoTile(username.String, event)}
       >{username.Valid ? username.String : "Anon"}</div>
     </div>
   )

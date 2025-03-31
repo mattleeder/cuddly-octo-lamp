@@ -577,3 +577,31 @@ func getPastMatchesListHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Write(jsonStr)
 }
+
+func getUserAccountSettingsHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() { app.perfLog.Printf("getUserAccountSettingsHandler took: %s\n", time.Since(start)) }()
+
+	if r.Method != "GET" {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+
+	playerID := app.sessionManager.GetInt64(r.Context(), "playerID")
+
+	accountSettings, err := app.users.GetUserAccountSettings(playerID)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	jsonStr, err := json.Marshal(accountSettings)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	w.Write(jsonStr)
+}

@@ -126,11 +126,11 @@ export function ToggleDropdownItem({ children, to, onClick }: { children: React.
         parentContext.setMenuActive(false)
         parentContext.setParentActive(false)}}
     >
-       { to !== undefined ?
+      { to !== undefined ?
         <Link to={to}><span style={{width: "100%"}}>{children}</span></Link>
         :
         <span style={{width: "100%"}}>{children}</span>
-       }
+      }
     </li>
   )
 }

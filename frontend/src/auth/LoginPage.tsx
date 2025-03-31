@@ -1,6 +1,6 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { Link, useNavigate, NavigateFunction, useSearchParams } from 'react-router-dom';
-import { FormError } from '../FormError';
+import { FormError } from '../ui/forms/FormError';
 import { AuthContext, AuthContextType, LoginFormValidationErrors } from './AuthContext';
 
 // When redirected to login can use ?referrer=/somePage to redirect after successful login attempt

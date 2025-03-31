@@ -17,6 +17,7 @@ import { AuthProvider } from './auth/AuthContext.tsx';
 import { WatchPage } from './WatchPage.tsx';
 import { AccountPage } from './auth/AccountPage.tsx';
 import { AccountSettingsPage } from './auth/AccountSettings.tsx';
+import { ProtectedRoute } from './auth/ProtectedRoute.tsx';
 
 function App() {
   console.log(import.meta.env.VITE_API_URL)
@@ -35,7 +36,7 @@ function App() {
               <Route path="/register" element={<RegisterPage/>}/>
               <Route path="/watch" element={<WatchPage />}/>
               <Route path="/user/:username" element={<AccountPage/>}/>
-              <Route path="/account/settings" element={<AccountSettingsPage/>}/>
+              <Route path="/account/settings" element={<ProtectedRoute element={<AccountSettingsPage/>}/>}/>
               <Route path="*" element={<PageNotFound />}/>
             </Routes>
           </Router>
