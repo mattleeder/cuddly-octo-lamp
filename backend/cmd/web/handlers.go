@@ -48,6 +48,15 @@ type userSearchData struct {
 	SearchString string `json:"searchString"`
 }
 
+type updateEmailRequest struct {
+	Email string `json:"email"`
+}
+
+type updatePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 func generateNewPlayerId() int64 {
 	return rand.Int63()
 }
@@ -587,6 +596,9 @@ func getUserAccountSettingsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
 
+	if !app.sessionManager.Exists(r.Context(), "playerID") {
+		app.clientError(w, http.StatusUnauthorized)
+	}
 	playerID := app.sessionManager.GetInt64(r.Context(), "playerID")
 
 	accountSettings, err := app.users.GetUserAccountSettings(playerID)
@@ -604,4 +616,76 @@ func getUserAccountSettingsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	w.Write(jsonStr)
+}
+
+func updateEmailHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() { app.perfLog.Printf("updateEmailHandler took: %s\n", time.Since(start)) }()
+
+	if r.Method != "POST" {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+
+	if !app.sessionManager.Exists(r.Context(), "playerID") {
+		app.clientError(w, http.StatusUnauthorized)
+	}
+	playerID := app.sessionManager.GetInt64(r.Context(), "playerID")
+
+	var updateEmailData updateEmailRequest
+
+	app.infoLog.Printf("%v\n", r.Body)
+
+	err := json.NewDecoder(r.Body).Decode(&updateEmailData)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	err = app.users.UpdateEmail(playerID, updateEmailData.Email)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func updatePasswordHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() { app.perfLog.Printf("updatePasswordHandler took: %s\n", time.Since(start)) }()
+
+	if r.Method != "POST" {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+
+	if !app.sessionManager.Exists(r.Context(), "playerID") || !app.sessionManager.Exists(r.Context(), "username") {
+		app.clientError(w, http.StatusUnauthorized)
+	}
+	playerID := app.sessionManager.GetInt64(r.Context(), "playerID")
+	username := app.sessionManager.GetString(r.Context(), "username")
+
+	var updatePasswordData updatePasswordRequest
+
+	app.infoLog.Printf("%v\n", r.Body)
+
+	err := json.NewDecoder(r.Body).Decode(&updatePasswordData)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	_, authorized := app.users.Authenticate(username, updatePasswordData.CurrentPassword)
+	if !authorized {
+		app.clientError(w, http.StatusUnauthorized)
+	}
+
+	err = app.users.UpdatePassword(playerID, updatePasswordData.NewPassword)
+	if err != nil {
+		app.serverError(w, err, false)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

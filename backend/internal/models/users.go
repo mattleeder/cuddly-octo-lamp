@@ -112,8 +112,8 @@ func (m *UserModel) InsertNew(username string, password string, options *NewUser
 		return 0, errors.New("username not given")
 	}
 
-	if username == "" {
-		app.errorLog.Printf("Username not given")
+	if password == "" {
+		app.errorLog.Printf("Password not given")
 		return 0, errors.New("password not given")
 	}
 
@@ -574,4 +574,104 @@ func (m *UserModel) GetUserAccountSettings(playerID int64) (AccountSettings, err
 	return AccountSettings{
 		Email: email,
 	}, nil
+}
+
+func (m *UserModel) UpdateEmail(playerID int64, newEmail string) error {
+	sqlStmt := `
+	UPDATE users
+	   SET email = ?
+	 WHERE player_id = ?
+	`
+
+	var validEmail = false
+	if newEmail != "" {
+		validEmail = true
+	}
+
+	updateEmail := sql.NullString{
+		String: newEmail,
+		Valid:  validEmail,
+	}
+
+	tx, err := m.DB.Begin()
+	if err != nil {
+		app.errorLog.Printf("Error starting transaction: %v\n", err)
+		return err
+	}
+
+	updateStmt, err := tx.Prepare(sqlStmt)
+	if err != nil {
+		app.errorLog.Printf("Error preparing statement: %v\n", err)
+		return err
+	}
+	defer updateStmt.Close()
+
+	_, err = ExecStatementWithRetry(updateStmt, updateEmail, playerID)
+
+	if err != nil {
+		app.errorLog.Printf("Error executing statement: %v\n", err)
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("insert updateRating: unable to rollback: %v", rollbackErr)
+		}
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		app.errorLog.Printf("Error commiting transaction in updateEmail: %v\n", err)
+		return err
+	}
+
+	return err
+}
+
+func (m *UserModel) UpdatePassword(playerID int64, newPassword string) error {
+	sqlStmt := `
+	UPDATE users
+	   SET password = ?
+	 WHERE player_id = ?
+	`
+
+	if newPassword == "" {
+		app.errorLog.Printf("Password not given")
+		return errors.New("password not given")
+	}
+
+	hashedPassword, err := hashPassword(newPassword)
+	newPassword = "" // Overwrite password to avoid accidental usage
+	if err != nil {
+		app.errorLog.Printf("Error generating password hash: %v\n", err.Error())
+		return err
+	}
+
+	tx, err := m.DB.Begin()
+	if err != nil {
+		app.errorLog.Printf("Error starting transaction: %v\n", err)
+		return err
+	}
+
+	updateStmt, err := tx.Prepare(sqlStmt)
+	if err != nil {
+		app.errorLog.Printf("Error preparing statement: %v\n", err)
+		return err
+	}
+	defer updateStmt.Close()
+
+	_, err = ExecStatementWithRetry(updateStmt, hashedPassword, playerID)
+
+	if err != nil {
+		app.errorLog.Printf("Error executing statement: %v\n", err)
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			app.errorLog.Printf("insert updateRating: unable to rollback: %v", rollbackErr)
+		}
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		app.errorLog.Printf("Error commiting transaction in updateEmail: %v\n", err)
+		return err
+	}
+
+	return err
 }
